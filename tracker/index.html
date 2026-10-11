@@ -1,0 +1,567 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Construction Project Tracker</title>
+<meta name="robots" content="noindex,nofollow">
+<style>
+:root{
+  --bg:#f4f3ef; --panel:#ffffff; --ink:#1c2326; --muted:#65707a; --line:#d9dce0; --soft:#e9ebed;
+  --accent:#b45309; --accent-ink:#ffffff; --good:#2f7d4f; --bad:#b42318; --info:#2563eb;
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#131719; --panel:#1b2124; --ink:#e7eaec; --muted:#97a2ab; --line:#2d353a; --soft:#252d31;
+    --accent:#f59e0b; --accent-ink:#1a1204; --good:#4ade80; --bad:#f87171; --info:#60a5fa; color-scheme:dark;
+  }
+}
+body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.45 ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;min-height:100vh}
+.wrap{max-width:1180px;margin:0 auto;padding-block:20px 96px;padding-inline:16px}
+.top{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap}
+.eyebrow{margin:0;color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.06em}
+h1{margin:2px 0 0;font-size:22px;line-height:1.2;text-wrap:balance}
+h2{margin:0;font-size:16px}
+.meta{margin:4px 0 0;color:var(--muted)}
+.muted{color:var(--muted)} .small{font-size:12px} .neg{color:var(--bad)}
+.banner{margin-top:14px;padding:10px 12px;border-radius:6px;background:var(--soft);border:1px solid var(--line)}
+.banner.err{color:var(--bad)}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-top:16px}
+.tile{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:14px;min-width:0}
+.tile .l{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+.tile .v{font-size:22px;font-weight:650;margin-top:4px;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.tile .s{font-size:12px;color:var(--muted);margin-top:2px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:8px;margin-top:16px;padding:16px}
+.card-h{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:12px}
+.scroll{overflow-x:auto}
+table{width:100%;border-collapse:collapse;min-width:640px}
+th,td{padding:9px 8px;border-bottom:1px solid var(--line);text-align:left;vertical-align:middle}
+th{font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;white-space:nowrap}
+td.num,th.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+td.acts{text-align:right;white-space:nowrap}
+td.empty{padding:24px 8px;color:var(--muted);text-align:center}
+tr:last-child td{border-bottom:0}
+.bar{height:6px;background:var(--soft);border-radius:3px;overflow:hidden;min-width:70px}
+.bar>i{display:block;height:100%;background:var(--info)}
+.bar.done>i{background:var(--good)} .bar.over>i{background:var(--bad)}
+.badge{display:inline-flex;align-items:center;gap:6px;padding:2px 8px;border-radius:999px;background:var(--soft);font-size:12px;white-space:nowrap;--dot:var(--muted)}
+.badge::before{content:"";width:7px;height:7px;border-radius:50%;background:var(--dot)}
+.badge[data-status="Complete"],.badge[data-status="Billed"]{--dot:var(--good)}
+.badge[data-status="Ongoing"]{--dot:var(--info)}
+.badge[data-status="Delayed"]{--dot:var(--bad)}
+.btn{font:inherit;padding:8px 12px;border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:6px;cursor:pointer;white-space:nowrap}
+.btn-primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);font-weight:600}
+.btn-link{font:inherit;border:0;background:none;color:var(--info);padding:4px 6px;cursor:pointer}
+.btn-link.danger,.danger{color:var(--bad)}
+.fab{position:fixed;right:16px;bottom:calc(16px + env(safe-area-inset-bottom,0px));z-index:5;font-size:16px;padding:14px 20px;border-radius:999px;box-shadow:0 6px 18px rgba(0,0,0,.25)}
+button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+input,select{font:inherit;padding:7px 9px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--ink);min-width:0;width:100%;box-sizing:border-box}
+input[type=number].amt{width:110px;text-align:right}
+.inline{display:flex;gap:8px;flex-wrap:wrap} .inline input{width:auto;min-width:180px}
+dialog{background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:10px;width:min(680px,calc(100vw - 32px));padding:20px;box-sizing:border-box;max-height:90vh;overflow:auto}
+dialog::backdrop{background:rgba(0,0,0,.45)}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin-top:12px}
+label{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--muted);min-width:0}
+label.full{grid-column:1/-1}
+.actions{display:flex;justify-content:flex-end;gap:8px;margin-top:16px;flex-wrap:wrap}
+.err-line{color:var(--bad);margin:10px 0 0}
+.hint{margin:4px 0 0;font-size:12px;color:var(--muted)}
+.receipts{margin-top:16px;border-top:1px solid var(--line);padding-top:12px}
+.receipts ul{list-style:none;padding:0;margin:8px 0 0}
+.receipts li{display:flex;justify-content:space-between;gap:8px;align-items:center;padding:6px 0;border-bottom:1px solid var(--line)}
+.receipts li span{overflow-wrap:anywhere}
+.gate{max-width:360px;margin:12vh auto 0;padding:0 16px}
+.gate form{display:grid;gap:10px;margin-top:16px}
+.quick .grid{grid-template-columns:1fr 1fr}
+.quick input,.quick select{font-size:16px;padding:10px}
+@media (max-width:520px){ .quick .grid{grid-template-columns:1fr} }
+.hidden{display:none !important}
+</style>
+</head>
+<body>
+
+<!-- Sign-in screen -->
+<section id="gate" class="gate hidden" aria-labelledby="gateH">
+  <h1 id="gateH">Construction Project Tracker</h1>
+  <p class="meta">Sign in to view and edit the project.</p>
+  <form id="loginForm">
+    <label>Email<input type="email" name="email" autocomplete="username" required></label>
+    <label>Password<input type="password" name="password" autocomplete="current-password" required></label>
+    <button class="btn btn-primary">Sign in</button>
+    <p class="err-line" id="loginErr" hidden></p>
+  </form>
+</section>
+
+<!-- Tracker -->
+<div class="wrap hidden" id="app">
+  <header class="top">
+    <div>
+      <p class="eyebrow" id="client"></p>
+      <h1 id="pname">Loading…</h1>
+      <p class="meta" id="pmeta"></p>
+    </div>
+    <div class="inline">
+      <button class="btn" data-act="edit-project">Project details</button>
+      <button class="btn" data-act="sign-out">Sign out</button>
+    </div>
+  </header>
+
+  <div id="banner" class="banner" hidden></div>
+
+  <section class="tiles" id="tiles" aria-label="Summary"></section>
+
+  <section class="card" aria-labelledby="catH">
+    <div class="card-h">
+      <h2 id="catH">Budget by category</h2>
+      <form id="catForm" class="inline">
+        <input id="catName" placeholder="New category, e.g. Labor" aria-label="New category name" required>
+        <button class="btn">Add category</button>
+      </form>
+    </div>
+    <div class="scroll"><table id="catTable"></table></div>
+  </section>
+
+  <section class="card" aria-labelledby="taskH">
+    <div class="card-h">
+      <h2 id="taskH">Tasks</h2>
+      <button class="btn btn-primary" data-act="add-task">Add task</button>
+    </div>
+    <div class="scroll"><table id="taskTable"></table></div>
+  </section>
+</div>
+
+<button class="btn btn-primary fab hidden" id="quickBtn" data-act="quick-add">+ Quick add</button>
+
+<!-- Quick add -->
+<dialog id="quickDlg" class="quick" aria-labelledby="quickTitle">
+  <form id="quickForm">
+    <h2 id="quickTitle">Quick add</h2>
+    <p class="hint">Only the task name is required. Add the rest later with Edit.</p>
+    <div class="grid">
+      <label class="full">Task<input name="name" required autocomplete="off"></label>
+      <label>Category<input name="category" list="catList" autocomplete="off"></label>
+      <label>Status
+        <select name="status"><option>Ongoing</option><option>Complete</option><option>Delayed</option><option>Billed</option><option>Cancelled</option></select>
+      </label>
+      <label>Actual cost ($)<input type="number" name="actual" inputmode="decimal" min="0" step="any" placeholder="0"></label>
+      <label>Paid so far ($)<input type="number" name="paid" inputmode="decimal" min="0" step="any" placeholder="0"></label>
+      <label class="full">Date<input type="date" name="start_date"></label>
+    </div>
+    <p class="err-line" id="quickErr" hidden></p>
+    <div class="actions">
+      <button type="button" class="btn" data-close>Cancel</button>
+      <button class="btn btn-primary">Save</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- Task -->
+<dialog id="taskDlg" aria-labelledby="taskTitle">
+  <form id="taskForm">
+    <h2 id="taskTitle">Add task</h2>
+    <div class="grid">
+      <label class="full">Task<input name="name" required></label>
+      <label>Phase<input name="phase" list="phaseList"></label>
+      <label>Category<input name="category" list="catList"></label>
+      <label>Assigned to<input name="assigned_to" list="whoList"></label>
+      <label>Status
+        <select name="status"><option>Ongoing</option><option>Complete</option><option>Delayed</option><option>Billed</option><option>Cancelled</option></select>
+      </label>
+      <label>Start date<input type="date" name="start_date"></label>
+      <label>Duration (days)<input type="number" name="duration_days" min="0" step="1"></label>
+      <label>Delayed by (days)<input type="number" name="delay_days" min="0" step="1"></label>
+      <label>Progress (%)<input type="number" name="progress" min="0" max="100" step="1"></label>
+      <label>Quantity<input type="number" name="qty" min="0" step="any"></label>
+      <label>Unit<input name="unit" placeholder="hr, sq ft, ea"></label>
+      <label>Cost per unit<input type="number" name="unit_cost" min="0" step="any"></label>
+      <label>Actual cost<input type="number" name="actual" min="0" step="any"></label>
+      <label>Paid so far<input type="number" name="paid" min="0" step="any"></label>
+    </div>
+    <div class="receipts" id="receiptsBox">
+      <h2 style="font-size:14px">Receipts</h2>
+      <p class="hint" id="receiptHint">Save the task first, then attach receipts.</p>
+      <input type="file" id="receiptInput" accept="image/*,application/pdf" multiple hidden>
+      <div class="inline" style="margin-top:8px"><button type="button" class="btn" id="attachBtn" hidden>Attach receipts</button></div>
+      <ul id="receiptList"></ul>
+    </div>
+    <p class="err-line" id="taskErr" hidden></p>
+    <div class="actions">
+      <button type="button" class="btn" data-close>Cancel</button>
+      <button class="btn btn-primary">Save task</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- Project -->
+<dialog id="projDlg" aria-labelledby="projTitle">
+  <form id="projForm">
+    <h2 id="projTitle">Project details</h2>
+    <div class="grid">
+      <label class="full">Project name<input name="name" required></label>
+      <label>Client<input name="client"></label>
+      <label>Project manager<input name="manager"></label>
+      <label>Start date<input type="date" name="start_date"></label>
+      <label>Expected end date<input type="date" name="end_date"></label>
+    </div>
+    <p class="err-line" id="projErr" hidden></p>
+    <div class="actions">
+      <button type="button" class="btn" data-close>Cancel</button>
+      <button class="btn btn-primary">Save details</button>
+    </div>
+  </form>
+</dialog>
+
+<datalist id="catList"></datalist>
+<datalist id="phaseList"></datalist>
+<datalist id="whoList"></datalist>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<script src="../config.js"></script>
+<script>
+const STATUSES = ['Ongoing','Complete','Delayed','Billed','Cancelled'];
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]);
+const num = v => { const n = parseFloat(v); return isNaN(n) ? 0 : n; };
+const clamp = (n, a, b) => Math.min(b, Math.max(a, n));
+const money = n => Number(n || 0).toLocaleString('en-US', {style:'currency', currency:'USD'});
+const toDate = s => s ? new Date(s + 'T00:00:00') : null;
+const addDays = (d, n) => { const x = new Date(d); x.setDate(x.getDate() + n); return x; };
+const fmtDate = d => d ? d.toLocaleDateString('en-US', {month:'short', day:'numeric', year:'numeric'}) : '—';
+const sum = (arr, k) => arr.reduce((a, t) => a + (Number(t[k]) || 0), 0);
+const dateOrNull = v => v || null;
+const isoOf = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+
+const sb = supabase.createClient(window.TRACKER_CONFIG.url, window.TRACKER_CONFIG.anonKey);
+
+// null = still loading
+const state = { project: null, cats: null, tasks: null, receipts: [] };
+let signedIn = false;
+
+function banner(msg, isErr = true){
+  const b = $('#banner'); b.textContent = msg; b.classList.toggle('err', isErr); b.hidden = !msg;
+}
+function fail(error){ banner(error?.message || 'Something went wrong. Try again.'); }
+
+function derive(t){
+  const planned = num(t.qty) * num(t.unit_cost);
+  const actual = num(t.actual), paid = num(t.paid);
+  const sd = toDate(t.start_date);
+  return {
+    ...t, planned, actual, paid, due: actual - paid,
+    startD: sd,
+    endD: sd ? addDays(sd, num(t.duration_days) + num(t.delay_days)) : null,
+    progress: clamp(num(t.progress), 0, 100)
+  };
+}
+const tasksD = () => (state.tasks || []).map(derive).sort((a, b) =>
+  String(a.start_date || '9999').localeCompare(String(b.start_date || '9999')) || String(a.name).localeCompare(String(b.name)));
+
+async function loadAll(){
+  const [p, c, t, r] = await Promise.all([
+    sb.from('project').select('*').eq('id', 1).maybeSingle(),
+    sb.from('categories').select('*').order('name'),
+    sb.from('tasks').select('*'),
+    sb.from('receipts').select('*')
+  ]);
+  const bad = [p, c, t, r].find(x => x.error);
+  if (bad){ fail(bad.error); return; }
+  state.project = p.data || {};
+  state.cats = c.data;
+  state.tasks = t.data;
+  state.receipts = r.data;
+  renderAll();
+}
+
+function renderAll(){ renderProject(); renderTiles(); renderCats(); renderTasks(); fillLists(); }
+
+function renderProject(){
+  const p = state.project;
+  $('#pname').textContent = p ? (p.name || 'Untitled project') : 'Loading…';
+  $('#client').textContent = p?.client || '';
+  const range = p && (p.start_date || p.end_date) ? `${fmtDate(toDate(p.start_date))} – ${fmtDate(toDate(p.end_date))}` : '';
+  const bits = p ? [p.manager ? `Project manager: ${p.manager}` : '', range].filter(Boolean) : [];
+  $('#pmeta').textContent = p ? (bits.join('  ·  ') || 'Add project details to get started.') : '';
+}
+
+function renderTiles(){
+  const cats = state.cats || [], ts = tasksD();
+  const loading = state.cats === null || state.tasks === null;
+  const approved = sum(cats, 'budget'), actual = sum(ts, 'actual');
+  const planned = sum(ts, 'planned'), paid = sum(ts, 'paid'), due = sum(ts, 'due');
+  const remaining = approved - actual;
+  const used = approved ? Math.round(actual / approved * 100) : 0;
+  const count = s => ts.filter(t => t.status === s).length;
+  const tiles = [
+    ['Approved budget', money(approved), `${cats.length} categor${cats.length === 1 ? 'y' : 'ies'}`, false],
+    ['Actual cost', money(actual), `Planned ${money(planned)}`, false],
+    ['Remaining budget', money(remaining), approved ? `${used}% used` : 'Set category budgets', remaining < 0],
+    ['Paid', money(paid), `Due ${money(due)}`, false],
+    ['Tasks', String(ts.length), `${count('Complete')} complete · ${count('Delayed')} delayed`, false]
+  ];
+  $('#tiles').innerHTML = tiles.map(([l, v, s, neg]) =>
+    `<div class="tile"><div class="l">${l}</div><div class="v${neg ? ' neg' : ''}">${loading ? '…' : esc(v)}</div><div class="s">${esc(s)}</div></div>`).join('');
+}
+
+function catRow(name, budget, id, ts){
+  const rs = ts.filter(t => t.category === name);
+  const actual = sum(rs, 'actual'), paid = sum(rs, 'paid'), b = num(budget);
+  const rem = b - actual, pct = b ? Math.min(actual / b * 100, 100) : 0, over = b && actual > b;
+  const budgetCell = id
+    ? `<input class="amt" type="number" min="0" step="any" value="${b}" data-cat-budget="${esc(id)}" aria-label="Approved budget for ${esc(name)}">`
+    : `<span class="muted">No budget set</span>`;
+  return `<tr>
+    <td>${esc(name)}</td>
+    <td class="num">${budgetCell}</td>
+    <td class="num">${money(actual)}</td>
+    <td class="num">${money(paid)}</td>
+    <td class="num${rem < 0 ? ' neg' : ''}">${b ? money(rem) : '—'}</td>
+    <td style="min-width:120px">${b ? `<div class="bar${over ? ' over' : ''}"><i style="width:${pct}%"></i></div>` : ''}</td>
+    <td class="acts">${id ? `<button class="btn-link danger" data-act="del-cat" data-id="${esc(id)}">Delete</button>` : ''}</td>
+  </tr>`;
+}
+
+function renderCats(){
+  const el = $('#catTable');
+  if (state.cats === null){ el.innerHTML = `<tbody><tr><td class="empty">Loading…</td></tr></tbody>`; return; }
+  const cats = state.cats, ts = tasksD();
+  const known = new Set(cats.map(c => c.name));
+  const extra = [...new Set(ts.map(t => t.category).filter(n => n && !known.has(n)))];
+  if (!cats.length && !extra.length){
+    el.innerHTML = `<tbody><tr><td class="empty">No categories yet. Add one, such as Labor or Materials, and give it a budget.</td></tr></tbody>`;
+    return;
+  }
+  el.innerHTML = `<thead><tr><th>Category</th><th class="num">Approved</th><th class="num">Actual</th><th class="num">Paid</th>
+    <th class="num">Remaining</th><th>Used</th><th></th></tr></thead>
+    <tbody>${cats.map(c => catRow(c.name, c.budget, c.id, ts)).join('')}${extra.map(n => catRow(n, null, null, ts)).join('')}</tbody>`;
+}
+
+function taskRow(t){
+  const qty = t.qty ? `<div class="muted small">${esc(t.qty)} ${esc(t.unit || '')} × ${money(t.unit_cost)}</div>` : '';
+  return `<tr>
+    <td><strong>${esc(t.name)}</strong>${qty}</td>
+    <td>${esc(t.phase)}</td><td>${esc(t.category)}</td><td>${esc(t.assigned_to)}</td>
+    <td>${fmtDate(t.startD)}</td><td>${fmtDate(t.endD)}</td>
+    <td style="min-width:110px"><div class="bar${t.progress >= 100 ? ' done' : ''}"><i style="width:${t.progress}%"></i></div><div class="small muted">${t.progress}%</div></td>
+    <td class="num">${money(t.planned)}</td><td class="num">${money(t.actual)}</td><td class="num">${money(t.due)}</td>
+    <td><span class="badge" data-status="${esc(t.status)}">${esc(t.status || '—')}</span></td>
+    <td class="acts">
+      <button class="btn-link" data-act="edit-task" data-id="${esc(t.id)}">Edit</button>
+      <button class="btn-link danger" data-act="del-task" data-id="${esc(t.id)}">Delete</button>
+    </td></tr>`;
+}
+
+function renderTasks(){
+  const el = $('#taskTable');
+  if (state.tasks === null){ el.innerHTML = `<tbody><tr><td class="empty">Loading…</td></tr></tbody>`; return; }
+  const ts = tasksD();
+  if (!ts.length){ el.innerHTML = `<tbody><tr><td class="empty">No tasks yet. Add one to track its schedule, cost and payments.</td></tr></tbody>`; return; }
+  el.innerHTML = `<thead><tr><th>Task</th><th>Phase</th><th>Category</th><th>Assigned</th><th>Start</th><th>End</th><th>Progress</th>
+    <th class="num">Planned</th><th class="num">Actual</th><th class="num">Due</th><th>Status</th><th></th></tr></thead>
+    <tbody>${ts.map(taskRow).join('')}</tbody>`;
+}
+
+function fillLists(){
+  const uniq = a => [...new Set(a.filter(Boolean))].sort();
+  const opts = a => uniq(a).map(v => `<option value="${esc(v)}"></option>`).join('');
+  $('#catList').innerHTML = opts((state.cats || []).map(c => c.name));
+  $('#phaseList').innerHTML = opts((state.tasks || []).map(t => t.phase));
+  $('#whoList').innerHTML = opts((state.tasks || []).map(t => t.assigned_to));
+}
+
+// ---------- Receipts ----------
+function renderReceipts(taskId){
+  const list = $('#receiptList');
+  const rs = state.receipts.filter(r => r.task_id === taskId);
+  $('#receiptHint').hidden = !!taskId;
+  $('#attachBtn').hidden = !taskId;
+  list.innerHTML = rs.map(r => `<li><span>${esc(r.filename)}</span>
+    <span class="inline"><button type="button" class="btn-link" data-act="open-receipt" data-id="${esc(r.id)}">Open</button>
+    <button type="button" class="btn-link danger" data-act="del-receipt" data-id="${esc(r.id)}">Delete</button></span></li>`).join('');
+}
+
+async function uploadReceipts(taskId, files){
+  for (const file of files){
+    const safe = file.name.replace(/[^\w.-]+/g, '_');
+    const path = `${taskId}/${crypto.randomUUID()}-${safe}`;
+    const up = await sb.storage.from('receipts').upload(path, file, {contentType: file.type || undefined});
+    if (up.error){ fail(up.error); return; }
+    const ins = await sb.from('receipts').insert({task_id: taskId, path, filename: file.name});
+    if (ins.error){ fail(ins.error); return; }
+  }
+  await loadAll();
+  renderReceipts(taskId);
+}
+
+// ---------- Dialogs ----------
+function openTask(id){
+  const f = $('#taskForm');
+  const t = id ? (state.tasks || []).find(x => x.id === id) : null;
+  $('#taskTitle').textContent = t ? 'Edit task' : 'Add task';
+  f.dataset.id = t ? t.id : '';
+  $('#taskErr').hidden = true;
+  for (const el of f.elements){
+    if (!el.name) continue;
+    el.value = t ? (t[el.name] ?? '') : (el.name === 'status' ? 'Ongoing' : '');
+  }
+  renderReceipts(t ? t.id : null);
+  $('#taskDlg').showModal();
+}
+
+function openQuick(){
+  const f = $('#quickForm');
+  f.reset();
+  f.elements.start_date.value = isoOf(new Date());
+  f.elements.status.value = 'Ongoing';
+  $('#quickErr').hidden = true;
+  $('#quickDlg').showModal();
+  f.elements.name.focus();
+}
+
+function openProject(){
+  const f = $('#projForm'), p = state.project || {};
+  for (const el of f.elements){ if (el.name) el.value = p[el.name] ?? ''; }
+  $('#projErr').hidden = true;
+  $('#projDlg').showModal();
+}
+
+// ---------- Events ----------
+document.addEventListener('click', async e => {
+  if (e.target.closest('[data-close]')){ e.target.closest('dialog').close(); return; }
+  const btn = e.target.closest('[data-act]');
+  if (!btn) return;
+  const act = btn.dataset.act, id = btn.dataset.id;
+  if (act === 'add-task') return openTask('');
+  if (act === 'edit-task') return openTask(id);
+  if (act === 'quick-add') return openQuick();
+  if (act === 'edit-project') return openProject();
+  if (act === 'sign-out'){ await sb.auth.signOut(); return; }
+  if (act === 'open-receipt'){
+    const r = state.receipts.find(x => x.id === id);
+    const s = await sb.storage.from('receipts').createSignedUrl(r.path, 3600);
+    if (s.error){ fail(s.error); return; }
+    window.open(s.data.signedUrl, '_blank', 'noopener');
+    return;
+  }
+  if (act === 'del-receipt'){
+    const r = state.receipts.find(x => x.id === id);
+    if (!btn.dataset.armed){ armDelete(btn); return; }
+    await sb.storage.from('receipts').remove([r.path]);
+    const del = await sb.from('receipts').delete().eq('id', id);
+    if (del.error){ fail(del.error); return; }
+    await loadAll();
+    renderReceipts($('#taskForm').dataset.id || null);
+    return;
+  }
+  if (act === 'del-task' || act === 'del-cat'){
+    // No confirm() dialogs in this app either, so the button arms itself first.
+    if (!btn.dataset.armed){ armDelete(btn); return; }
+    const table = act === 'del-task' ? 'tasks' : 'categories';
+    const del = await sb.from(table).delete().eq('id', id);
+    if (del.error){ fail(del.error); return; }
+    await loadAll();
+  }
+});
+
+function armDelete(btn){
+  btn.dataset.armed = '1'; btn.textContent = 'Confirm';
+  setTimeout(() => { btn.dataset.armed = ''; btn.textContent = 'Delete'; }, 4000);
+}
+
+document.addEventListener('change', async e => {
+  const inp = e.target.closest('[data-cat-budget]');
+  if (!inp) return;
+  const up = await sb.from('categories').update({budget: num(inp.value)}).eq('id', inp.dataset.catBudget);
+  if (up.error){ fail(up.error); return; }
+  await loadAll();
+});
+
+$('#attachBtn').addEventListener('click', () => $('#receiptInput').click());
+$('#receiptInput').addEventListener('change', async e => {
+  const taskId = $('#taskForm').dataset.id;
+  if (!taskId || !e.target.files.length) return;
+  await uploadReceipts(taskId, [...e.target.files]);
+  e.target.value = '';
+});
+
+$('#taskForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const f = e.currentTarget, v = Object.fromEntries(new FormData(f));
+  if (!v.name.trim()){ $('#taskErr').textContent = 'Enter a task name.'; $('#taskErr').hidden = false; return; }
+  const data = {
+    name: v.name.trim(), phase: v.phase.trim(), category: v.category.trim(), assigned_to: v.assigned_to.trim(),
+    status: v.status, start_date: dateOrNull(v.start_date), duration_days: num(v.duration_days), delay_days: num(v.delay_days),
+    progress: clamp(num(v.progress), 0, 100), qty: num(v.qty), unit: v.unit.trim(), unit_cost: num(v.unit_cost),
+    actual: num(v.actual), paid: num(v.paid)
+  };
+  const res = f.dataset.id
+    ? await sb.from('tasks').update(data).eq('id', f.dataset.id)
+    : await sb.from('tasks').insert(data);
+  if (res.error){ $('#taskErr').textContent = res.error.message; $('#taskErr').hidden = false; return; }
+  $('#taskDlg').close();
+  await loadAll();
+});
+
+$('#quickForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const v = Object.fromEntries(new FormData(e.currentTarget));
+  if (!v.name.trim()){ $('#quickErr').textContent = 'Enter a task name.'; $('#quickErr').hidden = false; return; }
+  const res = await sb.from('tasks').insert({
+    name: v.name.trim(), category: v.category.trim(), status: v.status,
+    start_date: dateOrNull(v.start_date), actual: num(v.actual), paid: num(v.paid)
+  });
+  if (res.error){ $('#quickErr').textContent = res.error.message; $('#quickErr').hidden = false; return; }
+  $('#quickDlg').close();
+  await loadAll();
+});
+
+$('#projForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const v = Object.fromEntries(new FormData(e.currentTarget));
+  const res = await sb.from('project').upsert({
+    id: 1, name: v.name.trim(), client: v.client.trim(), manager: v.manager.trim(),
+    start_date: dateOrNull(v.start_date), end_date: dateOrNull(v.end_date)
+  });
+  if (res.error){ $('#projErr').textContent = res.error.message; $('#projErr').hidden = false; return; }
+  $('#projDlg').close();
+  await loadAll();
+});
+
+$('#catForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const inp = $('#catName'), name = inp.value.trim();
+  if (!name) return;
+  const res = await sb.from('categories').insert({name, budget: 0});
+  if (res.error){ banner(res.error.code === '23505' ? 'That category already exists.' : res.error.message); return; }
+  inp.value = '';
+  await loadAll();
+});
+
+$('#loginForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const v = Object.fromEntries(new FormData(e.currentTarget));
+  const res = await sb.auth.signInWithPassword({email: v.email.trim(), password: v.password});
+  if (res.error){ $('#loginErr').textContent = 'Email or password is not right.'; $('#loginErr').hidden = false; }
+});
+
+// ---------- Session ----------
+function showSignedIn(on){
+  signedIn = on;
+  $('#gate').classList.toggle('hidden', on);
+  $('#app').classList.toggle('hidden', !on);
+  $('#quickBtn').classList.toggle('hidden', !on);
+  if (!on){ state.project = null; state.cats = null; state.tasks = null; state.receipts = []; }
+}
+
+sb.auth.onAuthStateChange(async (_event, session) => {
+  if (session){
+    showSignedIn(true);
+    renderAll();
+    await loadAll();
+  } else {
+    showSignedIn(false);
+  }
+});
+</script>
+</body>
+</html>

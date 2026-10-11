@@ -1,0 +1,604 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SN SQUARE GROUP — Building What Matters</title>
+<meta name="description" content="SN Square Group is a Massachusetts-based development and general construction company delivering new builds, historic preservation, and multifamily projects with precision and care.">
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<link rel="icon" type="image/x-icon" href="favicon.ico">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --navy:#0C2A4A;
+  --navy-deep:#06182C;
+  --white:#FAFAF8;
+  --off:#F2F0EB;
+  --gray:#6B7280;
+  --gray-light:#E8E6E1;
+  --border:rgba(12,42,74,0.1);
+  --font-display:'Cormorant Garamond',serif;
+  --font-body:'DM Sans',sans-serif;
+}
+html{scroll-behavior:smooth}
+body{font-family:var(--font-body);background:var(--white);color:var(--navy);overflow-x:hidden;font-size:15px;line-height:1.7}
+
+/* NAV */
+nav{
+  position:fixed;top:0;left:0;right:0;z-index:100;
+  display:flex;align-items:center;justify-content:space-between;
+  padding:0 52px;height:72px;
+  background:rgba(250,250,248,0.95);
+  backdrop-filter:blur(12px);
+  border-bottom:0.5px solid var(--border);
+  transition:box-shadow 0.3s;
+}
+nav.scrolled{box-shadow:0 2px 32px rgba(12,42,74,0.08)}
+.nav-logo{display:flex;align-items:center;gap:12px;text-decoration:none}
+.nav-wordmark{display:flex;flex-direction:column;gap:2px}
+.nav-name{font-family:var(--font-body);font-size:13px;font-weight:700;color:var(--navy);letter-spacing:4px}
+.nav-sub{font-family:var(--font-body);font-size:8px;font-weight:400;color:var(--gray);letter-spacing:3px}
+.nav-links{display:flex;gap:36px;list-style:none}
+.nav-links a{font-size:12px;font-weight:400;color:var(--gray);text-decoration:none;letter-spacing:1px;transition:color 0.2s}
+.nav-links a:hover{color:var(--navy)}
+.nav-cta{background:var(--navy)!important;color:var(--white)!important;padding:9px 22px;font-size:11px!important;letter-spacing:2px!important;font-weight:500!important}
+.nav-cta:hover{background:var(--navy-deep)!important}
+
+/* HERO */
+#hero{
+  min-height:100vh;display:flex;align-items:center;justify-content:center;
+  padding:160px 52px 120px;
+  position:relative;overflow:hidden;
+  background:var(--navy-deep);
+  text-align:center;
+}
+.hero-grid-bg{
+  position:absolute;inset:0;
+  background-image:
+    linear-gradient(rgba(255,255,255,0.03) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(255,255,255,0.03) 1px,transparent 1px);
+  background-size:60px 60px;
+}
+.hero-content{position:relative;z-index:2;max-width:860px;margin:0 auto}
+.hero-eyebrow{
+  font-family:var(--font-body);font-size:10px;font-weight:500;
+  color:rgba(255,255,255,0.4);letter-spacing:5px;
+  margin-bottom:36px;display:flex;align-items:center;justify-content:center;gap:20px;
+}
+.hero-eyebrow::before,.hero-eyebrow::after{content:'';width:32px;height:1px;background:rgba(255,255,255,0.2)}
+.hero-title{
+  font-family:var(--font-display);font-size:clamp(64px,9vw,120px);
+  font-weight:400;line-height:0.95;color:#ffffff;
+  margin-bottom:40px;letter-spacing:-2px;
+}
+.hero-title em{font-style:italic;color:rgba(255,255,255,0.35)}
+.hero-body{
+  font-size:17px;font-weight:300;color:rgba(255,255,255,0.5);
+  max-width:520px;line-height:1.9;margin:0 auto 52px;
+}
+.hero-actions{display:flex;gap:16px;align-items:center;justify-content:center}
+.btn-primary{
+  background:#ffffff;color:var(--navy);
+  padding:14px 32px;font-size:11px;font-weight:500;letter-spacing:2px;
+  text-decoration:none;display:inline-block;transition:all 0.2s;
+}
+.btn-primary:hover{background:var(--off);transform:translateY(-1px)}
+.btn-ghost{
+  color:rgba(255,255,255,0.45);font-size:11px;font-weight:400;
+  letter-spacing:2px;text-decoration:none;
+  border-bottom:0.5px solid rgba(255,255,255,0.2);
+  padding-bottom:2px;transition:all 0.2s;
+}
+.btn-ghost:hover{color:#ffffff;border-color:rgba(255,255,255,0.5)}
+.hero-mark{
+  position:absolute;
+  top:50%;left:50%;
+  transform:translate(-50%,-50%);
+  z-index:1;opacity:0.04;
+  pointer-events:none;
+}
+
+/* SECTIONS */
+section{padding:120px 52px}
+.section-eyebrow{
+  font-size:10px;font-weight:500;letter-spacing:4px;color:var(--gray);
+  margin-bottom:20px;display:flex;align-items:center;gap:12px;
+}
+.section-eyebrow::before{content:'';width:24px;height:1px;background:var(--gray-light)}
+.section-title{
+  font-family:var(--font-display);font-size:clamp(36px,4vw,56px);
+  font-weight:400;line-height:1.1;color:var(--navy);
+  letter-spacing:-0.5px;margin-bottom:64px;
+}
+.section-title em{font-style:italic;color:var(--gray)}
+
+/* SERVICES */
+#services{background:var(--off)}
+.services-grid{
+  display:grid;grid-template-columns:repeat(3,1fr);gap:1px;
+  background:var(--gray-light);
+}
+.service-card{background:var(--off);padding:48px 40px;transition:background 0.3s}
+.service-card:hover{background:#ffffff}
+.service-num{
+  font-family:var(--font-display);font-size:48px;font-weight:400;
+  color:rgba(12,42,74,0.2);line-height:1;margin-bottom:24px;
+}
+.service-title{
+  font-family:var(--font-display);font-size:24px;font-weight:500;
+  color:var(--navy);margin-bottom:16px;line-height:1.2;
+}
+.service-body{font-size:14px;color:#4a5568;line-height:1.9}
+.service-link{
+  display:inline-block;margin-top:24px;font-size:11px;
+  font-weight:500;letter-spacing:2px;color:var(--navy);
+  text-decoration:none;border-bottom:0.5px solid var(--navy);
+  padding-bottom:2px;transition:opacity 0.2s;
+}
+.service-link:hover{opacity:0.4}
+
+/* PROJECTS */
+#projects{background:var(--white);padding:120px 52px}
+.projects-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:64px}
+.project-card{position:relative;overflow:hidden;aspect-ratio:4/5;cursor:pointer;border-radius:2px}
+.project-bg{position:absolute;inset:0;transition:transform 0.6s ease}
+.project-card:hover .project-bg{transform:scale(1.04)}
+.pc-1{background:linear-gradient(160deg,#1a3a5c 0%,#0C2A4A 100%)}
+.pc-2{background:linear-gradient(160deg,#243B55 0%,#141E30 100%)}
+.pc-3{background:linear-gradient(160deg,#1B2A3B 0%,#0C2A4A 100%)}
+.pc-4{background:linear-gradient(160deg,#162840 0%,#0a2038 100%)}
+.project-grid-lines{
+  position:absolute;inset:0;
+  background-image:
+    linear-gradient(rgba(255,255,255,0.04) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(255,255,255,0.04) 1px,transparent 1px);
+  background-size:32px 32px;
+}
+.project-info{
+  position:absolute;bottom:0;left:0;right:0;padding:24px;
+  background:linear-gradient(transparent,rgba(6,24,44,0.96));
+}
+.project-tag{font-size:8px;font-weight:500;letter-spacing:2px;color:rgba(255,255,255,0.45);margin-bottom:6px}
+.project-name{font-family:var(--font-display);font-size:18px;font-weight:400;color:#ffffff;line-height:1.2;margin-bottom:4px}
+.project-location{font-size:11px;color:rgba(255,255,255,0.4);letter-spacing:0.5px}
+
+/* ABOUT */
+#about{background:var(--navy-deep);color:#ffffff}
+#about .section-eyebrow{color:rgba(255,255,255,0.25)}
+#about .section-eyebrow::before{background:rgba(255,255,255,0.08)}
+#about .section-title{color:#ffffff}
+#about .section-title em{color:rgba(255,255,255,0.3)}
+.about-grid{display:grid;grid-template-columns:1fr 1fr;gap:80px;align-items:start}
+.about-body{font-size:16px;color:rgba(255,255,255,0.55);line-height:1.9;font-weight:300}
+.about-body p+p{margin-top:20px}
+.about-stats{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:rgba(255,255,255,0.05)}
+.stat{background:var(--navy-deep);padding:40px 36px}
+.stat-num{font-family:var(--font-display);font-size:56px;font-weight:400;color:#ffffff;line-height:1;margin-bottom:8px}
+.stat-label{font-size:10px;font-weight:400;color:rgba(255,255,255,0.25);letter-spacing:2px}
+.about-values{margin-top:48px}
+.value-item{padding:20px 0;border-top:0.5px solid rgba(255,255,255,0.07);display:flex;gap:24px;align-items:flex-start}
+.value-title{font-size:11px;font-weight:500;color:#ffffff;letter-spacing:2px;min-width:140px;padding-top:3px}
+.value-body{font-size:13px;color:rgba(255,255,255,0.35);line-height:1.7}
+
+/* CONTACT */
+#contact{background:var(--off)}
+.contact-grid{display:grid;grid-template-columns:1fr 1.4fr;gap:80px;align-items:start}
+.contact-item{padding:20px 0;border-top:0.5px solid var(--gray-light)}
+.contact-label{font-size:10px;font-weight:500;letter-spacing:3px;color:var(--gray);margin-bottom:6px}
+.contact-value{font-size:15px;color:var(--navy)}
+.contact-value a{color:var(--navy);text-decoration:none;border-bottom:0.5px solid var(--gray-light)}
+.contact-value a:hover{border-color:var(--navy)}
+.contact-form{background:#ffffff;padding:52px;border:0.5px solid var(--gray-light)}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+.form-group{margin-bottom:24px}
+.form-group label{display:block;font-size:10px;font-weight:500;letter-spacing:2px;color:var(--gray);margin-bottom:8px}
+.form-group input,.form-group select,.form-group textarea{
+  width:100%;padding:12px 0;font-size:14px;font-family:var(--font-body);
+  background:transparent;border:none;border-bottom:0.5px solid var(--gray-light);
+  color:var(--navy);outline:none;transition:border-color 0.2s;
+  -webkit-appearance:none;appearance:none;border-radius:0;
+}
+.form-group input:focus,.form-group select:focus,.form-group textarea:focus{border-color:var(--navy)}
+.form-group textarea{height:100px;resize:none}
+.form-submit{
+  width:100%;padding:16px;background:var(--navy);color:#ffffff;
+  border:none;font-family:var(--font-body);font-size:11px;font-weight:500;
+  letter-spacing:3px;cursor:pointer;transition:background 0.2s;
+}
+.form-submit:hover{background:var(--navy-deep)}
+.form-note{font-size:11px;color:var(--gray);margin-top:16px;letter-spacing:0.5px}
+
+/* FOOTER */
+footer{
+  background:var(--navy-deep);padding:48px 52px;
+  display:flex;align-items:center;justify-content:space-between;
+  border-top:0.5px solid rgba(255,255,255,0.05);
+}
+.footer-logo{display:flex;align-items:center;gap:12px}
+.footer-name{font-size:11px;font-weight:700;color:#ffffff;letter-spacing:4px}
+.footer-links{display:flex;gap:28px}
+.footer-links a{font-size:11px;color:rgba(255,255,255,0.25);text-decoration:none;letter-spacing:1px;transition:color 0.2s}
+.footer-links a:hover{color:#ffffff}
+.footer-copy{font-size:11px;color:rgba(255,255,255,0.15);letter-spacing:1px}
+
+/* ANIMATIONS */
+.fade-up{opacity:0;transform:translateY(28px);transition:opacity 0.7s ease,transform 0.7s ease}
+.fade-up.visible{opacity:1;transform:none}
+</style>
+</head>
+<body>
+
+<nav id="navbar">
+  <a href="#hero" class="nav-logo">
+    <svg width="40" height="40" viewBox="0 0 80 80" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <rect width="80" height="80" fill="#0C2A4A"/>
+      <rect x="2" y="2" width="76" height="76" stroke="#ffffff" stroke-width="3"/>
+      <polygon points="40,10 55,44 40,38 25,44" fill="#ffffff"/>
+      <polygon points="40,70 55,36 40,42 25,36" fill="#ffffff" opacity="0.25"/>
+      <circle cx="40" cy="40" r="5.5" fill="#ffffff"/>
+      <circle cx="40" cy="40" r="2.5" fill="#0C2A4A"/>
+    </svg>
+    <div class="nav-wordmark">
+      <span class="nav-name">SN SQUARE</span>
+      <span class="nav-sub">GROUP</span>
+    </div>
+  </a>
+  <ul class="nav-links">
+    <li><a href="#services">SERVICES</a></li>
+    <li><a href="#projects">PROJECTS</a></li>
+    <li><a href="#about">ABOUT</a></li>
+    <li><a href="#contact" class="nav-cta">CONTACT</a></li>
+  </ul>
+</nav>
+
+<section id="hero">
+  <div class="hero-grid-bg"></div>
+  <div class="hero-content fade-up">
+    <div class="hero-eyebrow">MASSACHUSETTS</div>
+    <h1 class="hero-title">Building<br><em>What</em><br>Matters</h1>
+    <p class="hero-body">SN Square Group is a development and construction company rooted in care — for the craft, for the work, and for the communities these buildings become part of. Every project, whether a single-family home or a multifamily development, gets the same thing: patience, precision, and the kind of pride that shows in the finished work.</p>
+    <div class="hero-actions">
+      <a href="#projects" class="btn-primary">VIEW OUR WORK</a>
+      <a href="#contact" class="btn-ghost">START A PROJECT</a>
+    </div>
+  </div>
+  <div class="hero-mark">
+    <svg width="500" height="500" viewBox="0 0 80 80" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <rect width="80" height="80" fill="#ffffff" opacity="0.02"/>
+      <rect x="1.5" y="1.5" width="77" height="77" stroke="#ffffff" stroke-width="3"/>
+      <polygon points="40,8 54,42 40,36 26,42" fill="#ffffff"/>
+      <polygon points="40,72 54,38 40,44 26,38" fill="#ffffff" opacity="0.15"/>
+      <circle cx="40" cy="40" r="5" fill="#ffffff"/>
+      <circle cx="40" cy="40" r="2.5" fill="#06182C"/>
+    </svg>
+  </div>
+</section>
+
+<section id="services">
+  <div class="fade-up">
+    <h2 class="section-title">Our <em>services</em></h2>
+  </div>
+  <div class="services-grid fade-up">
+    <div class="service-card">
+      <div class="service-num">01</div>
+      <div class="service-title">New Construction</div>
+      <p class="service-body">Ground-up residential and mixed-use construction across Massachusetts. From single-family homes to multi-story developments, we build with precision from foundation to finish.</p>
+      <a href="#contact" class="service-link">LEARN MORE</a>
+    </div>
+    <div class="service-card">
+      <div class="service-num">02</div>
+      <div class="service-title">Historic Preservation</div>
+      <p class="service-body">We restore and rehabilitate historic properties with meticulous attention to original materials and craft — balancing modern code compliance with architectural integrity. 780 CMR compliant.</p>
+      <a href="#contact" class="service-link">LEARN MORE</a>
+    </div>
+    <div class="service-card">
+      <div class="service-num">03</div>
+      <div class="service-title">Multifamily Development</div>
+      <p class="service-body">End-to-end development of multifamily residential projects — from site acquisition and entitlements through construction and delivery. Built for communities, built to last.</p>
+      <a href="#contact" class="service-link">LEARN MORE</a>
+    </div>
+    <div class="service-card">
+      <div class="service-num">04</div>
+      <div class="service-title">General Contracting</div>
+      <p class="service-body">Full-service general contracting for owners, developers, and institutions. Rigorous scheduling, transparent budgeting, and a single point of accountability from start to certificate of occupancy.</p>
+      <a href="#contact" class="service-link">LEARN MORE</a>
+    </div>
+    <div class="service-card">
+      <div class="service-num">05</div>
+      <div class="service-title">Renovation & Remodeling</div>
+      <p class="service-body">Transformative renovations that respect a building's bones while elevating every detail. Kitchens, additions, full gut-rehabs, and everything in between.</p>
+      <a href="#contact" class="service-link">LEARN MORE</a>
+    </div>
+    <div class="service-card">
+      <div class="service-num">06</div>
+      <div class="service-title">Project Management</div>
+      <p class="service-body">Owner's representation and construction management for clients who need expert oversight without the overhead. We protect your schedule, budget, and vision.</p>
+      <a href="#contact" class="service-link">LEARN MORE</a>
+    </div>
+  </div>
+</section>
+
+<section id="projects">
+  <div class="fade-up">
+    <div class="section-eyebrow">PROJECTS</div>
+    <h2 class="section-title">Selected <em>work</em></h2>
+  </div>
+  <div class="projects-grid fade-up">
+    <div class="project-card">
+      <div class="project-bg pc-1"><div class="project-grid-lines"></div></div>
+      <div class="project-info">
+        <div class="project-tag">STOUGHTON, MA</div>
+        <div class="project-name">Bank Loft</div>
+        <div class="project-location">810 Washington Street</div>
+      </div>
+    </div>
+    <div class="project-card" onclick="openGallery('walpole')">
+      <div class="project-bg pc-2">
+        <img src="images/Walpole/1.webp" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;">
+      </div>
+      <div class="project-info">
+        <div class="project-tag">WALPOLE, MA</div>
+        <div class="project-name">24 Marion Street</div>
+        <div class="project-location">Marion Street Extension</div>
+      </div>
+    </div>
+    <div class="project-card">
+      <div class="project-bg pc-3"><div class="project-grid-lines"></div></div>
+      <div class="project-info">
+        <div class="project-tag">MASSACHUSETTS</div>
+        <div class="project-name">10-Unit Apartment</div>
+        <div class="project-location">Multifamily Building</div>
+      </div>
+    </div>
+    <div class="project-card">
+      <div class="project-bg pc-4"><div class="project-grid-lines"></div></div>
+      <div class="project-info">
+        <div class="project-tag">MASSACHUSETTS</div>
+        <div class="project-name">Coming Soon</div>
+        <div class="project-location">New Project</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="about">
+  <div class="fade-up">
+    <div class="section-eyebrow">WHO WE ARE</div>
+    <h2 class="section-title">Built on <em>precision</em><br>and purpose</h2>
+  </div>
+  <div class="about-grid fade-up">
+    <div>
+      <div class="about-body">
+        <p>SN Square Group was founded on a simple belief: that the built environment shapes how people live, and that building well is an act of care for the communities we serve.</p>
+        <p>We are a Massachusetts-based development and general construction company with deep roots in residential and mixed-use construction. Every project we take on — from a single-family home to a multifamily development — is built with the same commitment to craft, transparency, and lasting quality.</p>
+        <p>We work closely with owners, developers, and communities across Massachusetts to deliver projects that stand the test of time.</p>
+      </div>
+      <div class="about-values">
+        <div class="value-item">
+          <div class="value-title">CRAFTSMANSHIP</div>
+          <div class="value-body">We care about every detail, from the foundation to the finish. Quality is not an add-on — it is the standard.</div>
+        </div>
+        <div class="value-item">
+          <div class="value-title">TRANSPARENCY</div>
+          <div class="value-body">Clear communication, honest budgets, and no surprises. You always know where your project stands.</div>
+        </div>
+        <div class="value-item">
+          <div class="value-title">COMMUNITY</div>
+          <div class="value-body">We build in Massachusetts because we live here. The work we do shapes the places people call home.</div>
+        </div>
+      </div>
+    </div>
+    <div class="about-stats">
+      <div class="stat">
+        <div class="stat-num">15+</div>
+        <div class="stat-label">YEARS COMBINED EXPERIENCE</div>
+      </div>
+      <div class="stat">
+        <div class="stat-num">30+</div>
+        <div class="stat-label">PROJECTS DELIVERED</div>
+      </div>
+      <div class="stat">
+        <div class="stat-num">MA</div>
+        <div class="stat-label">LICENSED & INSURED</div>
+      </div>
+      <div class="stat">
+        <div class="stat-num">780</div>
+        <div class="stat-label">CMR COMPLIANT</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="contact">
+  <div class="fade-up">
+    <div class="section-eyebrow">GET IN TOUCH</div>
+    <h2 class="section-title">Start your <em>project</em></h2>
+  </div>
+  <div class="contact-grid fade-up">
+    <div class="contact-info">
+      <div class="contact-item">
+        <div class="contact-label">WEBSITE</div>
+        <div class="contact-value"><a href="https://www.snsquareinc.com">www.snsquareinc.com</a></div>
+      </div>
+      <div class="contact-item">
+        <div class="contact-label">EMAIL</div>
+        <div class="contact-value"><a href="mailto:info@snsquareinc.com">info@snsquareinc.com</a></div>
+      </div>
+      <div class="contact-item">
+        <div class="contact-label">LOCATION</div>
+        <div class="contact-value">Massachusetts</div>
+      </div>
+      <div class="contact-item">
+        <div class="contact-label">SERVICES</div>
+        <div class="contact-value" style="font-size:14px;line-height:2.2">
+          New Construction · Historic Preservation<br>
+          Multifamily · General Contracting<br>
+          Renovation · Project Management
+        </div>
+      </div>
+    </div>
+    <div class="contact-form">
+      <div class="form-row">
+        <div class="form-group"><label>FIRST NAME</label><input type="text" placeholder="John"></div>
+        <div class="form-group"><label>LAST NAME</label><input type="text" placeholder="Smith"></div>
+      </div>
+      <div class="form-group"><label>EMAIL</label><input type="email" placeholder="john@email.com"></div>
+      <div class="form-group"><label>PHONE (OPTIONAL)</label><input type="tel" placeholder="(617) 000-0000"></div>
+      <div class="form-group">
+        <label>PROJECT TYPE</label>
+        <select>
+          <option value="">Select a service...</option>
+          <option>New Construction</option>
+          <option>Historic Preservation</option>
+          <option>Multifamily Development</option>
+          <option>General Contracting</option>
+          <option>Renovation & Remodeling</option>
+          <option>Project Management</option>
+        </select>
+      </div>
+      <div class="form-group"><label>MESSAGE</label><textarea placeholder="Tell us about your project — location, scope, timeline..."></textarea></div>
+      <button class="form-submit" onclick="alert('Thank you! We will be in touch at info@snsquareinc.com')">SEND MESSAGE</button>
+      <p class="form-note">We typically respond within 1 business day.</p>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="footer-logo">
+    <svg width="26" height="26" viewBox="0 0 80 80" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <rect width="80" height="80" fill="#ffffff" opacity="0.04"/>
+      <rect x="1.5" y="1.5" width="77" height="77" stroke="#ffffff" stroke-width="3"/>
+      <polygon points="40,8 54,42 40,36 26,42" fill="#ffffff"/>
+      <polygon points="40,72 54,38 40,44 26,38" fill="#ffffff" opacity="0.2"/>
+      <circle cx="40" cy="40" r="5" fill="#ffffff"/>
+      <circle cx="40" cy="40" r="2.5" fill="#06182C"/>
+    </svg>
+    <span class="footer-name">SN SQUARE GROUP</span>
+  </div>
+  <div class="footer-links">
+    <a href="#services">SERVICES</a>
+    <a href="#projects">PROJECTS</a>
+    <a href="#about">ABOUT</a>
+    <a href="#contact">CONTACT</a>
+  </div>
+  <div class="footer-copy">© 2026 SN SQUARE GROUP · MASSACHUSETTS</div>
+</footer>
+
+<!-- GALLERY LIGHTBOX -->
+<div id="gallery-overlay" style="display:none;position:fixed;inset:0;z-index:999;background:rgba(6,24,44,0.97);flex-direction:column;align-items:center;justify-content:center;">
+
+  <!-- Close button -->
+  <button onclick="closeGallery()" style="position:absolute;top:28px;right:36px;background:none;border:none;color:#ffffff;font-size:28px;cursor:pointer;letter-spacing:1px;font-family:'DM Sans',sans-serif;">✕</button>
+
+  <!-- Project title -->
+  <div id="gallery-title" style="position:absolute;top:30px;left:36px;font-family:'DM Sans',sans-serif;font-size:11px;font-weight:500;letter-spacing:4px;color:rgba(255,255,255,0.4)"></div>
+
+  <!-- Main image -->
+  <div style="position:relative;display:flex;align-items:center;gap:24px;">
+    <button onclick="prevPhoto()" style="background:none;border:0.5px solid rgba(255,255,255,0.2);color:#fff;width:48px;height:48px;font-size:20px;cursor:pointer;flex-shrink:0;transition:border-color 0.2s;" onmouseover="this.style.borderColor='#fff'" onmouseout="this.style.borderColor='rgba(255,255,255,0.2)'">‹</button>
+    <img id="gallery-img" src="" style="max-height:75vh;max-width:70vw;object-fit:contain;display:block;">
+    <button onclick="nextPhoto()" style="background:none;border:0.5px solid rgba(255,255,255,0.2);color:#fff;width:48px;height:48px;font-size:20px;cursor:pointer;flex-shrink:0;transition:border-color 0.2s;" onmouseover="this.style.borderColor='#fff'" onmouseout="this.style.borderColor='rgba(255,255,255,0.2)'">›</button>
+  </div>
+
+  <!-- Counter -->
+  <div id="gallery-counter" style="margin-top:24px;font-family:'DM Sans',sans-serif;font-size:11px;color:rgba(255,255,255,0.3);letter-spacing:3px;"></div>
+
+  <!-- Thumbnails -->
+  <div id="gallery-thumbs" style="display:flex;gap:8px;margin-top:20px;"></div>
+
+</div>
+
+<script>
+const navbar = document.getElementById('navbar');
+window.addEventListener('scroll', () => {
+  navbar.classList.toggle('scrolled', window.scrollY > 20);
+});
+const observer = new IntersectionObserver((entries) => {
+  entries.forEach((e, i) => {
+    if (e.isIntersecting) {
+      setTimeout(() => e.target.classList.add('visible'), i * 100);
+    }
+  });
+}, { threshold: 0.1 });
+document.querySelectorAll('.fade-up').forEach(el => observer.observe(el));
+
+const galleries = {
+  walpole: {
+    title: 'WALPOLE, MA · 24 MARION STREET',
+    photos: [
+      'images/Walpole/1.webp',
+      'images/Walpole/2.webp',
+      'images/Walpole/3.webp',
+      'images/Walpole/4.webp',
+      'images/Walpole/5.webp',
+      'images/Walpole/6.webp',
+      'images/Walpole/7.webp'
+    ]
+  }
+};
+
+let currentGallery = null;
+let currentIndex = 0;
+
+function openGallery(name) {
+  currentGallery = galleries[name];
+  currentIndex = 0;
+  document.getElementById('gallery-title').textContent = currentGallery.title;
+  const overlay = document.getElementById('gallery-overlay');
+  overlay.style.display = 'flex';
+  document.body.style.overflow = 'hidden';
+  buildThumbs();
+  showPhoto(0);
+}
+
+function closeGallery() {
+  document.getElementById('gallery-overlay').style.display = 'none';
+  document.body.style.overflow = '';
+}
+
+function showPhoto(index) {
+  currentIndex = index;
+  document.getElementById('gallery-img').src = currentGallery.photos[index];
+  document.getElementById('gallery-counter').textContent = (index + 1) + ' / ' + currentGallery.photos.length;
+  document.querySelectorAll('.thumb').forEach((t, i) => {
+    t.style.opacity = i === index ? '1' : '0.4';
+    t.style.borderColor = i === index ? '#ffffff' : 'transparent';
+  });
+}
+
+function nextPhoto() {
+  showPhoto((currentIndex + 1) % currentGallery.photos.length);
+}
+
+function prevPhoto() {
+  showPhoto((currentIndex - 1 + currentGallery.photos.length) % currentGallery.photos.length);
+}
+
+function buildThumbs() {
+  const container = document.getElementById('gallery-thumbs');
+  container.innerHTML = '';
+  currentGallery.photos.forEach((src, i) => {
+    const img = document.createElement('img');
+    img.src = src;
+    img.className = 'thumb';
+    img.style.cssText = 'width:64px;height:48px;object-fit:cover;cursor:pointer;border:1.5px solid transparent;opacity:0.4;transition:all 0.2s;';
+    img.onclick = () => showPhoto(i);
+    container.appendChild(img);
+  });
+}
+
+document.getElementById('gallery-overlay').addEventListener('click', function(e) {
+  if (e.target === this) closeGallery();
+});
+
+document.addEventListener('keydown', function(e) {
+  if (document.getElementById('gallery-overlay').style.display === 'flex') {
+    if (e.key === 'ArrowRight') nextPhoto();
+    if (e.key === 'ArrowLeft') prevPhoto();
+    if (e.key === 'Escape') closeGallery();
+  }
+});
+</script>
+</body>
+</html>
