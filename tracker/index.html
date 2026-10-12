@@ -89,6 +89,31 @@ main{padding:14px 16px 110px;display:flex;flex-direction:column;gap:12px;max-wid
 .sheet-tbl .tr-click:hover{background:#F8FAFC}
 .sheet-tbl .tr-sub td{background:#F8FAFC;font-weight:700;color:var(--navy)}
 .sheet-tbl .tr-grand td{background:var(--navy);color:#fff;font-weight:700}
+@media (max-width:640px){
+  .sheet-tbl, .sheet-tbl tbody{display:block;min-width:0}
+  .sheet-tbl thead{display:none}
+  .sheet-tbl tr{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 12px;padding:12px 14px;border-bottom:1px solid var(--soft)}
+  .sheet-tbl td{border:0;padding:0;white-space:normal}
+  .sheet-tbl tr.tr-click{display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"name amt" "meta owed";gap:2px 12px}
+  .sheet-tbl tr.tr-click td:nth-child(1),
+  .sheet-tbl tr.tr-click td:nth-child(4),
+  .sheet-tbl tr.tr-click td:nth-child(5),
+  .sheet-tbl tr.tr-click td:nth-child(8){display:none}
+  .sheet-tbl tr.tr-click td:nth-child(2){grid-area:name;font-weight:600}
+  .sheet-tbl tr.tr-click td:nth-child(3){grid-area:amt;text-align:right;font-weight:700}
+  .sheet-tbl tr.tr-click td:nth-child(6){grid-area:meta;color:var(--muted);font-size:12px}
+  .sheet-tbl tr.tr-click td:nth-child(7){grid-area:owed;text-align:right;font-size:12px;color:var(--muted)}
+  .sheet-tbl tr.tr-sub,.sheet-tbl tr.tr-grand{background:#F8FAFC;justify-content:space-between}
+  .sheet-tbl tr.tr-grand{background:var(--navy);color:#fff}
+  .sheet-tbl tr.tr-sub td:nth-child(1){flex:1 1 100%;font-weight:700}
+  .sheet-tbl tr.tr-grand td:nth-child(1){flex:1 1 100%}
+  .sheet-tbl tr.tr-sub td:nth-child(3),.sheet-tbl tr.tr-sub td:nth-child(4),.sheet-tbl tr.tr-sub td:nth-child(8),
+  .sheet-tbl tr.tr-grand td:nth-child(4),.sheet-tbl tr.tr-grand td:nth-child(8){display:none}
+  .sheet-tbl tr.tr-sub td:nth-child(5),.sheet-tbl tr.tr-grand td:nth-child(5){order:2}
+  .sheet-tbl tr.tr-sub td:nth-child(6),.sheet-tbl tr.tr-grand td:nth-child(6){font-size:12px;color:var(--muted)}
+  .sheet-tbl tr.tr-sub td:nth-child(7),.sheet-tbl tr.tr-grand td:nth-child(7){font-size:12px}
+  .sheet-tbl tr.tr-grand td:nth-child(6),.sheet-tbl tr.tr-grand td:nth-child(7){color:#E2E8F0}
+}
 .line-h{display:grid;grid-template-columns:minmax(0,1fr) auto auto 14px;gap:12px;font-size:11px;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);font-weight:600;padding-top:6px}
 .line-h span:not(:first-child){text-align:right}
 details{background:var(--card);border-radius:16px;padding:14px 16px;box-shadow:0 1px 2px rgba(15,23,42,.05)}
@@ -216,7 +241,7 @@ const sb = supabase.createClient(window.TRACKER_CONFIG.url, window.TRACKER_CONFI
 let session = null;
 
 // Library cache (global) and current project cache
-const S = { divs: [], subs: [], divMap: {}, subMap: {}, vendors: [], proj: null, year: new Date().getFullYear(), budgetView: 'list' };
+const S = { divs: [], subs: [], divMap: {}, subMap: {}, vendors: [], proj: null, year: new Date().getFullYear() };
 
 function setLibrary(divs, subs){
   S.divs = divs; S.subs = subs;
@@ -405,59 +430,19 @@ function renderBudget(P){
       <div><div class="l">Bank Funded</div><div class="v">${money(bankBudget)}</div>${notBank ? `<div class="small muted">${money(notBank)} not bank funded</div>` : ''}</div>
     </div>
     <div class="page-h">
-      <div class="seg" style="flex:1;max-width:280px"><button aria-pressed="${S.budgetView !== 'sheet'}" data-act="budget-view" data-view="list">List</button><button aria-pressed="${S.budgetView === 'sheet'}" data-act="budget-view" data-view="sheet">Spreadsheet</button></div>
-      ${S.budgetView === 'sheet' ? '<button class="btn sm" data-act="export-csv">Export CSV</button>' : ''}
-    </div>
-    <div class="page-h">
-      <h2>Budget By Division</h2>
-      <button class="btn primary sm" data-act="add-line">+ Budget Line</button>
+      <h2>Budget</h2>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn sm" data-act="export-csv">Export CSV</button>
+        <button class="btn primary sm" data-act="add-line">+ Budget Line</button>
+      </div>
     </div>`;
 
-  if (S.budgetView === 'sheet'){
-    $('#main').innerHTML = html + budgetTableHtml(P, paid, byDiv, codes);
-    return;
-  }
   if (!codes.length){
     html += `<div class="empty">No budget yet. Add the sub-tasks from the Library, or a custom line.</div>`;
+    $('#main').innerHTML = html;
+    return;
   }
-
-  if (codes.length){
-    html += `<div class="card" style="padding:4px 16px">
-      <div class="line-h" style="padding-top:12px"><span>Sub-Task</span><span>Budget</span><span>Owed</span><span></span></div>
-      <div class="hint-line" style="padding-bottom:4px">Tap a line to edit its budget or record a revision.</div>`;
-  }
-  codes.forEach(code => {
-    const ls = byDiv[code];
-    const b = ls.reduce((a, l) => a + budgetOf(l), 0);
-    const pd = ls.reduce((a, l) => a + (paid[l.id] || 0), 0);
-    html += `<div class="div-h" style="display:flex;justify-content:space-between;align-items:baseline;gap:10px;padding:14px 0 6px;margin-top:6px;border-top:2px solid var(--soft)">
-        <span style="font-weight:700;color:var(--navy);overflow-wrap:anywhere">${esc(divName(code))}</span>
-        <span class="num" style="font-weight:700">${money(b)} <span class="small muted" style="font-weight:500">· Owed ${money(Math.max(0, b - pd))}</span></span>
-      </div>`;
-    ls.forEach(l => {
-      const lp = paid[l.id] || 0;
-      const bl = budgetOf(l);
-      html += `<button class="line" data-act="edit-line" data-id="${l.id}">
-        <span class="n">${esc(lineName(l))}${l.bank_funded ? '' : ' <span class="badge b-mute" style="font-size:11px;padding:1px 6px">Not Bank Funded</span>'}
-          ${Number(l.revision) ? `<div class="c">Revision ${money(l.revision)}${l.revision_reason ? ' · ' + esc(l.revision_reason) : ''}</div>` : ''}
-          <div class="c">Paid ${money(lp)}</div></span>
-        <span class="v">${money(bl)}</span>
-        <span class="v ${bl - lp > 0 ? 'warnText' : ''}">${money(Math.max(0, bl - lp))}</span>
-        <span class="chev" aria-hidden="true">›</span>
-      </button>`;
-    });
-    html += `</div>`;
-  });
-  if (codes.length){
-    html += `</div>`;
-  }
-
-  if (codes.length){
-    html += `<div style="display:flex;justify-content:space-between;align-items:center;background:var(--navy);color:#fff;border-radius:14px;padding:14px 16px;font-weight:600"><span>Total Budget</span><span class="num" style="font-size:18px">${money(totalBudget)}</span></div>`;
-  }
-  html += `<div class="small muted" style="text-align:center">Division totals are the sum of their lines. Every payment is tied to one line.</div>`;
-
-  $('#main').innerHTML = html;
+  $('#main').innerHTML = html + budgetTableHtml(P, paid, byDiv, codes);
 }
 
 // ---------- Budget spreadsheet view ----------
@@ -1195,7 +1180,6 @@ const actions = {
   'open-vendor': (t, id) => vendorSheet(S.vendors.find(v => v.id === id)),
   'new-division': () => divisionSheet(),
   'new-subtask': (t) => subtaskSheet(t.dataset.code),
-  'budget-view': (t) => { S.budgetView = t.dataset.view; return render(); },
   'export-csv': () => exportBudgetCsv()
 };
 
