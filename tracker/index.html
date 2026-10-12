@@ -71,6 +71,14 @@ main{padding:16px 16px 110px;display:flex;flex-direction:column;gap:14px;max-wid
 .line .v{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
 .line .chev{color:var(--teal-d);font-size:18px;line-height:1;font-weight:700}
 .hint-line{font-size:12px;color:var(--muted);margin-top:2px}
+.sheet-tbl{width:100%;border-collapse:collapse;font-size:13px;min-width:680px;font-variant-numeric:tabular-nums}
+.sheet-tbl th,.sheet-tbl td{padding:9px 10px;border-bottom:1px solid var(--soft);text-align:left;white-space:nowrap}
+.sheet-tbl th{background:var(--soft);font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--ink2);position:sticky;top:0}
+.sheet-tbl .r{text-align:right}
+.sheet-tbl .tr-click{cursor:pointer}
+.sheet-tbl .tr-click:hover{background:#F8FAFC}
+.sheet-tbl .tr-sub td{background:#F8FAFC;font-weight:700;color:var(--navy)}
+.sheet-tbl .tr-grand td{background:var(--navy);color:#fff;font-weight:700}
 .line-h{display:grid;grid-template-columns:minmax(0,1fr) auto auto 14px;gap:12px;font-size:11px;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);font-weight:600;padding-top:6px}
 .line-h span:not(:first-child){text-align:right}
 details{background:var(--card);border-radius:16px;padding:14px 16px;box-shadow:0 1px 2px rgba(15,23,42,.05)}
@@ -198,7 +206,7 @@ const sb = supabase.createClient(window.TRACKER_CONFIG.url, window.TRACKER_CONFI
 let session = null;
 
 // Library cache (global) and current project cache
-const S = { divs: [], subs: [], divMap: {}, subMap: {}, vendors: [], proj: null, year: new Date().getFullYear() };
+const S = { divs: [], subs: [], divMap: {}, subMap: {}, vendors: [], proj: null, year: new Date().getFullYear(), budgetView: 'list' };
 
 function setLibrary(divs, subs){
   S.divs = divs; S.subs = subs;
@@ -387,10 +395,18 @@ function renderBudget(P){
       <div class="tile"><div class="l">Bank Funded</div><div class="v">${money(bankBudget)}</div>${notBank ? `<div class="small muted">${money(notBank)} not bank funded</div>` : ''}</div>
     </div>
     <div class="page-h">
+      <div class="seg" style="flex:1;max-width:280px"><button aria-pressed="${S.budgetView !== 'sheet'}" data-act="budget-view" data-view="list">List</button><button aria-pressed="${S.budgetView === 'sheet'}" data-act="budget-view" data-view="sheet">Spreadsheet</button></div>
+      ${S.budgetView === 'sheet' ? '<button class="btn sm" data-act="export-csv">Export CSV</button>' : ''}
+    </div>
+    <div class="page-h">
       <h2>Budget By Division</h2>
       <button class="btn primary sm" data-act="add-line">+ Budget Line</button>
     </div>`;
 
+  if (S.budgetView === 'sheet'){
+    $('#main').innerHTML = html + budgetTableHtml(P, paid, byDiv, codes);
+    return;
+  }
   if (!codes.length){
     html += `<div class="empty">No budget yet. Add the sub-tasks from the Library, or a custom line.</div>`;
   }
@@ -432,6 +448,61 @@ function renderBudget(P){
   html += `<div class="small muted" style="text-align:center">Division totals are the sum of their lines. Every payment is tied to one line.</div>`;
 
   $('#main').innerHTML = html;
+}
+
+// ---------- Budget spreadsheet view ----------
+function budgetTableHtml(P, paid, byDiv, codes){
+  const body = [];
+  let gBud = 0, gTot = 0, gPaid = 0;
+  codes.forEach(code => {
+    let dBud = 0, dTot = 0, dPaid = 0;
+    byDiv[code].forEach(l => {
+      const bl = budgetOf(l), lp = paid[l.id] || 0;
+      dBud += num(l.budget); dTot += bl; dPaid += lp;
+      body.push(`<tr class="tr-click" data-act="edit-line" data-id="${l.id}">
+        <td>${esc(l.subtask_code || 'Custom')}</td>
+        <td>${esc(lineName(l))}</td>
+        <td class="r">${money(l.budget)}</td>
+        <td class="r">${Number(l.revision) ? money(l.revision) : '—'}</td>
+        <td class="r">${money(bl)}</td>
+        <td class="r">${money(lp)}</td>
+        <td class="r ${bl - lp > 0 ? 'warnText' : ''}">${money(Math.max(0, bl - lp))}</td>
+        <td>${l.bank_funded ? 'Yes' : 'No'}</td>
+      </tr>`);
+    });
+    body.push(`<tr class="tr-sub"><td colspan="2">${esc(divName(code))}</td>
+      <td class="r">${money(dBud)}</td><td></td><td class="r">${money(dTot)}</td>
+      <td class="r">${money(dPaid)}</td><td class="r">${money(Math.max(0, dTot - dPaid))}</td><td></td></tr>`);
+    gBud += dBud; gTot += dTot; gPaid += dPaid;
+  });
+  body.push(`<tr class="tr-grand"><td colspan="2">Total Budget</td>
+      <td class="r">${money(gBud)}</td><td></td><td class="r">${money(gTot)}</td>
+      <td class="r">${money(gPaid)}</td><td class="r">${money(Math.max(0, gTot - gPaid))}</td><td></td></tr>`);
+  return `<div class="card" style="padding:0;overflow-x:auto">
+    <table class="sheet-tbl">
+      <thead><tr><th>Code</th><th>Sub-Task</th><th class="r">Budget</th><th class="r">Revision</th><th class="r">Total</th><th class="r">Paid</th><th class="r">Owed</th><th>Bank Funded</th></tr></thead>
+      <tbody>${body.join('')}</tbody>
+    </table>
+  </div>
+  <div class="small muted" style="text-align:center">Tap a row to edit it. Export CSV opens in Excel.</div>`;
+}
+
+function exportBudgetCsv(){
+  const P = S.proj;
+  const paid = paidByLine(P);
+  const rows = [['Division', 'Code', 'Sub-Task', 'Budget', 'Revision', 'Total', 'Paid', 'Owed', 'Bank Funded']];
+  P.lines.slice().sort((a, b) => a.division_code.localeCompare(b.division_code)).forEach(l => {
+    const bl = budgetOf(l), lp = paid[l.id] || 0;
+    rows.push([divName(l.division_code), l.subtask_code || 'Custom', lineName(l), num(l.budget), num(l.revision), bl, lp, Math.max(0, bl - lp), l.bank_funded ? 'Yes' : 'No']);
+  });
+  const csv = rows.map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\r\n');
+  const blob = new Blob(['\ufeff' + csv], {type: 'text/csv;charset=utf-8'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = (P.project.name + ' Budget.csv').replace(/[\\/:*?"<>|]/g, '-');
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 // ---------- Payments ----------
@@ -1113,7 +1184,9 @@ const actions = {
   'new-vendor': () => vendorSheet(null),
   'open-vendor': (t, id) => vendorSheet(S.vendors.find(v => v.id === id)),
   'new-division': () => divisionSheet(),
-  'new-subtask': (t) => subtaskSheet(t.dataset.code)
+  'new-subtask': (t) => subtaskSheet(t.dataset.code),
+  'budget-view': (t) => { S.budgetView = t.dataset.view; return render(); },
+  'export-csv': () => exportBudgetCsv()
 };
 
 document.addEventListener('click', async e => {
