@@ -140,7 +140,7 @@ dialog.sheet form{display:flex;flex-direction:column;gap:14px;padding:18px}
     <form id="loginForm" style="display:flex;flex-direction:column;gap:12px">
       <label>Email<input type="email" name="email" autocomplete="username" required></label>
       <label>Password<input type="password" name="password" autocomplete="current-password" required></label>
-      <button class="btn navy" type="submit">Sign in</button>
+      <button class="btn navy" type="submit">Sign In</button>
       <p class="err" id="loginErr" hidden></p>
     </form>
   </div>
@@ -165,8 +165,17 @@ dialog.sheet form{display:flex;flex-direction:column;gap:14px;padding:18px}
 // ---------- Helpers ----------
 const $ = (s, r = document) => r.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const num = v => (v === '' || v == null) ? 0 : (Number(v) || 0);
-const money = n => Number(n || 0).toLocaleString('en-US', {style:'currency', currency:'USD', maximumFractionDigits:0});
+const num = v => { if (v === '' || v == null) return 0; const n = Number(String(v).replace(/[$,\s]/g, '')); return Number.isFinite(n) ? n : 0; };
+const money = n => Number(n || 0).toLocaleString('en-US', {style:'currency', currency:'USD', maximumFractionDigits:2});
+const fmtInput = n => (n === '' || n == null) ? '' : Number(n).toLocaleString('en-US', {maximumFractionDigits:2});
+function formatMoneyText(raw){
+  const cleaned = String(raw).replace(/[^0-9.]/g, '');
+  if (!cleaned) return '';
+  const parts = cleaned.split('.');
+  const whole = (parts[0] || '').replace(/^0+(?=\d)/, '').replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  const dec = parts.length > 1 ? '.' + parts.slice(1).join('').slice(0, 2) : '';
+  return whole + dec;
+}
 const todayISO = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; };
 const fmtDate = s => s ? new Date(s + 'T12:00:00').toLocaleDateString('en-US', {month:'short', day:'numeric', year:'numeric'}) : '—';
 const daysBetween = (a, b) => Math.round((new Date(b + 'T12:00:00') - new Date(a + 'T12:00:00')) / 86400000);
@@ -262,7 +271,7 @@ async function renderProjects(){
   let html = `
     <div class="page-h">
       <h2>Projects</h2>
-      <button class="btn primary" data-act="new-project">New project</button>
+      <button class="btn primary" data-act="new-project">New Project</button>
     </div>`;
 
   if (reminders.length){
@@ -343,7 +352,7 @@ function setTopbar(brand, title, sub, extra){
   $('#topbar').innerHTML = `
     <div class="top-row">
       <div class="brand">${esc(brand)}</div>
-      <button class="btn sm" data-act="sign-out" style="background:transparent;color:#CBD5E1;border-color:#334155">Sign out</button>
+      <button class="btn sm" data-act="sign-out" style="background:transparent;color:#CBD5E1;border-color:#334155">Sign Out</button>
     </div>
     <h1>${esc(title)}</h1>
     ${sub ? `<p class="sub">${esc(sub)}</p>` : ''}
@@ -370,14 +379,14 @@ function renderBudget(P){
 
   let html = `
     <div class="tiles">
-      <div class="tile teal"><div class="l">Total budget</div><div class="v">${money(totalBudget)}</div></div>
-      <div class="tile"><div class="l">Paid out</div><div class="v">${money(totalPaid)}</div></div>
-      <div class="tile"><div class="l">Still owed</div><div class="v warnText">${money(Math.max(0, totalBudget - totalPaid))}</div></div>
-      <div class="tile"><div class="l">Bank funded</div><div class="v">${money(bankBudget)}</div>${notBank ? `<div class="small muted">${money(notBank)} not bank funded</div>` : ''}</div>
+      <div class="tile teal"><div class="l">Total Budget</div><div class="v">${money(totalBudget)}</div></div>
+      <div class="tile"><div class="l">Paid Out</div><div class="v">${money(totalPaid)}</div></div>
+      <div class="tile"><div class="l">Still Owed</div><div class="v warnText">${money(Math.max(0, totalBudget - totalPaid))}</div></div>
+      <div class="tile"><div class="l">Bank Funded</div><div class="v">${money(bankBudget)}</div>${notBank ? `<div class="small muted">${money(notBank)} not bank funded</div>` : ''}</div>
     </div>
     <div class="page-h">
-      <h2>Budget by division</h2>
-      <button class="btn primary sm" data-act="add-line">+ Budget line</button>
+      <h2>Budget By Division</h2>
+      <button class="btn primary sm" data-act="add-line">+ Budget Line</button>
     </div>`;
 
   if (!codes.length){
@@ -397,12 +406,12 @@ function renderBudget(P){
         <div class="card-h small"><span class="muted">Paid ${money(pd)}</span><span class="warnText">Owed ${money(owed)}</span></div>
         ${custom ? `<div class="small" style="color:var(--indigo-ink)">${custom} custom line${custom > 1 ? 's' : ''} not in the Library</div>` : ''}
         <div>
-          <div class="line-h"><span>Sub-task</span><span>Budget</span><span>Owed</span></div>
+          <div class="line-h"><span>Sub-Task</span><span>Budget</span><span>Owed</span></div>
           ${ls.map(l => {
             const lp = paid[l.id] || 0;
             const bl = budgetOf(l);
             return `<button class="line" data-act="edit-line" data-id="${l.id}">
-              <span class="n">${esc(lineName(l))}${l.bank_funded ? '' : ' <span class="badge b-mute" style="font-size:11px;padding:1px 6px">Not bank funded</span>'}
+              <span class="n">${esc(lineName(l))}${l.bank_funded ? '' : ' <span class="badge b-mute" style="font-size:11px;padding:1px 6px">Not Bank Funded</span>'}
                 ${Number(l.revision) ? `<div class="c">Revision ${money(l.revision)}${l.revision_reason ? ' · ' + esc(l.revision_reason) : ''}</div>` : ''}
                 <div class="c">Paid ${money(lp)}</div></span>
               <span class="v">${money(bl)}</span>
@@ -414,7 +423,7 @@ function renderBudget(P){
   });
 
   if (codes.length){
-    html += `<div style="display:flex;justify-content:space-between;align-items:center;background:var(--navy);color:#fff;border-radius:14px;padding:14px 16px;font-weight:600"><span>Total budget</span><span class="num" style="font-size:18px">${money(totalBudget)}</span></div>`;
+    html += `<div style="display:flex;justify-content:space-between;align-items:center;background:var(--navy);color:#fff;border-radius:14px;padding:14px 16px;font-weight:600"><span>Total Budget</span><span class="num" style="font-size:18px">${money(totalBudget)}</span></div>`;
   }
   html += `<div class="small muted" style="text-align:center">Division totals are the sum of their lines. Every payment is tied to one line.</div>`;
 
@@ -430,7 +439,7 @@ function renderPayments(P){
   let html = `
     <div class="page-h">
       <h2>Payments · ${money(total)}</h2>
-      <button class="btn primary sm" data-act="new-payment">+ Record payment</button>
+      <button class="btn primary sm" data-act="new-payment">+ Record Payment</button>
     </div>`;
 
   if (!P.pays.length){
@@ -465,8 +474,8 @@ function renderContractors(P){
 
   let html = `
     <div class="page-h">
-      <h2>Contractors on this project</h2>
-      <button class="btn primary sm" data-act="assign">+ Assign contractor</button>
+      <h2>Contractors On This Project</h2>
+      <button class="btn primary sm" data-act="assign">+ Assign Contractor</button>
     </div>`;
 
   if (needing.length){
@@ -492,9 +501,9 @@ function renderContractors(P){
         ${r.ins && r.ins.file_path && !r.ins.dismissed_reason ? `<div class="small muted">${esc(r.ins.insurer || 'Insurer not listed')}${r.ins.expires_on ? ' · expires ' + fmtDate(r.ins.expires_on) : ''}${r.ins.holder_listed ? ' · bank listed as holder' : ''}</div>` : ''}
         <div class="btn-row">
           ${open
-            ? `<button class="btn primary" data-act="add-coi" data-id="${r.v.id}">Add certificate</button>
-               <button class="btn" data-act="dismiss-coi" data-id="${r.v.id}">Dismiss with reason</button>`
-            : `<button class="btn" data-act="add-coi" data-id="${r.v.id}">Update certificate</button>`}
+            ? `<button class="btn primary" data-act="add-coi" data-id="${r.v.id}">Add Certificate</button>
+               <button class="btn" data-act="dismiss-coi" data-id="${r.v.id}">Dismiss With Reason</button>`
+            : `<button class="btn" data-act="add-coi" data-id="${r.v.id}">Update Certificate</button>`}
         </div>
       </div>`;
   });
@@ -524,10 +533,10 @@ async function renderVendors(){
   let html = `
     <div class="page-h">
       <h2>Contractors</h2>
-      <button class="btn primary sm" data-act="new-vendor">+ Add contractor</button>
+      <button class="btn primary sm" data-act="new-vendor">+ Add Contractor</button>
     </div>
     <div class="card" style="flex-direction:row;align-items:center;justify-content:space-between;gap:10px;padding:12px 16px">
-      <span class="small muted">1099 year</span>
+      <span class="small muted">1099 Year</span>
       <select id="yearSel" style="width:auto;padding:8px 10px">${yearOpts}</select>
     </div>`;
 
@@ -577,7 +586,7 @@ async function renderLibrary(){
         <div style="margin-top:6px">
           ${subs.map(s => `<div class="sub-li"><span>${esc(s.code)} ${esc(s.name)}</span></div>`).join('') || '<div class="small muted">No sub-tasks yet.</div>'}
         </div>
-        <div style="margin-top:10px"><button class="btn sm" data-act="new-subtask" data-code="${esc(d.code)}">+ Sub-task</button></div>
+        <div style="margin-top:10px"><button class="btn sm" data-act="new-subtask" data-code="${esc(d.code)}">+ Sub-Task</button></div>
       </details>`;
   });
 
@@ -602,6 +611,7 @@ function sheet({title, html, submit = 'Save', onSubmit, onOpen, danger}){
   document.body.append(d);
   d.addEventListener('close', () => d.remove());
   const form = d.querySelector('form');
+  d.querySelectorAll('input.money').forEach(el => el.addEventListener('input', () => { el.value = formatMoneyText(el.value); }));
   const err = d.querySelector('.err');
   const showErr = e => { err.textContent = msg(e); err.hidden = false; };
   d.querySelectorAll('[data-close]').forEach(b => b.addEventListener('click', () => d.close()));
@@ -633,17 +643,17 @@ function divOptions(selected = ''){
 function projectSheet(pr){
   const editing = !!pr;
   sheet({
-    title: editing ? 'Project details' : 'New project',
+    title: editing ? 'Project Details' : 'New Project',
     submit: 'Save',
     html: `<div class="grid">
-      <label class="full">Project name<input name="name" required value="${esc(pr?.name)}"></label>
+      <label class="full">Project Name<input name="name" required value="${esc(pr?.name)}"></label>
       <label class="full">Address<input name="address" value="${esc(pr?.address)}"></label>
       <label>Status<select name="status">${PROJECT_STATUS.map(s => `<option ${s === (pr?.status || 'Planning') ? 'selected' : ''}>${s}</option>`).join('')}</select></label>
-      <label>General contractor<input name="general_contractor" value="${esc(pr?.general_contractor)}"></label>
+      <label>General Contractor<input name="general_contractor" value="${esc(pr?.general_contractor)}"></label>
       <label>Lender<input name="lender" value="${esc(pr?.lender)}"></label>
-      <label>Loan amount ($)<input type="number" name="loan_amount" inputmode="decimal" min="0" step="any" value="${esc(pr?.loan_amount ?? '')}"></label>
-      <label>Start date<input type="date" name="start_date" value="${esc(pr?.start_date || '')}"></label>
-      <label>End date<input type="date" name="end_date" value="${esc(pr?.end_date || '')}"></label>
+      <label>Loan Amount ($)<input type="text" class="money" name="loan_amount" inputmode="decimal" min="0" step="any" value="${esc(fmtInput(pr?.loan_amount))}"></label>
+      <label>Start Date<input type="date" name="start_date" value="${esc(pr?.start_date || '')}"></label>
+      <label>End Date<input type="date" name="end_date" value="${esc(pr?.end_date || '')}"></label>
     </div>`,
     onSubmit: async form => {
       const v = form.elements;
@@ -672,14 +682,14 @@ function lineSheet(line){
       title: lineName(line),
       html: `<div class="small muted">${esc(divName(line.division_code))}</div>
         <div class="grid">
-          <label>Budget ($)<input type="number" name="budget" inputmode="decimal" step="any" value="${esc(line.budget)}"></label>
-          <label>Revision ($)<input type="number" name="revision" inputmode="decimal" step="any" value="${esc(line.revision)}"></label>
-          <label class="full">Reason for revision<input name="revision_reason" value="${esc(line.revision_reason)}" placeholder="e.g. Change order 2"></label>
-          <label class="check full"><input type="checkbox" name="bank_funded" ${line.bank_funded ? 'checked' : ''}> Bank funds this line</label>
+          <label>Budget ($)<input type="text" class="money" name="budget" inputmode="decimal" step="any" value="${esc(fmtInput(line.budget))}"></label>
+          <label>Revision ($)<input type="text" class="money" name="revision" inputmode="decimal" step="any" value="${esc(fmtInput(line.revision))}"></label>
+          <label class="full">Reason For Revision<input name="revision_reason" value="${esc(line.revision_reason)}" placeholder="e.g. Change order 2"></label>
+          <label class="check full"><input type="checkbox" name="bank_funded" ${line.bank_funded ? 'checked' : ''}> Bank Funds This Line</label>
         </div>
         <div class="small muted">Paid so far: ${money(paidHere)}. ${paidHere ? 'Lines with payments cannot be deleted.' : ''}</div>`,
       danger: paidHere ? null : {
-        label: 'Delete line',
+        label: 'Delete Line',
         run: async () => check(await sb.from('project_lines').delete().eq('id', line.id))
       },
       onSubmit: async form => {
@@ -696,20 +706,20 @@ function lineSheet(line){
   }
 
   sheet({
-    title: 'Add budget line',
+    title: 'Add Budget Line',
     html: `<div class="grid">
       <label class="full">Division<select name="division_code">${divOptions()}</select></label>
-      <label class="full">Sub-task<select name="subtask_code"></select></label>
-      <label class="full" data-custom hidden>Line name<input name="label" placeholder="e.g. Permit fee, unexpected"></label>
-      <label>Budget ($)<input type="number" name="budget" inputmode="decimal" step="any" value="0"></label>
-      <label class="check"><input type="checkbox" name="bank_funded" checked> Bank funds this line</label>
+      <label class="full">Sub-Task<select name="subtask_code"></select></label>
+      <label class="full" data-custom hidden>Line Name<input name="label" placeholder="e.g. Permit fee, unexpected"></label>
+      <label>Budget ($)<input type="text" class="money" name="budget" inputmode="decimal" step="any" value="0"></label>
+      <label class="check"><input type="checkbox" name="bank_funded" checked> Bank Funds This Line</label>
     </div>`,
     onOpen: (form) => {
       const v = form.elements;
       const fillSubs = () => {
         const code = v.division_code.value;
         const subs = S.subs.filter(s => s.division_code === code);
-        v.subtask_code.innerHTML = `<option value="">Custom line</option>` + subs.map(s => `<option value="${esc(s.code)}">${esc(s.code + ' ' + s.name)}</option>`).join('');
+        v.subtask_code.innerHTML = `<option value="">Custom Line</option>` + subs.map(s => `<option value="${esc(s.code)}">${esc(s.code + ' ' + s.name)}</option>`).join('');
         v.bank_funded.checked = !!S.divMap[code]?.bank_funded;
         toggleCustom();
       };
@@ -739,20 +749,20 @@ function paymentSheet(){
   const P = S.proj;
   const vendorOpts = S.vendors.map(v => `<option value="${v.id}">${esc(v.name)}</option>`).join('');
   sheet({
-    title: 'Record payment',
-    submit: 'Save payment',
+    title: 'Record Payment',
+    submit: 'Save Payment',
     html: `<div class="grid">
       <label>Date<input type="date" name="pay_date" value="${todayISO()}" required></label>
-      <label>Amount ($)<input type="number" name="amount" inputmode="decimal" step="0.01" min="0"></label>
-      <label class="full">Paid to<select name="vendor_id"><option value="">No vendor</option>${vendorOpts}</select></label>
-      <label class="full">What is this for?<input name="what" placeholder="e.g. Floor 2 framing, draw 1" autocomplete="off"></label>
+      <label>Amount ($)<input type="text" class="money" name="amount" inputmode="decimal" step="0.01" min="0"></label>
+      <label class="full">Paid To<select name="vendor_id"><option value="">No Vendor</option>${vendorOpts}</select></label>
+      <label class="full">What Is This For?<input name="what" placeholder="e.g. Floor 2 framing, draw 1" autocomplete="off"></label>
       <div class="notice full" data-notice hidden></div>
-      <label class="full">Budget line<select name="budget_line_id"><option value="">Choose a budget line</option>${lineOptions(P.lines)}<option value="new">+ New line for this description</option></select></label>
-      <label class="full" data-newdiv hidden>Division for the new line<select name="new_division">${divOptions()}</select></label>
+      <label class="full">Budget Line<select name="budget_line_id"><option value="">Choose A Budget Line</option>${lineOptions(P.lines)}<option value="new">+ New Line For This Description</option></select></label>
+      <label class="full" data-newdiv hidden>Division For The New Line<select name="new_division">${divOptions()}</select></label>
       <label>Method<select name="method">${PAY_METHODS.map(m => `<option>${m}</option>`).join('')}</select></label>
-      <label>Check or reference #<input name="reference"></label>
+      <label>Check Or Reference #<input name="reference"></label>
       <label>Invoice #<input name="invoice_number"></label>
-      <label class="full">Receipts and invoices<input type="file" name="files" multiple accept="image/*,application/pdf"></label>
+      <label class="full">Receipts And Invoices<input type="file" name="files" multiple accept="image/*,application/pdf"></label>
     </div>`,
     onOpen: (form) => {
       const v = form.elements;
@@ -839,11 +849,11 @@ function paymentDetail(p){
   const files = P.receipts.filter(r => r.payment_id === p.id);
   sheet({
     title: p.vendors?.name || 'Payment',
-    submit: 'Attach files',
+    submit: 'Attach Files',
     html: `<dl class="kv">
         <dt>Date</dt><dd>${fmtDate(p.pay_date)}</dd>
         <dt>Amount</dt><dd>${money(p.amount)}</dd>
-        <dt>Budget line</dt><dd>${esc(line ? divName(line.division_code) + ' · ' + lineName(line) : 'Unclassified')}</dd>
+        <dt>Budget Line</dt><dd>${esc(line ? divName(line.division_code) + ' · ' + lineName(line) : 'Unclassified')}</dd>
         <dt>Method</dt><dd>${esc(p.method)}${p.reference ? ' #' + esc(p.reference) : ''}</dd>
         <dt>Invoice</dt><dd>${esc(p.invoice_number || '—')}</dd>
         <dt>Status</dt><dd>${esc(p.status)}</dd>
@@ -854,9 +864,9 @@ function paymentDetail(p){
             <span style="display:flex;gap:6px"><button type="button" class="btn sm" data-act="open-file" data-path="${esc(f.path)}">Open</button>
             <button type="button" class="btn sm danger" data-act="del-receipt" data-id="${f.id}" data-path="${esc(f.path)}">Remove</button></span></div>`).join('') || '<div class="small muted">No receipts attached.</div>'}
       </div>
-      <label>Add receipts or invoices<input type="file" name="files" multiple accept="image/*,application/pdf"></label>`,
+      <label>Add Receipts Or Invoices<input type="file" name="files" multiple accept="image/*,application/pdf"></label>`,
     danger: {
-      label: 'Delete payment',
+      label: 'Delete Payment',
       confirm: 'Delete this payment and its receipts?',
       run: async () => {
         const paths = files.map(f => f.path);
@@ -877,11 +887,11 @@ function assignSheet(){
   const P = S.proj;
   const free = S.vendors.filter(v => !P.assignedIds.has(v.id));
   sheet({
-    title: 'Assign contractor',
+    title: 'Assign Contractor',
     submit: 'Assign',
     html: `<label>Contractor<select name="vendor_id">
         ${free.map(v => `<option value="${v.id}">${esc(v.name)}${v.trade ? ' · ' + esc(v.trade) : ''}</option>`).join('')}
-        <option value="__new">+ New contractor</option></select></label>
+        <option value="__new">+ New Contractor</option></select></label>
       <div class="grid" data-newbox hidden>
         <label class="full">Name<input name="new_name" autocomplete="off"></label>
         <label>Trade<input name="new_trade" autocomplete="off" placeholder="Framing, electrical"></label>
@@ -925,14 +935,14 @@ function coiSheet(vendorId){
   const vendor = S.vendors.find(v => v.id === vendorId);
   const cur = P.insMap[vendorId + '|' + P.project.id];
   sheet({
-    title: `Certificate of insurance · ${vendor?.name || ''}`,
-    submit: 'Save certificate',
+    title: `Certificate Of Insurance · ${vendor?.name || ''}`,
+    submit: 'Save Certificate',
     html: `<div class="grid">
         <label>Insurer<input name="insurer" value="${esc(cur?.insurer)}"></label>
-        <label>Policy number<input name="policy_number" value="${esc(cur?.policy_number)}"></label>
+        <label>Policy Number<input name="policy_number" value="${esc(cur?.policy_number)}"></label>
         <label>Expires<input type="date" name="expires_on" value="${esc(cur?.expires_on || '')}"></label>
-        <label class="check"><input type="checkbox" name="holder_listed" ${cur?.holder_listed ? 'checked' : ''}> Bank named as certificate holder</label>
-        <label class="full">Certificate file<input type="file" name="file" accept="image/*,application/pdf"></label>
+        <label class="check"><input type="checkbox" name="holder_listed" ${cur?.holder_listed ? 'checked' : ''}> Bank Named As Certificate Holder</label>
+        <label class="full">Certificate File<input type="file" name="file" accept="image/*,application/pdf"></label>
       </div>
       <div class="small muted">A certificate file is required to mark insurance as on file.</div>`,
     onSubmit: async form => {
@@ -954,10 +964,10 @@ function dismissSheet(vendorId){
   const P = S.proj;
   const vendor = S.vendors.find(v => v.id === vendorId);
   sheet({
-    title: `Dismiss reminder · ${vendor?.name || ''}`,
-    submit: 'Dismiss reminder',
+    title: `Dismiss Reminder · ${vendor?.name || ''}`,
+    submit: 'Dismiss Reminder',
     html: `<label>Reason<select name="reason">${DISMISS_REASONS.map(r => `<option>${esc(r)}</option>`).join('')}</select></label>
-      <label>Note (optional)<input name="note" autocomplete="off"></label>
+      <label>Note (Optional)<input name="note" autocomplete="off"></label>
       <div class="small muted">The reminder stops for this contractor on this project. You can add the certificate later.</div>`,
     onSubmit: async form => {
       const v = form.elements;
@@ -985,12 +995,12 @@ async function vendorSheet(v){
   const yearTotal = ledger.filter(p => String(p.pay_date).startsWith(String(S.year))).reduce((a, p) => a + num(p.amount), 0);
   const ledgerHtml = editing ? `
     <div>
-      <div class="small muted" style="font-weight:600;text-transform:uppercase;letter-spacing:.6px">Payment ledger · ${money(total)} total · ${money(yearTotal)} in ${S.year}</div>
+      <div class="small muted" style="font-weight:600;text-transform:uppercase;letter-spacing:.6px">Payment Ledger · ${money(total)} total · ${money(yearTotal)} in ${S.year}</div>
       ${ledger.map(p => `<div class="file-li"><span>${fmtDate(p.pay_date)} · ${esc(p.projects?.name || 'Project')}</span><span class="num">${money(p.amount)}</span></div>`).join('') || '<div class="small muted">No payments yet.</div>'}
     </div>` : '';
 
   sheet({
-    title: editing ? v.name : 'New contractor',
+    title: editing ? v.name : 'New Contractor',
     submit: 'Save',
     html: `<div class="grid">
         <label>Name<input name="name" required value="${esc(v?.name)}"></label>
@@ -998,12 +1008,12 @@ async function vendorSheet(v){
         <label>Company<input name="company" value="${esc(v?.company)}"></label>
         <label>Phone<input name="phone" type="tel" value="${esc(v?.phone)}"></label>
         <label class="full">Email<input name="email" type="email" value="${esc(v?.email)}"></label>
-        <label class="check full"><input type="checkbox" name="is_corporation" ${v?.is_corporation ? 'checked' : ''}> Corporation (no 1099 needed)</label>
-        <label class="full">W-9 ${v?.w9_path ? '(on file, upload to replace)' : '(missing)'}<input type="file" name="w9" accept="image/*,application/pdf"></label>
+        <label class="check full"><input type="checkbox" name="is_corporation" ${v?.is_corporation ? 'checked' : ''}> Corporation (No 1099 Needed)</label>
+        <label class="full">W-9 ${v?.w9_path ? '(On File, Upload To Replace)' : '(Missing)'}<input type="file" name="w9" accept="image/*,application/pdf"></label>
       </div>
       ${ledgerHtml}`,
     danger: editing ? {
-      label: 'Delete contractor',
+      label: 'Delete Contractor',
       confirm: 'Delete this contractor? Payments to them stay, but lose the link.',
       run: async () => {
         if (v.w9_path) await sb.storage.from('receipts').remove([v.w9_path]);
@@ -1034,11 +1044,11 @@ async function vendorSheet(v){
 
 function divisionSheet(){
   sheet({
-    title: 'New division',
+    title: 'New Division',
     html: `<div class="grid">
         <label>Code<input name="code" placeholder="210-000" required></label>
         <label>Name<input name="name" placeholder="Garage" required></label>
-        <label class="check full"><input type="checkbox" name="bank_funded" checked> Bank funds this division</label>
+        <label class="check full"><input type="checkbox" name="bank_funded" checked> Bank Funds This Division</label>
       </div>
       <div class="small muted">Codes use the form NNN-000, for example 210-000.</div>`,
     onSubmit: async form => {
@@ -1060,7 +1070,7 @@ function subtaskSheet(divCode){
     return `${divCode.slice(0, 3)}-${String(n).padStart(3, '0')}`;
   };
   sheet({
-    title: `New sub-task · ${divName(divCode)}`,
+    title: `New Sub-Task · ${divName(divCode)}`,
     html: `<label>Name<input name="name" required placeholder="e.g. Pool heater"></label>
       <div class="small muted">Code will be ${preview()}.</div>`,
     onSubmit: async form => {
