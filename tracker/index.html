@@ -80,39 +80,43 @@ main{padding:14px 16px 110px;display:flex;flex-direction:column;gap:12px;max-wid
 .line .v{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
 .line .chev{color:var(--teal-d);font-size:18px;line-height:1;font-weight:700}
 .hint-line{font-size:12px;color:var(--muted);margin-top:2px}
-.sheet-tbl{width:100%;border-collapse:collapse;font-size:13px;min-width:600px;font-variant-numeric:tabular-nums}
-.sheet-tbl th,.sheet-tbl td{padding:9px 10px;border-bottom:1px solid var(--soft);text-align:left;white-space:nowrap}
-.sheet-tbl th{background:var(--soft);font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--ink2);position:sticky;top:0}
+.sheet-tbl{width:100%;border-collapse:collapse;font-size:13px;min-width:640px;font-variant-numeric:tabular-nums}
+.sheet-tbl th,.sheet-tbl td{padding:8px 10px;border-bottom:1px solid var(--soft);text-align:left;white-space:nowrap;vertical-align:middle}
+.sheet-tbl thead th{background:#fff;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);font-weight:700;position:sticky;top:0;border-bottom:1px solid var(--line)}
+.sheet-tbl thead tr.band th{background:var(--navy);color:#fff;text-align:center;font-size:11px;letter-spacing:.8px;border-bottom:1px solid #2B3A5E}
 .sheet-tbl .r{text-align:right}
-.sheet-tbl td.wrap{white-space:normal;min-width:180px}
-.sheet-tbl .tr-click{cursor:pointer}
-.sheet-tbl .tr-click:hover{background:#F8FAFC}
-.sheet-tbl .tr-sub td{background:#F8FAFC;font-weight:700;color:var(--navy)}
-.sheet-tbl .tr-grand td{background:var(--navy);color:#fff;font-weight:700}
+.sheet-tbl .ctr{text-align:center}
+.sheet-tbl td.code{width:86px;color:var(--muted);font-weight:600}
+.sheet-tbl td.desc{min-width:240px}
+.sheet-tbl td.wrap{white-space:normal}
+.sheet-tbl tr.item td.desc{padding-left:26px}
+.sheet-tbl tr.grp td{background:#E8F3F1;font-weight:700;color:var(--navy);border-top:1px solid #CFE7E3;padding-top:10px;padding-bottom:10px}
+.sheet-tbl tr.grp td.code{color:var(--teal-d)}
+.sheet-tbl tr.grp td.desc{text-transform:uppercase;letter-spacing:.3px;font-size:12px}
+.sheet-tbl tr.tr-click{cursor:pointer}
+.sheet-tbl tr.tr-click:hover td{background:#F8FAFC}
+.sheet-tbl tr.tr-grand td{background:var(--navy);color:#fff;font-weight:700;border-bottom:0}
 @media (max-width:640px){
   .sheet-tbl, .sheet-tbl tbody{display:block;min-width:0}
   .sheet-tbl thead{display:none}
   .sheet-tbl tr{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 12px;padding:12px 14px;border-bottom:1px solid var(--soft)}
-  .sheet-tbl td{border:0;padding:0;white-space:normal}
-  .sheet-tbl tr.tr-click{display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"name amt" "meta owed";gap:2px 12px}
-  .sheet-tbl tr.tr-click td:nth-child(1),
-  .sheet-tbl tr.tr-click td:nth-child(4),
-  .sheet-tbl tr.tr-click td:nth-child(5),
-  .sheet-tbl tr.tr-click td:nth-child(8){display:none}
-  .sheet-tbl tr.tr-click td:nth-child(2){grid-area:name;font-weight:600}
-  .sheet-tbl tr.tr-click td:nth-child(3){grid-area:amt;text-align:right;font-weight:700}
-  .sheet-tbl tr.tr-click td:nth-child(6){grid-area:meta;color:var(--muted);font-size:12px}
-  .sheet-tbl tr.tr-click td:nth-child(7){grid-area:owed;text-align:right;font-size:12px;color:var(--muted)}
-  .sheet-tbl tr.tr-sub,.sheet-tbl tr.tr-grand{background:#F8FAFC;justify-content:space-between}
-  .sheet-tbl tr.tr-grand{background:var(--navy);color:#fff}
-  .sheet-tbl tr.tr-sub td:nth-child(1){flex:1 1 100%;font-weight:700}
-  .sheet-tbl tr.tr-grand td:nth-child(1){flex:1 1 100%}
-  .sheet-tbl tr.tr-sub td:nth-child(3),.sheet-tbl tr.tr-sub td:nth-child(4),.sheet-tbl tr.tr-sub td:nth-child(8),
-  .sheet-tbl tr.tr-grand td:nth-child(4),.sheet-tbl tr.tr-grand td:nth-child(8){display:none}
-  .sheet-tbl tr.tr-sub td:nth-child(5),.sheet-tbl tr.tr-grand td:nth-child(5){order:2}
-  .sheet-tbl tr.tr-sub td:nth-child(6),.sheet-tbl tr.tr-grand td:nth-child(6){font-size:12px;color:var(--muted)}
-  .sheet-tbl tr.tr-sub td:nth-child(7),.sheet-tbl tr.tr-grand td:nth-child(7){font-size:12px}
-  .sheet-tbl tr.tr-grand td:nth-child(6),.sheet-tbl tr.tr-grand td:nth-child(7){color:#E2E8F0}
+  .sheet-tbl td{border:0;padding:0;white-space:normal;min-width:0}
+  .sheet-tbl tr.item{display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"name amt" "meta owed";gap:2px 12px}
+  .sheet-tbl tr.item td.code,.sheet-tbl tr.item td:nth-child(4),.sheet-tbl tr.item td:nth-child(5),.sheet-tbl tr.item td:nth-child(8){display:none}
+  .sheet-tbl tr.item td.desc{grid-area:name;font-weight:600;padding-left:0}
+  .sheet-tbl tr.item td:nth-child(3){grid-area:amt;text-align:right;font-weight:700}
+  .sheet-tbl tr.item td:nth-child(6){grid-area:meta;color:var(--muted);font-size:12px}
+  .sheet-tbl tr.item td:nth-child(7){grid-area:owed;text-align:right;font-size:12px;color:var(--muted)}
+  .sheet-tbl tr.grp{background:#E8F3F1;justify-content:space-between;align-items:center;padding:10px 14px}
+  .sheet-tbl tr.grp td.code,.sheet-tbl tr.grp td:nth-child(3),.sheet-tbl tr.grp td:nth-child(4),.sheet-tbl tr.grp td:nth-child(6),.sheet-tbl tr.grp td:nth-child(8){display:none}
+  .sheet-tbl tr.grp td.desc{flex:1 1 55%;font-size:12px}
+  .sheet-tbl tr.grp td:nth-child(5){font-weight:700;color:var(--navy)}
+  .sheet-tbl tr.grp td:nth-child(7){font-size:12px;color:var(--muted)}
+  .sheet-tbl tr.tr-grand{background:var(--navy);color:#fff;justify-content:space-between;align-items:center}
+  .sheet-tbl tr.tr-grand td:nth-child(1){flex:1 1 55%}
+  .sheet-tbl tr.tr-grand td:nth-child(3),.sheet-tbl tr.tr-grand td:nth-child(4),.sheet-tbl tr.tr-grand td:nth-child(6),.sheet-tbl tr.tr-grand td:nth-child(8){display:none}
+  .sheet-tbl tr.tr-grand td:nth-child(5){font-weight:700}
+  .sheet-tbl tr.tr-grand td:nth-child(7){font-size:12px;color:#CBD5E1}
 }
 .line-h{display:grid;grid-template-columns:minmax(0,1fr) auto auto 14px;gap:12px;font-size:11px;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);font-weight:600;padding-top:6px}
 .line-h span:not(:first-child){text-align:right}
@@ -448,38 +452,58 @@ function renderBudget(P){
 // ---------- Budget spreadsheet view ----------
 function budgetTableHtml(P, paid, byDiv, codes){
   const body = [];
-  let gBud = 0, gTot = 0, gPaid = 0;
+  let gBud = 0, gRev = 0, gPaid = 0;
   codes.forEach(code => {
-    let dBud = 0, dTot = 0, dPaid = 0;
-    byDiv[code].forEach(l => {
+    const ls = byDiv[code];
+    const dBud = ls.reduce((a, l) => a + num(l.budget), 0);
+    const dRev = ls.reduce((a, l) => a + num(l.revision), 0);
+    const dTot = dBud + dRev;
+    const dPaid = ls.reduce((a, l) => a + (paid[l.id] || 0), 0);
+    body.push(`<tr class="grp">
+      <td class="code">${esc(code)}</td>
+      <td class="desc">${esc((S.divMap[code]?.name || 'Unnamed Division').toUpperCase())}</td>
+      <td class="r">${money(dBud)}</td>
+      <td class="r">${dRev ? money(dRev) : ''}</td>
+      <td class="r">${money(dTot)}</td>
+      <td class="r">${money(dPaid)}</td>
+      <td class="r">${money(Math.max(0, dTot - dPaid))}</td>
+      <td class="ctr"></td>
+    </tr>`);
+    ls.forEach(l => {
       const bl = budgetOf(l), lp = paid[l.id] || 0;
-      dBud += num(l.budget); dTot += bl; dPaid += lp;
-      body.push(`<tr class="tr-click" data-act="edit-line" data-id="${l.id}">
-        <td>${esc(l.subtask_code || 'Custom')}</td>
-        <td class="wrap">${esc(lineName(l))}</td>
+      body.push(`<tr class="item tr-click" data-act="edit-line" data-id="${l.id}">
+        <td class="code">${esc(l.subtask_code || '')}</td>
+        <td class="desc wrap">${esc(lineName(l))}</td>
         <td class="r">${money(l.budget)}</td>
-        <td class="r">${Number(l.revision) ? money(l.revision) : '—'}</td>
+        <td class="r">${Number(l.revision) ? money(l.revision) : ''}</td>
         <td class="r">${money(bl)}</td>
         <td class="r">${money(lp)}</td>
         <td class="r">${money(Math.max(0, bl - lp))}</td>
-        <td>${l.bank_funded ? 'Yes' : 'No'}</td>
+        <td class="ctr">${l.bank_funded ? 'Yes' : 'No'}</td>
       </tr>`);
     });
-    body.push(`<tr class="tr-sub"><td colspan="2">${esc(divName(code))}</td>
-      <td class="r">${money(dBud)}</td><td></td><td class="r">${money(dTot)}</td>
-      <td class="r">${money(dPaid)}</td><td class="r">${money(Math.max(0, dTot - dPaid))}</td><td></td></tr>`);
-    gBud += dBud; gTot += dTot; gPaid += dPaid;
+    gBud += dBud; gRev += dRev; gPaid += dPaid;
   });
-  body.push(`<tr class="tr-grand"><td colspan="2">Total Budget</td>
-      <td class="r">${money(gBud)}</td><td></td><td class="r">${money(gTot)}</td>
-      <td class="r">${money(gPaid)}</td><td class="r">${money(Math.max(0, gTot - gPaid))}</td><td></td></tr>`);
+  const gTot = gBud + gRev;
+  body.push(`<tr class="tr-grand">
+    <td colspan="2">Total Budget</td>
+    <td class="r">${money(gBud)}</td>
+    <td class="r">${gRev ? money(gRev) : ''}</td>
+    <td class="r">${money(gTot)}</td>
+    <td class="r">${money(gPaid)}</td>
+    <td class="r">${money(Math.max(0, gTot - gPaid))}</td>
+    <td></td>
+  </tr>`);
   return `<div class="card" style="padding:0;overflow-x:auto">
     <table class="sheet-tbl">
-      <thead><tr><th>Code</th><th>Sub-Task</th><th class="r">Budget</th><th class="r">Revision</th><th class="r">Total</th><th class="r">Paid</th><th class="r">Owed</th><th>Bank Funded</th></tr></thead>
+      <thead>
+        <tr class="band"><th class="code"></th><th class="desc"></th><th colspan="3">Estimated Cost</th><th colspan="2">Paid To Date</th><th>Funding</th></tr>
+        <tr><th class="code">Code</th><th class="desc">Description</th><th class="r">Budget</th><th class="r">Revision</th><th class="r">Total</th><th class="r">Paid</th><th class="r">Owed</th><th class="ctr">Bank Funded</th></tr>
+      </thead>
       <tbody>${body.join('')}</tbody>
     </table>
   </div>
-  <div class="small muted" style="text-align:center">Tap a row to edit it. Export CSV opens in Excel.</div>`;
+  <div class="small muted" style="text-align:center">Tap a line to edit it. Export CSV opens in Excel.</div>`;
 }
 
 function exportBudgetCsv(){
