@@ -65,11 +65,13 @@ main{padding:16px 16px 110px;display:flex;flex-direction:column;gap:14px;max-wid
 .row .t{font-weight:600;overflow-wrap:anywhere}
 .row .s{font-size:12px;color:var(--muted);overflow-wrap:anywhere}
 .row .amt{font-weight:700;font-variant-numeric:tabular-nums;text-align:right}
-.line{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:2px 12px;padding:10px 0;border-top:1px solid var(--soft);font-size:13px;background:none;border-left:0;border-right:0;border-bottom:0;width:100%;text-align:left;cursor:pointer;align-items:center}
+.line{display:grid;grid-template-columns:minmax(0,1fr) auto auto 14px;gap:2px 12px;padding:10px 0;border-top:1px solid var(--soft);font-size:13px;background:none;border-left:0;border-right:0;border-bottom:0;width:100%;text-align:left;cursor:pointer;align-items:center}
 .line .n{overflow-wrap:anywhere;color:var(--ink)}
 .line .c{font-size:12px;color:var(--muted)}
 .line .v{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
-.line-h{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:12px;font-size:11px;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);font-weight:600;padding-top:6px}
+.line .chev{color:var(--teal-d);font-size:18px;line-height:1;font-weight:700}
+.hint-line{font-size:12px;color:var(--muted);margin-top:2px}
+.line-h{display:grid;grid-template-columns:minmax(0,1fr) auto auto 14px;gap:12px;font-size:11px;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);font-weight:600;padding-top:6px}
 .line-h span:not(:first-child){text-align:right}
 details{background:var(--card);border-radius:16px;padding:14px 16px;box-shadow:0 1px 2px rgba(15,23,42,.05)}
 summary{cursor:pointer;font-weight:700;list-style:none;display:flex;justify-content:space-between;gap:10px;align-items:center}
@@ -406,7 +408,8 @@ function renderBudget(P){
         <div class="card-h small"><span class="muted">Paid ${money(pd)}</span><span class="warnText">Owed ${money(owed)}</span></div>
         ${custom ? `<div class="small" style="color:var(--indigo-ink)">${custom} custom line${custom > 1 ? 's' : ''} not in the Library</div>` : ''}
         <div>
-          <div class="line-h"><span>Sub-Task</span><span>Budget</span><span>Owed</span></div>
+          <div class="line-h"><span>Sub-Task</span><span>Budget</span><span>Owed</span><span></span></div>
+          <div class="hint-line">Tap a line to edit its budget or record a revision.</div>
           ${ls.map(l => {
             const lp = paid[l.id] || 0;
             const bl = budgetOf(l);
@@ -416,6 +419,7 @@ function renderBudget(P){
                 <div class="c">Paid ${money(lp)}</div></span>
               <span class="v">${money(bl)}</span>
               <span class="v ${bl - lp > 0 ? 'warnText' : ''}">${money(Math.max(0, bl - lp))}</span>
+              <span class="chev" aria-hidden="true">›</span>
             </button>`;
           }).join('')}
         </div>
@@ -1180,8 +1184,13 @@ function showSignedIn(on){
   $('#app').classList.toggle('hidden', !on);
 }
 
-sb.auth.onAuthStateChange(async (_event, s) => {
+sb.auth.onAuthStateChange((_event, s) => {
   session = s;
+  // Run app queries after the auth callback returns. Awaiting queries inside it can hang in some browsers.
+  setTimeout(() => startApp(s), 0);
+});
+
+async function startApp(s){
   if (!s){ showSignedIn(false); return; }
   showSignedIn(true);
   try {
@@ -1191,7 +1200,7 @@ sb.auth.onAuthStateChange(async (_event, s) => {
   } catch (e) {
     $('#main').innerHTML = `<div class="notice bad">Could not load: ${esc(msg(e))}</div>`;
   }
-});
+}
 </script>
 </body>
 </html>
