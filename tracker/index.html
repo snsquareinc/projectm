@@ -533,10 +533,6 @@ $('#projForm').addEventListener('submit', async e => {
     $('#projErr').hidden = false;
   }
 });
-  if (res.error){ $('#projErr').textContent = res.error.message; $('#projErr').hidden = false; return; }
-  $('#projDlg').close();
-  await loadAll();
-});
 
 $('#catForm').addEventListener('submit', async e => {
   e.preventDefault();
