@@ -99,25 +99,26 @@ main{padding:14px 16px 110px;display:flex;flex-direction:column;gap:12px;max-wid
 @media (max-width:640px){
   .sheet-tbl, .sheet-tbl tbody{display:block;min-width:0}
   .sheet-tbl thead{display:none}
-  .sheet-tbl tr{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 12px;padding:12px 14px;border-bottom:1px solid var(--soft)}
-  .sheet-tbl td{border:0;padding:0;white-space:normal;min-width:0}
+  .sheet-tbl tr{display:flex;flex-wrap:wrap;align-items:center;gap:4px 12px;padding:12px 14px;border-bottom:1px solid var(--soft)}
+  .sheet-tbl td{display:none;border:0;padding:0;white-space:normal;min-width:0}
+  .sheet-tbl td.m-name,.sheet-tbl td.m-amt,.sheet-tbl td.m-meta,.sheet-tbl td.m-owed{display:block}
   .sheet-tbl tr.item{display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"name amt" "meta owed";gap:2px 12px}
-  .sheet-tbl tr.item td.code,.sheet-tbl tr.item td:nth-child(4),.sheet-tbl tr.item td:nth-child(5),.sheet-tbl tr.item td:nth-child(8){display:none}
-  .sheet-tbl tr.item td.desc{grid-area:name;font-weight:600;padding-left:0}
-  .sheet-tbl tr.item td:nth-child(3){grid-area:amt;text-align:right;font-weight:700}
-  .sheet-tbl tr.item td:nth-child(6){grid-area:meta;color:var(--muted);font-size:12px}
-  .sheet-tbl tr.item td:nth-child(7){grid-area:owed;text-align:right;font-size:12px;color:var(--muted)}
-  .sheet-tbl tr.grp{background:#E8F3F1;justify-content:space-between;align-items:center;padding:10px 14px}
-  .sheet-tbl tr.grp td.code,.sheet-tbl tr.grp td:nth-child(3),.sheet-tbl tr.grp td:nth-child(4),.sheet-tbl tr.grp td:nth-child(6),.sheet-tbl tr.grp td:nth-child(8){display:none}
-  .sheet-tbl tr.grp td.desc{flex:1 1 55%;font-size:12px}
-  .sheet-tbl tr.grp td:nth-child(5){font-weight:700;color:var(--navy)}
-  .sheet-tbl tr.grp td:nth-child(7){font-size:12px;color:var(--muted)}
-  .sheet-tbl tr.tr-grand{background:var(--navy);color:#fff;justify-content:space-between;align-items:center}
-  .sheet-tbl tr.tr-grand td:nth-child(1){flex:1 1 55%}
-  .sheet-tbl tr.tr-grand td:nth-child(3),.sheet-tbl tr.tr-grand td:nth-child(4),.sheet-tbl tr.tr-grand td:nth-child(6),.sheet-tbl tr.tr-grand td:nth-child(8){display:none}
-  .sheet-tbl tr.tr-grand td:nth-child(5){font-weight:700}
-  .sheet-tbl tr.tr-grand td:nth-child(7){font-size:12px;color:#CBD5E1}
+  .sheet-tbl tr.item td.m-name{grid-area:name;font-weight:600;padding-left:0}
+  .sheet-tbl tr.item td.m-amt{grid-area:amt;text-align:right;font-weight:700}
+  .sheet-tbl tr.item td.m-meta{grid-area:meta;color:var(--muted);font-size:12px}
+  .sheet-tbl tr.item td.m-owed{grid-area:owed;text-align:right;font-size:12px;color:var(--muted)}
+  .sheet-tbl tr.grp{background:#E8F3F1;justify-content:space-between;padding:10px 14px}
+  .sheet-tbl tr.grp td.m-name{flex:1 1 55%;font-size:12px}
+  .sheet-tbl tr.grp td.m-amt{font-weight:700;color:var(--navy)}
+  .sheet-tbl tr.grp td.m-owed{font-size:12px;color:var(--muted)}
+  .sheet-tbl tr.tr-grand{background:var(--navy);color:#fff;justify-content:space-between}
+  .sheet-tbl tr.tr-grand td.m-name{flex:1 1 55%}
+  .sheet-tbl tr.tr-grand td.m-amt{font-weight:700}
+  .sheet-tbl tr.tr-grand td.m-owed{font-size:12px;color:#CBD5E1}
 }
+.calc{display:flex;justify-content:space-between;align-items:center;gap:12px;background:var(--soft);border-radius:12px;padding:12px 14px}
+.calc strong{font-size:18px}
+
 .line-h{display:grid;grid-template-columns:minmax(0,1fr) auto auto 14px;gap:12px;font-size:11px;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);font-weight:600;padding-top:6px}
 .line-h span:not(:first-child){text-align:right}
 details{background:var(--card);border-radius:16px;padding:14px 16px;box-shadow:0 1px 2px rgba(15,23,42,.05)}
@@ -450,6 +451,8 @@ function renderBudget(P){
 }
 
 // ---------- Budget spreadsheet view ----------
+function fmtQty(n){ return Number(n || 0).toLocaleString('en-US', {maximumFractionDigits: 2}); }
+
 function budgetTableHtml(P, paid, byDiv, codes){
   const body = [];
   let gBud = 0, gRev = 0, gPaid = 0;
@@ -461,24 +464,27 @@ function budgetTableHtml(P, paid, byDiv, codes){
     const dPaid = ls.reduce((a, l) => a + (paid[l.id] || 0), 0);
     body.push(`<tr class="grp">
       <td class="code">${esc(code)}</td>
-      <td class="desc">${esc((S.divMap[code]?.name || 'Unnamed Division').toUpperCase())}</td>
+      <td class="desc m-name">${esc((S.divMap[code]?.name || 'Unnamed Division').toUpperCase())}</td>
+      <td></td><td></td>
       <td class="r">${money(dBud)}</td>
       <td class="r">${dRev ? money(dRev) : ''}</td>
-      <td class="r">${money(dTot)}</td>
+      <td class="r m-amt">${money(dTot)}</td>
       <td class="r">${money(dPaid)}</td>
-      <td class="r">${money(Math.max(0, dTot - dPaid))}</td>
-      <td class="ctr"></td>
+      <td class="r m-owed">${money(Math.max(0, dTot - dPaid))}</td>
+      <td></td>
     </tr>`);
     ls.forEach(l => {
       const bl = budgetOf(l), lp = paid[l.id] || 0;
       body.push(`<tr class="item tr-click" data-act="edit-line" data-id="${l.id}">
         <td class="code">${esc(l.subtask_code || '')}</td>
-        <td class="desc wrap">${esc(lineName(l))}</td>
+        <td class="desc wrap m-name">${esc(lineName(l))}</td>
+        <td class="r">${fmtQty(l.qty)}</td>
+        <td class="r">${money(l.rate)}</td>
         <td class="r">${money(l.budget)}</td>
         <td class="r">${Number(l.revision) ? money(l.revision) : ''}</td>
-        <td class="r">${money(bl)}</td>
-        <td class="r">${money(lp)}</td>
-        <td class="r">${money(Math.max(0, bl - lp))}</td>
+        <td class="r m-amt">${money(bl)}</td>
+        <td class="r m-meta">${money(lp)}</td>
+        <td class="r m-owed">${money(Math.max(0, bl - lp))}</td>
         <td class="ctr">${l.bank_funded ? 'Yes' : 'No'}</td>
       </tr>`);
     });
@@ -486,19 +492,20 @@ function budgetTableHtml(P, paid, byDiv, codes){
   });
   const gTot = gBud + gRev;
   body.push(`<tr class="tr-grand">
-    <td colspan="2">Total Budget</td>
+    <td colspan="2" class="m-name">Total Budget</td>
+    <td></td><td></td>
     <td class="r">${money(gBud)}</td>
     <td class="r">${gRev ? money(gRev) : ''}</td>
-    <td class="r">${money(gTot)}</td>
+    <td class="r m-amt">${money(gTot)}</td>
     <td class="r">${money(gPaid)}</td>
-    <td class="r">${money(Math.max(0, gTot - gPaid))}</td>
+    <td class="r m-owed">${money(Math.max(0, gTot - gPaid))}</td>
     <td></td>
   </tr>`);
   return `<div class="card" style="padding:0;overflow-x:auto">
     <table class="sheet-tbl">
       <thead>
-        <tr class="band"><th class="code"></th><th class="desc"></th><th colspan="3">Estimated Cost</th><th colspan="2">Paid To Date</th><th>Funding</th></tr>
-        <tr><th class="code">Code</th><th class="desc">Description</th><th class="r">Budget</th><th class="r">Revision</th><th class="r">Total</th><th class="r">Paid</th><th class="r">Owed</th><th class="ctr">Bank Funded</th></tr>
+        <tr class="band"><th class="code"></th><th class="desc"></th><th colspan="2">Sq.Ft. / Qty</th><th colspan="3">Estimated Cost</th><th colspan="2">Paid To Date</th><th>Funding</th></tr>
+        <tr><th class="code">Code</th><th class="desc">Description</th><th class="r">Sq.Ft. / Qty</th><th class="r">Rate</th><th class="r">Budget</th><th class="r">Revision</th><th class="r">Total</th><th class="r">Paid</th><th class="r">Owed</th><th class="ctr">Bank Funded</th></tr>
       </thead>
       <tbody>${body.join('')}</tbody>
     </table>
@@ -509,13 +516,13 @@ function budgetTableHtml(P, paid, byDiv, codes){
 function exportBudgetCsv(){
   const P = S.proj;
   const paid = paidByLine(P);
-  const rows = [['Division', 'Code', 'Sub-Task', 'Budget', 'Revision', 'Total', 'Paid', 'Owed', 'Bank Funded']];
+  const rows = [['Division', 'Code', 'Sub-Task', 'Sq.Ft. / Qty', 'Rate', 'Budget', 'Revision', 'Total', 'Paid', 'Owed', 'Bank Funded']];
   P.lines.slice().sort((a, b) => a.division_code.localeCompare(b.division_code)).forEach(l => {
     const bl = budgetOf(l), lp = paid[l.id] || 0;
-    rows.push([divName(l.division_code), l.subtask_code || 'Custom', lineName(l), num(l.budget), num(l.revision), bl, lp, Math.max(0, bl - lp), l.bank_funded ? 'Yes' : 'No']);
+    rows.push([divName(l.division_code), l.subtask_code || 'Custom', lineName(l), num(l.qty), num(l.rate), num(l.budget), num(l.revision), bl, lp, Math.max(0, bl - lp), l.bank_funded ? 'Yes' : 'No']);
   });
   const csv = rows.map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\r\n');
-  const blob = new Blob(['\ufeff' + csv], {type: 'text/csv;charset=utf-8'});
+  const blob = new Blob(['﻿' + csv], {type: 'text/csv;charset=utf-8'});
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
@@ -768,6 +775,17 @@ function projectSheet(pr){
 }
 
 // Budget line (add or edit)
+function calcBox(qty, rate){
+  return `<div class="calc"><span class="small muted">Budget = Sq.Ft. / Qty × Rate</span><strong class="num" data-calc>${money(num(qty) * num(rate))}</strong></div>`;
+}
+function bindCalc(form){
+  const v = form.elements;
+  const out = form.querySelector('[data-calc]');
+  const upd = () => { out.textContent = money(num(v.qty.value) * num(v.rate.value)); };
+  v.qty.addEventListener('input', upd);
+  v.rate.addEventListener('input', upd);
+}
+
 function lineSheet(line){
   const P = S.proj;
   if (line){
@@ -776,23 +794,27 @@ function lineSheet(line){
       title: lineName(line),
       html: `<div class="small muted">${esc(divName(line.division_code))}</div>
         <div class="grid">
-          <label>Budget ($)<input type="text" class="money" name="budget" inputmode="decimal" step="any" value="${esc(fmtInput(line.budget))}"></label>
-          <label>Revision ($)<input type="text" class="money" name="revision" inputmode="decimal" step="any" value="${esc(fmtInput(line.revision))}"></label>
-          <label class="full">Reason For Revision<input name="revision_reason" value="${esc(line.revision_reason)}" placeholder="e.g. Change order 2"></label>
+          <label>Sq.Ft. / Qty<input type="text" class="money" name="qty" inputmode="decimal" value="${esc(fmtInput(line.qty))}"></label>
+          <label>Rate ($)<input type="text" class="money" name="rate" inputmode="decimal" value="${esc(fmtInput(line.rate))}"></label>
+          <label class="full">Revision ($)<input type="text" class="money" name="revision" inputmode="decimal" value="${esc(fmtInput(line.revision))}"></label>
+          <label class="full">Reason For Revision<input name="revision_reason" value="${esc(line.revision_reason)}" placeholder="e.g. Change Order 2"></label>
           <label class="check full"><input type="checkbox" name="bank_funded" ${line.bank_funded ? 'checked' : ''}> Bank Funds This Line</label>
         </div>
+        ${calcBox(line.qty, line.rate)}
         <div class="small muted">Paid so far: ${money(paidHere)}. ${paidHere ? 'Lines with payments cannot be deleted.' : ''}</div>`,
       danger: paidHere ? null : {
         label: 'Delete Line',
         run: async () => check(await sb.from('project_lines').delete().eq('id', line.id))
       },
+      onOpen: form => bindCalc(form),
       onSubmit: async form => {
         const v = form.elements;
         const rev = num(v.revision.value);
         if (rev !== num(line.revision) && !v.revision_reason.value.trim()) throw new Error('Give a reason for the revision.');
+        const qty = num(v.qty.value), rate = num(v.rate.value);
         check(await sb.from('project_lines').update({
-          budget: num(v.budget.value), revision: rev,
-          revision_reason: v.revision_reason.value.trim(), bank_funded: v.bank_funded.checked
+          qty, rate, budget: qty * rate,
+          revision: rev, revision_reason: v.revision_reason.value.trim(), bank_funded: v.bank_funded.checked
         }).eq('id', line.id));
       }
     });
@@ -804,10 +826,12 @@ function lineSheet(line){
     html: `<div class="grid">
       <label class="full">Division<select name="division_code">${divOptions()}</select></label>
       <label class="full">Sub-Task<select name="subtask_code"></select></label>
-      <label class="full" data-custom hidden>Line Name<input name="label" placeholder="e.g. Permit fee, unexpected"></label>
-      <label>Budget ($)<input type="text" class="money" name="budget" inputmode="decimal" step="any" value="0"></label>
-      <label class="check"><input type="checkbox" name="bank_funded" checked> Bank Funds This Line</label>
-    </div>`,
+      <label class="full" data-custom hidden>Line Name<input name="label" placeholder="e.g. Permit Fee, Unexpected"></label>
+      <label>Sq.Ft. / Qty<input type="text" class="money" name="qty" inputmode="decimal" value="1"></label>
+      <label>Rate ($)<input type="text" class="money" name="rate" inputmode="decimal" value="0"></label>
+      <label class="check full"><input type="checkbox" name="bank_funded" checked> Bank Funds This Line</label>
+    </div>
+    ${calcBox(1, 0)}`,
     onOpen: (form) => {
       const v = form.elements;
       const fillSubs = () => {
@@ -820,6 +844,7 @@ function lineSheet(line){
       const toggleCustom = () => { form.querySelector('[data-custom]').hidden = !!v.subtask_code.value; };
       v.division_code.addEventListener('change', fillSubs);
       v.subtask_code.addEventListener('change', toggleCustom);
+      bindCalc(form);
       fillSubs();
     },
     onSubmit: async form => {
@@ -827,12 +852,12 @@ function lineSheet(line){
       const sub = v.subtask_code.value || null;
       const label = v.label.value.trim();
       if (!sub && !label) throw new Error('Name the custom line, or pick a sub-task.');
-      const dup = sub && S.proj.lines.some(l => l.subtask_code === sub);
-      if (dup) throw new Error('That sub-task is already on this budget.');
+      if (sub && S.proj.lines.some(l => l.subtask_code === sub)) throw new Error('That sub-task is already on this budget.');
+      const qty = num(v.qty.value), rate = num(v.rate.value);
       check(await sb.from('project_lines').insert({
         project_id: S.proj.project.id, division_code: v.division_code.value,
         subtask_code: sub, label: sub ? '' : label,
-        budget: num(v.budget.value), bank_funded: v.bank_funded.checked
+        qty, rate, budget: qty * rate, bank_funded: v.bank_funded.checked
       }));
     }
   });

@@ -10,6 +10,7 @@ It runs on Netlify (hosting) and Supabase (database, login, and file storage). Y
 - `config.js`: your Supabase URL and public key. Served at `/config.js`.
 - `supabase/001_phase1.sql`: tables, access rules, library seed (21 divisions, 212 sub-tasks).
 - `supabase/002_project_vendors.sql`: contractor assignments to projects.
+- `supabase/003_qty_rate.sql`: Sq.Ft. / Qty and Rate on budget lines (budget = qty × rate).
 
 ## One-time setup
 
@@ -17,6 +18,7 @@ It runs on Netlify (hosting) and Supabase (database, login, and file storage). Y
 1. Go to supabase.com, sign in, and create a new project. Choose a region near Massachusetts and save the database password.
 2. Open **SQL Editor**, paste `supabase/001_phase1.sql`, and click **Run**.
 3. In a new query, paste `supabase/002_project_vendors.sql` and click **Run**.
+4. In a new query, paste `supabase/003_qty_rate.sql` and click **Run**.
 
 ### 2. Lock down sign-ups and add yourself
 1. In Supabase, go to **Authentication > Sign In / Providers > Email**, keep Email enabled, and turn off "Allow new users to sign up".
@@ -26,7 +28,7 @@ It runs on Netlify (hosting) and Supabase (database, login, and file storage). Y
 1. In Supabase, go to **Project Settings > API**.
 2. Copy the **Project URL** and the **anon public** key into `config.js`.
 
-### 4. Deploy
+### 5. Deploy
 Push the repository. Netlify redeploys the site. Open `https://snsquareinc.com/tracker/` and sign in.
 
 ## Using it
