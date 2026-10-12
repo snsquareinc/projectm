@@ -195,7 +195,7 @@ label.full{grid-column:1/-1}
 
 <!-- Project -->
 <dialog id="projDlg" aria-labelledby="projTitle">
-  <form id="projForm">
+  <form id="projForm" novalidate>
     <h2 id="projTitle">Project details</h2>
     <div class="grid">
       <label class="full">Project name<input name="name" required></label>
@@ -518,10 +518,21 @@ $('#quickForm').addEventListener('submit', async e => {
 $('#projForm').addEventListener('submit', async e => {
   e.preventDefault();
   const v = Object.fromEntries(new FormData(e.currentTarget));
-  const res = await sb.from('project').upsert({
-    id: 1, name: v.name.trim(), client: v.client.trim(), manager: v.manager.trim(),
-    start_date: dateOrNull(v.start_date), end_date: dateOrNull(v.end_date)
-  });
+  if (!v.name.trim()){ $('#projErr').textContent = 'Enter a project name.'; $('#projErr').hidden = false; return; }
+  $('#projErr').hidden = true;
+  try {
+    const res = await sb.from('project').upsert({
+      id: 1, name: v.name.trim(), client: v.client.trim(), manager: v.manager.trim(),
+      start_date: dateOrNull(v.start_date), end_date: dateOrNull(v.end_date)
+    });
+    if (res.error){ $('#projErr').textContent = res.error.message; $('#projErr').hidden = false; return; }
+    $('#projDlg').close();
+    await loadAll();
+  } catch (err) {
+    $('#projErr').textContent = 'Save failed: ' + (err?.message || err);
+    $('#projErr').hidden = false;
+  }
+});
   if (res.error){ $('#projErr').textContent = res.error.message; $('#projErr').hidden = false; return; }
   $('#projDlg').close();
   await loadAll();
