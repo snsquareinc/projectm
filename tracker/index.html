@@ -118,6 +118,8 @@ main{padding:14px 16px 110px;display:flex;flex-direction:column;gap:12px;max-wid
 .bud-entry input,.bud-entry select{height:26px;font-size:13px;padding:0 6px;width:100%;min-width:0;border:1px solid #D1FAE5;border-radius:3px;background:#fff;color:var(--ink)}
 .bud-entry input[type=checkbox]{width:auto;height:auto;margin:0}
 .bud-tbl.no-bank th:last-child,.bud-tbl.no-bank td:last-child{display:none}
+.bud-tbl{table-layout:fixed;width:100%}
+.bud-tbl.no-bank col:last-child{visibility:collapse}
 .bud-tbl thead tr.band th.gh{border-bottom:2px solid #5EEAD4;padding-top:6px}
 .bud-tbl .g-start{border-left:2px solid #CBD5E1}
 .bud-tbl thead tr.band th.g-start{border-left:1px solid rgba(255,255,255,.35)}
@@ -701,6 +703,7 @@ function budgetTableHtml(P, paid, byDiv, codes, filtered){
   </tr>`);
   return `<div class="card bud-wrap" style="padding:0;overflow-x:auto">
     <table class="sheet-tbl bud-tbl${S.showBank ? '' : ' no-bank'}">
+      <colgroup>${[96, null, 56, 72, 76, 96, 96, 92, 92, 84, 88, 88, 72].map(w => w ? `<col style="width:${w}px">` : '<col>').join('')}</colgroup>
       <thead>
         <tr class="band"><th class="code"></th><th class="desc"></th>
           <th colspan="3" class="gh g-start">Quantity</th>
