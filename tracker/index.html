@@ -746,8 +746,8 @@ function txRowHtml(r){
     <td><input type="date" data-f="date" value="${r.p.pay_date || ''}" aria-label="Date"></td>
     <td><input type="text" class="money r" data-f="amount" value="${fmtInput(r.amt)}" aria-label="Amount"></td>
     <td><select data-f="div" aria-label="Expense classification (division)"><option value="">Choose A Division</option>${divOptions(r.div)}</select></td>
-    <td><select data-f="task" aria-label="Task">${taskOptions(r.div, r.p.budget_line_id || '')}</select><input data-f="task-new" placeholder="Type the new task name" hidden aria-label="New task name"></td>
-    <td><select data-f="vendor" aria-label="Paid to">${vendorOptions(r.p.vendor_id || '')}</select><input data-f="vendor-new" placeholder="Type the new contractor name" hidden aria-label="New contractor name"></td>
+    <td><select data-f="task" aria-label="Task">${taskOptions(r.div, r.p.budget_line_id || '')}</select></td>
+    <td><select data-f="vendor" aria-label="Paid to">${vendorOptions(r.p.vendor_id || '')}</select></td>
     <td><select data-f="method" aria-label="Method">${methods.map(m => `<option ${m === r.method ? 'selected' : ''}>${esc(m)}</option>`).join('')}</select></td>
     <td><input data-f="ref" value="${esc(r.ref)}" aria-label="Check number"></td>
     <td class="ctr"><button class="icon-btn ${r.notes ? 'has' : ''}" data-act="edit-notes" data-id="${r.p.id}" title="${r.notes ? 'Edit notes' : 'Add notes'}" aria-label="${r.notes ? 'Edit notes' : 'Add notes'}">${ICON_NOTE}</button></td>
@@ -968,7 +968,7 @@ async function renderLibrary(){
 }
 
 // ---------- Sheets (forms) ----------
-function sheet({title, html, submit = 'Save', onSubmit, onOpen, danger}){
+function sheet({title, html, submit = 'Save', onSubmit, onOpen, danger, keepPage = false, onDone, onCancel}){
   const d = document.createElement('dialog');
   d.className = 'sheet';
   d.innerHTML = `<form novalidate>
@@ -982,7 +982,8 @@ function sheet({title, html, submit = 'Save', onSubmit, onOpen, danger}){
     </div>
   </form>`;
   document.body.append(d);
-  d.addEventListener('close', () => d.remove());
+  let finished = false;
+  d.addEventListener('close', () => { d.remove(); if (!finished && onCancel) onCancel(); });
   const form = d.querySelector('form');
   d.querySelectorAll('input.money').forEach(el => el.addEventListener('input', () => { el.value = formatMoneyText(el.value); }));
   const err = d.querySelector('.err');
@@ -999,7 +1000,13 @@ function sheet({title, html, submit = 'Save', onSubmit, onOpen, danger}){
     err.hidden = true;
     const btn = form.querySelector('button[type=submit]');
     btn.disabled = true;
-    try { await onSubmit(form); d.close(); await render(); }
+    try {
+      await onSubmit(form);
+      finished = true;
+      d.close();
+      if (!keepPage) await render();
+      else if (onDone) { try { await onDone(); } catch (ex) { toast(msg(ex), true); } }
+    }
     catch (ex) { showErr(ex); }
     finally { btn.disabled = false; }
   });
@@ -1180,23 +1187,43 @@ async function resolveVendorId(P, name){
   check(await sb.from('project_vendors').upsert({project_id: P.project.id, vendor_id: vendorId}, {onConflict: 'project_id,vendor_id', ignoreDuplicates: true}));
   return {vendorId, name: shown, created};
 }
-async function resolveLineId(P, lineId, name, div){
-  if (!div) throw new Error('Choose the division for this transaction.');
-  if (lineId){
-    const hit = P.lines.find(l => l.id === lineId && l.division_code === div);
-    if (!hit) throw new Error('Choose the task for this transaction. Nothing is saved without one.');
-    return {lineId: hit.id, created: false, label: lineName(hit), division_code: div};
-  }
-  const t = (name || '').trim();
-  if (!t) throw new Error('Choose the task for this transaction. Nothing is saved without one.');
-  const hit = P.lines.find(l => l.division_code === div && lineName(l).toLowerCase() === t.toLowerCase());
-  if (hit) return {lineId: hit.id, created: false, label: lineName(hit), division_code: div};
+async function addLibraryLine(P, div, code){
   const line = check(await sb.from('project_lines').insert({
-    project_id: P.project.id, division_code: div, subtask_code: null, label: t,
+    project_id: P.project.id, division_code: div, subtask_code: code, label: '',
     budget: 0, bank_funded: !!S.divMap[div]?.bank_funded
   }).select().single());
   P.lines.push(line);
-  return {lineId: line.id, created: true, label: t, division_code: div};
+  return line;
+}
+async function resolveLineId(P, value, div){
+  if (!div) throw new Error('Choose the division for this transaction.');
+  const v = (value || '').trim();
+  const need = 'Choose the task for this transaction. Nothing is saved without one.';
+  if (!v) throw new Error(need);
+  const hit = P.lines.find(l => l.id === v);
+  if (hit){
+    if (hit.division_code !== div) throw new Error(need);
+    return {lineId: hit.id, created: false, label: lineName(hit), division_code: div};
+  }
+  if (v.startsWith('lib:')){
+    const code = v.slice(4), sub = S.subMap[code];
+    if (!sub || sub.division_code !== div) throw new Error(need);
+    const existing = P.lines.find(l => l.subtask_code === code && l.division_code === div);
+    if (existing) return {lineId: existing.id, created: false, label: sub.name, division_code: div};
+    const line = await addLibraryLine(P, div, code);
+    return {lineId: line.id, created: true, label: sub.name, division_code: div};
+  }
+  // Typed name (phone form): use a matching library sub-item or project line, otherwise add a custom line.
+  const sub = S.subs.find(s => s.division_code === div && s.name.toLowerCase() === v.toLowerCase());
+  if (sub) return resolveLineId(P, 'lib:' + sub.code, div);
+  const named = P.lines.find(l => l.division_code === div && lineName(l).toLowerCase() === v.toLowerCase());
+  if (named) return {lineId: named.id, created: false, label: lineName(named), division_code: div};
+  const line = check(await sb.from('project_lines').insert({
+    project_id: P.project.id, division_code: div, subtask_code: null, label: v,
+    budget: 0, bank_funded: !!S.divMap[div]?.bank_funded
+  }).select().single());
+  P.lines.push(line);
+  return {lineId: line.id, created: true, label: v, division_code: div};
 }
 function txNotes(v, l){
   const notes = [];
@@ -1208,7 +1235,7 @@ function txNotes(v, l){
 async function savePaymentRecord(P, d){
   if (!d.date) throw new Error('Enter the payment date.');
   if (!(d.amount > 0)) throw new Error('Enter the amount.');
-  const l = await resolveLineId(P, d.lineId || null, d.task, d.div);
+  const l = await resolveLineId(P, d.lineId || d.task, d.div);
   const v = await vendorFor(P, d.vendorId || null, d.vendorName);
   const pay = check(await sb.from('payments').insert({
     project_id: P.project.id, vendor_id: v.vendorId, budget_line_id: l.lineId,
@@ -1229,21 +1256,17 @@ async function saveRow(tr){
   const date = q('date').value, amount = num(q('amount').value);
   if (!date) throw new Error('Enter the payment date.');
   if (!(amount > 0)) throw new Error('Enter the amount.');
-  const taskVal = q('task').value, vendorVal = q('vendor').value;
   const div = q('div').value;
-  const l = await resolveLineId(P, taskVal && taskVal !== '__new' ? taskVal : null, q('task-new').value, div);
-  const v = await vendorFor(P, vendorVal && vendorVal !== '__new' ? vendorVal : null, vendorVal === '__new' ? q('vendor-new').value : '');
+  const l = await resolveLineId(P, q('task').value, div);
+  const v = await vendorFor(P, q('vendor').value || null, '');
   const row = {pay_date: date, amount, method: q('method').value, reference: q('ref').value.trim(),
     vendor_id: v.vendorId, budget_line_id: l.lineId};
   check(await sb.from('payments').update(row).eq('id', pay.id));
   Object.assign(pay, row);
   pay.vendors = v.vendorId ? {name: v.name} : null;
   tr.classList.remove('tx-unc');
-  // Show the saved values in this row, and refresh the lists so new entries appear everywhere.
   fillSelect(q('task'), taskOptions(div, l.lineId), l.lineId);
   fillSelect(q('vendor'), vendorOptions(v.vendorId || ''), v.vendorId || '');
-  q('task-new').hidden = true; q('task-new').value = '';
-  q('vendor-new').hidden = true; q('vendor-new').value = '';
   if (v.created || l.created) refreshTxSelects(tr);
   txFoot(P);
   const note = txNotes(v, l);
@@ -1253,13 +1276,15 @@ async function saveRow(tr){
 // Dropdown options. Task lists only the tasks in the chosen division.
 function taskOptions(div, selectedId = ''){
   if (!div) return '<option value="">Choose Division First</option>';
-  const seen = new Set();
-  const lines = S.proj.lines
-    .filter(l => l.division_code === div || l.id === selectedId)
-    .sort((a, b) => lineName(a).localeCompare(lineName(b)))
-    .filter(l => { const k = lineName(l).toLowerCase(); if (seen.has(k) && l.id !== selectedId) return false; seen.add(k); return true; });
+  const here = S.proj.lines.filter(l => l.division_code === div);
+  const byCode = new Map(here.filter(l => l.subtask_code).map(l => [l.subtask_code, l]));
+  const items = S.subs.filter(s => s.division_code === div).map(s => ({
+    value: byCode.has(s.code) ? byCode.get(s.code).id : 'lib:' + s.code, label: s.name
+  }));
+  here.filter(l => !l.subtask_code).forEach(l => items.push({value: l.id, label: lineName(l)}));
+  items.sort((a, b) => a.label.localeCompare(b.label));
   return '<option value="">Choose A Task</option>' +
-    lines.map(l => `<option value="${l.id}" ${l.id === selectedId ? 'selected' : ''}>${esc(lineName(l))}</option>`).join('') +
+    items.map(i => `<option value="${esc(i.value)}" ${i.value === selectedId ? 'selected' : ''}>${esc(i.label)}</option>`).join('') +
     '<option value="__new">+ New Task…</option>';
 }
 function vendorOptions(selectedId = ''){
@@ -1312,8 +1337,8 @@ function draftRow(){
     <td><input type="date" data-d="date" value="${S.txDate || todayISO()}" aria-label="Date"></td>
     <td><input type="text" class="money" data-d="amount" inputmode="decimal" placeholder="0.00" aria-label="Amount"></td>
     <td><select data-d="div" aria-label="Expense classification (division)"><option value="">Choose A Division</option>${divOptions(div)}</select></td>
-    <td><select data-d="task" aria-label="Task">${taskOptions(div)}</select><input data-d="task-new" placeholder="Type the new task name" hidden aria-label="New task name"></td>
-    <td><select data-d="vendor" aria-label="Paid to">${vendorOptions()}</select><input data-d="vendor-new" placeholder="Type the new contractor name" hidden aria-label="New contractor name"></td>
+    <td><select data-d="task" aria-label="Task">${taskOptions(div)}</select></td>
+    <td><select data-d="vendor" aria-label="Paid to">${vendorOptions()}</select></td>
     <td><select data-d="method" aria-label="Method">${methodOpts}</select></td>
     <td><input data-d="ref" placeholder="Check or ref #" aria-label="Check number"></td>
     <td class="ctr"></td>
@@ -1326,13 +1351,12 @@ function draftRow(){
 async function saveDraft(){
   const body = $('#txDraftBody');
   const q = k => body.querySelector(`[data-d="${k}"]`);
-  const taskVal = q('task').value, vendorVal = q('vendor').value;
+  const vendorVal = q('vendor').value;
   const d = {
     date: q('date').value, amount: num(q('amount').value),
-    lineId: taskVal && taskVal !== '__new' ? taskVal : null, task: q('task-new').value, div: q('div').value,
+    lineId: q('task').value, div: q('div').value,
     method: q('method').value, reference: q('ref').value,
-    vendorId: vendorVal && vendorVal !== '__new' ? vendorVal : null,
-    vendorName: vendorVal === '__new' ? q('vendor-new').value : ''
+    vendorId: vendorVal || null
   };
   try {
     const out = await savePaymentRecord(S.proj, d);
@@ -1559,8 +1583,9 @@ function dismissSheet(vendorId){
 }
 
 // Contractor (global): create or edit, W-9, and ledger
-async function vendorSheet(v){
+async function vendorSheet(v, onCreated, onCancel){
   const editing = !!v;
+  let created = null;
   let ledger = [];
   if (editing){
     ledger = check(await sb.from('payments').select('*, projects(name)').eq('vendor_id', v.id).order('pay_date', {ascending:false}));
@@ -1576,6 +1601,7 @@ async function vendorSheet(v){
   sheet({
     title: editing ? v.name : 'New Contractor',
     submit: 'Save',
+    keepPage: !!onCreated, onCancel, onDone: onCreated ? () => onCreated(created) : null,
     html: `<div class="grid">
         <label>Name<input name="name" required value="${esc(v?.name)}"></label>
         <label>Trade<input name="trade" value="${esc(v?.trade)}" placeholder="Framing, electrical"></label>
@@ -1605,7 +1631,11 @@ async function vendorSheet(v){
       if (editing){
         check(await sb.from('vendors').update(row).eq('id', id));
       } else {
-        id = check(await sb.from('vendors').insert(row).select().single()).id;
+        const nv = check(await sb.from('vendors').insert(row).select().single());
+        id = nv.id;
+        created = nv;
+        S.vendors.push(nv);
+        S.vendors.sort((a, b) => a.name.localeCompare(b.name));
       }
       const w9 = f.w9.files[0];
       if (w9){
@@ -1636,26 +1666,25 @@ function divisionSheet(){
   });
 }
 
-function subtaskSheet(divCode){
-  const preview = () => {
+function subtaskSheet(divCode, onCreated, onCancel){
+  const nextCode = () => {
     const subs = S.subs.filter(s => s.division_code === divCode);
-    const nums = subs.map(s => Number(s.code.slice(4)));
-    const n = Math.max(0, ...nums) + 10;
+    const n = Math.max(0, ...subs.map(s => Number(s.code.slice(4)))) + 10;
     return `${divCode.slice(0, 3)}-${String(n).padStart(3, '0')}`;
   };
+  let created = null;
   sheet({
     title: `New Sub-Task · ${divName(divCode)}`,
     html: `<label>Name<input name="name" required placeholder="e.g. Pool heater"></label>
-      <div class="small muted">Code will be ${preview()}.</div>`,
+      <div class="small muted">Saved to the Library under ${esc(divName(divCode))}. Code will be ${nextCode()}.</div>`,
+    keepPage: !!onCreated, onCancel, onDone: onCreated ? () => onCreated(created) : null,
     onSubmit: async form => {
       const name = form.elements.name.value.trim();
       if (!name) throw new Error('Enter a name.');
-      const code = (() => {
-        const subs = S.subs.filter(s => s.division_code === divCode);
-        const n = Math.max(0, ...subs.map(s => Number(s.code.slice(4)))) + 10;
-        return `${divCode.slice(0, 3)}-${String(n).padStart(3, '0')}`;
-      })();
-      check(await sb.from('library_subtasks').insert({code, division_code: divCode, name, sort_order: 0}));
+      created = check(await sb.from('library_subtasks').insert({code: nextCode(), division_code: divCode, name, sort_order: 0}).select().single());
+      S.subs.push(created);
+      S.subs.sort((a, b) => a.code.localeCompare(b.code));
+      S.subMap[created.code] = created;
     }
   });
 }
@@ -1726,6 +1755,33 @@ document.addEventListener('keydown', e => {
   if (e.key === 'Escape'){ e.target.value = ''; }
 });
 
+// Remembers the value before a pick so a cancelled "+ New" can restore it.
+document.addEventListener('focusin', e => {
+  const t = e.target;
+  if (t.tagName === 'SELECT' && t.closest && t.closest('#txRows, #txDraftBody')) t.dataset.prev = t.value;
+});
+const revertPick = sel => { sel.value = sel.dataset.prev || ''; };
+
+function openNewTask(row, sel, isDraft){
+  const div = row.querySelector(`[data-${isDraft ? 'd' : 'f'}="div"]`).value;
+  if (!div){ revertPick(sel); toast('Choose the division first, then add the task.', true); return; }
+  subtaskSheet(div, async sub => {
+    const line = await addLibraryLine(S.proj, div, sub.code);
+    fillSelect(sel, taskOptions(div, line.id), line.id);
+    refreshTxSelects(isDraft ? null : row);
+    toast(`Added "${sub.name}" to ${divName(div)} in the Library. Set its budget on the Budget tab.`);
+    if (!isDraft) await saveRow(row);
+  }, () => revertPick(sel));
+}
+function openNewVendor(row, sel, isDraft){
+  vendorSheet(null, async v => {
+    fillSelect(sel, vendorOptions(v.id), v.id);
+    refreshTxSelects(isDraft ? null : row);
+    if (!isDraft) await saveRow(row);
+    else toast(`Added ${v.name} to the Contractor Directory.`);
+  }, () => revertPick(sel));
+}
+
 document.addEventListener('change', e => {
   const t = e.target;
   if (t.id === 'txDivSel' || t.id === 'txSortSel'){
@@ -1740,31 +1796,20 @@ document.addEventListener('change', e => {
   const attr = isDraft ? 'd' : 'f';
   const key = t.dataset[attr];
   if (!key) return;
-  const el = k => row.querySelector(`[data-${attr}="${k}"]`);
   const save = () => { if (!isDraft) saveRow(row).catch(err => toast(msg(err), true)); };
 
   if (key === 'div'){
-    // A different division means a different task list: fill it and open it for the next pick.
-    fillSelect(el('task'), taskOptions(t.value), '');
-    el('task-new').hidden = true;
+    // A different division has its own task list: show it straight away.
+    const task = row.querySelector(`[data-${attr}="task"]`);
+    fillSelect(task, taskOptions(t.value), '');
+    task.dataset.prev = '';
     if (!isDraft) row.classList.add('tx-unc');
-    const task = el('task');
     task.focus();
-    try { task.showPicker(); } catch (_) { /* browser opens it on click instead */ }
+    try { task.showPicker(); } catch (_) { /* opens on click instead */ }
     return;
   }
-  if (key === 'task' || key === 'vendor'){
-    const isNew = t.value === '__new';
-    const extra = el(key + '-new');
-    extra.hidden = !isNew;
-    if (isNew){ extra.value = ''; extra.focus(); return; }
-    save();
-    return;
-  }
-  if (key === 'task-new' || key === 'vendor-new'){
-    if (t.value.trim()) save();
-    return;
-  }
+  if (key === 'task' && t.value === '__new'){ openNewTask(row, t, isDraft); return; }
+  if (key === 'vendor' && t.value === '__new'){ openNewVendor(row, t, isDraft); return; }
   save();
 });
 
