@@ -70,8 +70,8 @@ main{padding:14px 16px 110px;display:flex;flex-direction:column;gap:12px;max-wid
 .look{gap:8px;margin:12px 0 16px}
 .look .card-h>div{white-space:nowrap}
 .look select{width:auto;min-width:150px;flex:none;font:inherit;font-size:14px;font-weight:600;padding:6px 10px;border:1px solid var(--line);border-radius:10px;background:#fff;color:var(--ink)}
-.tx-add-btn{display:none}
-@media (max-width:640px){.tx-add-btn{display:inline-flex}}
+.page-h .tx-add-btn{display:none}
+@media (max-width:640px){.page-h .tx-add-btn{display:inline-flex}}
 .tx-tools{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;align-items:center}
 .tx-tools .tx-q{flex:1 1 220px;margin:0}
 .tx-tools select{width:auto;flex:0 0 auto;padding:8px 10px;font:inherit;font-size:14px}
@@ -106,6 +106,26 @@ main{padding:14px 16px 110px;display:flex;flex-direction:column;gap:12px;max-wid
 .tx-tbl th,.tx-tbl td{padding-left:8px;padding-right:8px}
 .tx-tbl tfoot td{font-weight:700;border-top:2px solid var(--line)}
 .tx-tbl td.num{white-space:nowrap}
+/* Budget as a spreadsheet: sticky header, compact rows, inline entry row */
+.bud-wrap{max-height:calc(100vh - 250px);overflow:auto}
+.bud-wrap thead tr:first-child th{position:sticky;top:0;z-index:3}
+.bud-wrap thead tr:nth-child(2) th{position:sticky;top:30px;z-index:3;background:#F1F5F9;border-bottom:1px solid #CBD5E1}
+.bud-wrap .bud-tbl tbody td{height:28px;padding:2px 6px;border-bottom:1px solid #E2E8F0;border-right:1px solid #EEF2F6;vertical-align:middle}
+.bud-wrap .bud-tbl tr.grp td{background:#F8FAFC;font-weight:600}
+.bud-wrap .bud-tbl tr.item:hover td{background:#F8FAFC;cursor:pointer}
+.bud-wrap .bud-tbl tr.tr-grand td{position:sticky;bottom:0;background:#F1F5F9;border-top:2px solid #CBD5E1}
+.bud-entry td{background:#ECFDF5;padding:2px 3px;height:32px;border-bottom:2px solid #A7F3D0;vertical-align:middle}
+.bud-entry input,.bud-entry select{height:26px;font-size:13px;padding:0 6px;width:100%;min-width:0;border:1px solid #D1FAE5;border-radius:3px;background:#fff;color:var(--ink)}
+.bud-entry input[type=checkbox]{width:auto;height:auto;margin:0}
+.bud-entry input:focus,.bud-entry select:focus{border-color:var(--teal);outline:none;box-shadow:inset 0 0 0 1px var(--teal)}
+.bud-entry td:nth-child(1) select{width:100px}
+.bud-entry td:nth-child(2) select{width:100%;min-width:120px}
+.bud-entry td:nth-child(3) select{width:64px;padding:0 2px}
+.bud-entry td:nth-child(4) input,.bud-entry td:nth-child(5) input{width:112px;font-size:12px;padding:0 4px}
+.bud-entry td:nth-child(6) input,.bud-entry td:nth-child(7) input{width:64px}
+.bud-entry td:nth-child(8){white-space:nowrap}
+.bud-wrap .bud-tbl tr.tr-grand td{color:var(--ink)}
+.tx-no{color:var(--muted);font-size:12px;width:44px}
 /* Excel-style grid: compact rows, grey sticky header, cells with light gridlines */
 .tx-wrap{max-height:calc(100vh - 230px);overflow:auto}
 .tx-tbl{border-collapse:separate;border-spacing:0}
@@ -592,7 +612,8 @@ function renderBudget(P){
     </div>`;
 
   if (!P.lines.length){
-    html += `<div class="empty">No budget yet. Add the sub-tasks from the Library, or a custom line.</div>`;
+    html += `<div class="small muted" style="margin:-4px 0 10px">No budget yet. Enter the first line in the row below, or pick sub-tasks from the Library.</div>
+      <div id="budgetTable">${budgetTableHtml(P, {}, {}, [], false)}</div>`;
     $('#main').innerHTML = html;
     return;
   }
@@ -665,12 +686,13 @@ function budgetTableHtml(P, paid, byDiv, codes, filtered){
     <td class="r m-owed">${money(Math.max(0, gTot - gPaid))}</td>
     <td></td>
   </tr>`);
-  return `<div class="card" style="padding:0;overflow-x:auto">
+  return `<div class="card bud-wrap" style="padding:0;overflow-x:auto">
     <table class="sheet-tbl bud-tbl">
       <thead>
         <tr class="band"><th class="code"></th><th class="desc"></th><th></th><th colspan="2">Schedule</th><th colspan="2">Quantity</th><th colspan="3">Estimated Cost</th><th colspan="2">Paid To Date</th><th>Funding</th></tr>
         <tr><th class="code">Code</th><th class="desc">Description</th><th>Unit</th><th>Start</th><th>End</th><th class="r">Sq.Ft. / Qty</th><th class="r">Rate</th><th class="r">Budget</th><th class="r">Revision</th><th class="r">Total</th><th class="r">Paid</th><th class="r">Owed</th><th class="ctr">Bank Funded</th></tr>
       </thead>
+      ${budDraftRow()}
       <tbody>${body.join('')}</tbody>
     </table>
   </div>
@@ -693,6 +715,69 @@ function exportBudgetCsv(){
   a.download = (P.project.name + ' Budget.csv').replace(/[\\/:*?"<>|]/g, '-');
   a.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+// ---------- Budget entry row (inline, like Transactions) ----------
+function budSubOptions(div){
+  if (!div) return '<option value="">Choose A Division First</option>';
+  const used = new Set(S.proj.lines.map(l => l.subtask_code).filter(Boolean));
+  const subs = S.subs.filter(s => s.division_code === div && !used.has(s.code));
+  return '<option value="">Choose A Sub-Task</option>' +
+    subs.map(s => `<option value="${esc(s.code)}">${esc(s.name)}</option>`).join('') +
+    '<option value="__custom">Custom Line…</option>';
+}
+function budDraftRow(){
+  const unit = unitSelect().replace('name="unit"', 'data-b="unit" aria-label="Unit"');
+  return `<tbody class="bud-entry"><tr>
+    <td><select data-b="div" aria-label="Division"><option value="">Choose A Division</option>${divOptions('')}</select></td>
+    <td><select data-b="sub" aria-label="Sub-task">${budSubOptions('')}</select><input data-b="custom" placeholder="Name the custom line" hidden aria-label="Custom line name"></td>
+    <td>${unit}</td>
+    <td><input type="date" data-b="start" aria-label="Start date"></td>
+    <td><input type="date" data-b="end" aria-label="End date"></td>
+    <td class="r"><input type="text" class="money r" data-b="qty" value="1" inputmode="decimal" aria-label="Sq.Ft. or qty"></td>
+    <td class="r"><input type="text" class="money r" data-b="rate" value="0" inputmode="decimal" aria-label="Rate"></td>
+    <td class="r" data-b="budget">${money(0)}</td>
+    <td></td><td></td><td></td>
+    <td class="ctr"><button class="btn primary sm" data-act="save-bud">Save</button></td>
+    <td class="ctr"><input type="checkbox" data-b="bank" checked aria-label="Bank funded"></td>
+  </tr></tbody>`;
+}
+function budChange(t){
+  const body = t.closest('.bud-entry');
+  if (t.dataset.b === 'div') fillSelect(body.querySelector('[data-b=sub]'), budSubOptions(t.value), '');
+  if (t.dataset.b === 'sub'){
+    const c = body.querySelector('[data-b=custom]');
+    c.hidden = t.value !== '__custom';
+    if (!c.hidden) c.focus();
+  }
+}
+function budInput(el){
+  const body = el.closest('.bud-entry');
+  if (el.classList.contains('money')) el.value = formatMoneyText(el.value);
+  body.querySelector('[data-b=budget]').textContent = money(num(body.querySelector('[data-b=qty]').value) * num(body.querySelector('[data-b=rate]').value));
+}
+async function saveBudDraft(P, body){
+  const q = k => body.querySelector(`[data-b="${k}"]`);
+  const div = q('div').value;
+  if (!div) throw new Error('Choose the division for this line.');
+  const sub = q('sub').value;
+  if (!sub) throw new Error('Choose the sub-task for this line.');
+  const custom = sub === '__custom' ? q('custom').value.trim() : '';
+  if (sub === '__custom' && !custom) throw new Error('Name the custom line.');
+  const start = q('start').value, end = q('end').value;
+  if (start || end){
+    if (!start || !end) throw new Error('Enter both the start and end date, or clear both.');
+    if (end < start) throw new Error('End date cannot be before the start date.');
+  }
+  const qty = num(q('qty').value), rate = num(q('rate').value);
+  const line = check(await sb.from('project_lines').insert({
+    project_id: P.project.id, division_code: div, subtask_code: sub === '__custom' ? null : sub, label: custom,
+    unit: q('unit').value.trim(), notes: '', qty, rate, budget: qty * rate, bank_funded: q('bank').checked
+  }).select().single());
+  await syncLineTask(P, line.id, line, {start_date: {value: start}, end_date: {value: end}, percent_complete: {value: '0'}});
+  toast('Budget line added. Tap the line to set a revision or notes.');
+  await render();
+  document.querySelector('.bud-entry [data-b=div]')?.focus();
 }
 
 // ---------- Payments ----------
@@ -739,14 +824,15 @@ function txFoot(P){
   const rows = txSorted(P);
   const total = rows.reduce((a, r) => a + r.amt, 0);
   const foot = $('#txFoot');
-  if (foot) foot.innerHTML = rows.length ? `<tr><td>Total</td><td class="r num">${money(total)}</td><td colspan="8" class="small muted">${rows.length} of ${P.pays.length} shown</td></tr>` : '';
+  if (foot) foot.innerHTML = rows.length ? `<tr><td colspan="2">Total</td><td class="r num">${money(total)}</td><td colspan="8" class="small muted">${rows.length} of ${P.pays.length} shown</td></tr>` : '';
 }
 const ICON_CLIP = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/></svg>`;
 const ICON_TRASH = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></svg>`;
 const ICON_NOTE = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 4h16v12l-4 4H4z"/><path d="M8 9h8M8 13h5"/></svg>`;
-function txRowHtml(r){
+function txRowHtml(r, no){
   const methods = PAY_METHODS.includes(r.method) ? PAY_METHODS : [r.method, ...PAY_METHODS];
   return `<tr data-id="${r.p.id}" class="tx-edit ${r.line ? '' : 'tx-unc'}">
+    <td class="ctr tx-no">${no}</td>
     <td><input type="date" data-f="date" value="${r.p.pay_date || ''}" aria-label="Date"></td>
     <td><input type="text" class="money r" data-f="amount" value="${fmtInput(r.amt)}" aria-label="Amount"></td>
     <td><select data-f="div" aria-label="Expense classification (division)"><option value="">Choose A Division</option>${divOptions(r.div)}</select></td>
@@ -767,7 +853,7 @@ function txFill(P){
   const empty = P.pays.length ? 'No transactions match these filters.' : 'No transactions yet. Add one above.';
   const desk = $('#txRows'), cards = $('#txCards');
   if (!desk) return;
-  desk.innerHTML = rows.length ? rows.map(txRowHtml).join('') : `<tr><td colspan="10" class="small muted" style="text-align:center;padding:20px">${empty}</td></tr>`;
+  desk.innerHTML = rows.length ? rows.map((r, i) => txRowHtml(r, i + 1)).join('') : `<tr><td colspan="11" class="small muted" style="text-align:center;padding:20px">${empty}</td></tr>`;
   cards.innerHTML = rows.length ? rows.map(r => `
     <button class="row" data-act="open-pay" data-id="${r.p.id}">
       <div><div class="t">${esc(r.vendor || 'No vendor')}</div>
@@ -832,7 +918,7 @@ function renderPayments(P){
     <div class="card tx-wrap" id="txTableWrap" style="padding:0;overflow-x:auto">
       <table class="sheet-tbl tx-tbl">
         <thead>
-          <tr><th>Date</th><th class="r">Amount</th><th>Expense Classification</th><th>Task</th><th>Paid To</th><th>Method</th><th>Check #</th><th class="ctr">Notes</th><th class="ctr">Receipts</th><th class="ctr"></th></tr>
+          <tr><th class="ctr">#</th><th>Date</th><th class="r">Amount</th><th>Expense Classification</th><th>Task</th><th>Paid To</th><th>Method</th><th>Check #</th><th class="ctr">Notes</th><th class="ctr">Receipts</th><th class="ctr"></th></tr>
         </thead>
         <tbody id="txDraftBody">${draftRow()}</tbody>
         <tbody id="txRows"></tbody>
@@ -1252,7 +1338,7 @@ async function savePaymentRecord(P, d){
     reference: (d.reference || '').trim(), invoice_number: (d.invoice || '').trim()
   }).select().single());
   if (d.files && d.files.length) await attachFiles(`payments/${pay.id}`, pay.id, d.files);
-  S.txDate = d.date; S.txMethod = d.method; // date and method stay for the next entry; division, task, contractor, amount and check # clear
+  S.txDate = ''; S.txMethod = d.method; // date goes back to today; method stays; division, task, contractor, amount and check # clear
   return txNotes(v, l) || 'Transaction saved.';
 }
 
@@ -1343,6 +1429,7 @@ function draftRow(){
   const methodOpts = PAY_METHODS.map(m => `<option ${m === (S.txMethod || 'Check') ? 'selected' : ''}>${m}</option>`).join('');
   const div = S.txDiv || '';
   return `<tr class="tx-draft">
+    <td class="ctr tx-no">New</td>
     <td><input type="date" data-d="date" value="${S.txDate || todayISO()}" aria-label="Date"></td>
     <td><input type="text" class="money" data-d="amount" inputmode="decimal" placeholder="0.00" aria-label="Amount"></td>
     <td><select data-d="div" aria-label="Expense classification (division)"><option value="">Choose A Division</option>${divOptions(div)}</select></td>
@@ -1703,7 +1790,13 @@ const actions = {
   'sign-out': () => sb.auth.signOut(),
   'new-project': () => projectSheet(null),
   'edit-project': () => projectSheet(S.proj.project),
-  'add-line': () => lineSheet(null),
+  'add-line': () => {
+    if (window.matchMedia('(max-width:640px)').matches) return lineSheet(null);
+    const el = document.querySelector('.bud-entry [data-b=div]');
+    el?.scrollIntoView({block: 'center'});
+    el?.focus();
+  },
+  'save-bud': t => saveBudDraft(S.proj, t.closest('.bud-entry')),
   'edit-line': (t, id) => lineSheet(S.proj.lines.find(l => l.id === id)),
   'new-payment': () => {
     if (window.matchMedia('(max-width:640px)').matches) return paymentSheet();
@@ -1759,6 +1852,7 @@ document.addEventListener('click', async e => {
 });
 
 document.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && e.target.closest && e.target.closest('.bud-entry')){ e.preventDefault(); saveBudDraft(S.proj, e.target.closest('.bud-entry')).catch(err => toast(msg(err), true)); return; }
   if (!e.target.closest || !e.target.closest('#txDraftBody')) return;
   if (e.key === 'Enter'){ e.preventDefault(); saveDraft(); }
   if (e.key === 'Escape'){ e.target.value = ''; }
@@ -1801,6 +1895,7 @@ document.addEventListener('change', e => {
     return;
   }
   if (!S.proj || !t.closest) return;
+  if (t.closest('.bud-entry')){ budChange(t); return; }
   const isDraft = !!t.closest('#txDraftBody');
   const row = t.closest(isDraft ? '#txDraftBody tr' : '#txRows tr');
   if (!row) return;
@@ -1828,6 +1923,7 @@ document.addEventListener('input', e => {
   if (e.target.closest && e.target.closest('#txRows') && e.target.classList.contains('money')){
     e.target.value = formatMoneyText(e.target.value);
   }
+  if (e.target.closest && e.target.closest('.bud-entry')) budInput(e.target);
   if (e.target.closest && e.target.closest('#txDraftBody')){
     if (e.target.classList.contains('money')) e.target.value = formatMoneyText(e.target.value);
   }
