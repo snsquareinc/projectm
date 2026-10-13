@@ -40,6 +40,11 @@ main{padding:14px 16px 110px;display:flex;flex-direction:column;gap:12px;max-wid
 .section-t{font-size:11px;font-weight:700;color:var(--ink2);text-transform:uppercase;letter-spacing:1px;margin:6px 0 -4px}
 .card{background:var(--card);border-radius:16px;padding:16px;box-shadow:0 1px 2px rgba(15,23,42,.05),0 4px 14px rgba(15,23,42,.04);display:flex;flex-direction:column;gap:10px}
 .card.clickable{text-decoration:none;color:inherit;display:block}
+.la-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin:14px 0 22px}
+.la-card{gap:6px}
+.la-n{font-size:30px;font-weight:800;line-height:1;margin-top:6px}
+.la-t{font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+@media (max-width:900px){.la-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 .card-h{display:flex;justify-content:space-between;align-items:baseline;gap:10px}
 .card-h strong{font-size:16px;font-weight:700;overflow-wrap:anywhere}
 .tiles{display:grid;grid-template-columns:1fr 1fr;gap:10px}
@@ -432,11 +437,13 @@ async function renderProject(r){
     <a href="#/projects" class="back">← Projects</a>
     <div class="tabs" role="tablist">
       <a href="#/project/${pr.id}/budget" ${r.tab === 'budget' ? 'aria-current="page"' : ''}>Budget</a>
+      <a href="#/project/${pr.id}/schedule" ${r.tab === 'schedule' ? 'aria-current="page"' : ''}>Schedule</a>
       <a href="#/project/${pr.id}/payments" ${r.tab === 'payments' ? 'aria-current="page"' : ''}>Payments</a>
       <a href="#/project/${pr.id}/contractors" ${r.tab === 'contractors' ? 'aria-current="page"' : ''}>Contractors</a>
     </div>`);
   if (r.tab === 'payments') renderPayments(P);
   else if (r.tab === 'contractors') renderContractors(P);
+  else if (r.tab === 'schedule') await renderSchedule(P);
   else renderBudget(P);
 }
 
@@ -1293,6 +1300,8 @@ const actions = {
   'add-line': () => lineSheet(null),
   'edit-line': (t, id) => lineSheet(S.proj.lines.find(l => l.id === id)),
   'new-payment': () => paymentSheet(),
+  'new-task': () => taskSheet(null, S.proj),
+  'edit-task': async (t, id) => taskSheet(check(await sb.from('schedule_tasks').select('*').eq('id', id).single()), S.proj),
   'open-pay': (t, id) => paymentDetail(S.proj.pays.find(p => p.id === id)),
   'open-file': (t) => openFile(t.dataset.path).catch(e => toast(msg(e), true)),
   'del-receipt': async (t, id) => {
@@ -1336,6 +1345,109 @@ document.addEventListener('change', e => {
   }
 });
 
+// ---------- Schedule ----------
+const atNoon = d => new Date(d.getFullYear(), d.getMonth(), d.getDate(), 12);
+const addDays = (d, n) => { const x = new Date(d); x.setDate(x.getDate() + n); return x; };
+const toDate = s => new Date(s + 'T12:00:00');
+const rangeLabel = (a, b) => `${a.toLocaleDateString('en-US', {month:'short', day:'numeric'})} – ${b.toLocaleDateString('en-US', {month:'short', day:'numeric'})}`;
+
+function taskStatus(t, today){
+  if (num(t.percent_complete) >= 100) return 'Complete';
+  if (toDate(t.end_date) < today) return 'Late';
+  if (toDate(t.start_date) <= today) return 'In Progress';
+  return 'Not Started';
+}
+const STATUS_BADGE = {Complete:'b-ok', Late:'b-bad', 'In Progress':'b-info', 'Not Started':''};
+
+async function renderSchedule(P){
+  const tasks = check(await sb.from('schedule_tasks').select('*').eq('project_id', P.project.id).order('start_date'));
+  const today = atNoon(new Date());
+  const weekStart = addDays(today, -((today.getDay() + 6) % 7));
+  const y = today.getFullYear(), m = today.getMonth();
+  const windows = [
+    ['This Week', weekStart, addDays(weekStart, 6)],
+    ['Next Week', addDays(weekStart, 7), addDays(weekStart, 13)],
+    ['This Month', new Date(y, m, 1, 12), new Date(y, m + 1, 0, 12)],
+    ['Next Month', new Date(y, m + 1, 1, 12), new Date(y, m + 2, 0, 12)]
+  ];
+  const look = windows.map(([label, a, b]) => {
+    const list = tasks.filter(t => toDate(t.start_date) <= b && toDate(t.end_date) >= a);
+    return `<div class="card la-card">
+      <div class="card-h"><strong>${label}</strong><span class="small muted">${rangeLabel(a, b)}</span></div>
+      <div class="la-n num">${list.length}</div>
+      <div class="small muted">${list.length === 1 ? 'Task' : 'Tasks'} Active</div>
+      ${list.slice(0, 4).map(t => `<div class="la-t">${esc(t.name)}</div>`).join('')}
+      ${list.length > 4 ? `<div class="small muted">+${list.length - 4} More</div>` : ''}
+    </div>`;
+  }).join('');
+
+  const avg = tasks.length ? tasks.reduce((a, t) => a + num(t.percent_complete), 0) / tasks.length : 0;
+  const rows = tasks.map(t => {
+    const st = taskStatus(t, today);
+    const pct = Math.min(100, Math.max(0, num(t.percent_complete)));
+    const line = P.lines.find(l => l.id === t.budget_line_id);
+    const days = Math.round((toDate(t.end_date) - toDate(t.start_date)) / 86400000) + 1;
+    return `<tr class="item tr-click" data-act="edit-task" data-id="${t.id}">
+      <td><strong>${esc(t.name)}</strong>${line ? `<div class="small muted">${esc(lineName(line))}</div>` : ''}</td>
+      <td class="num">${fmtDate(t.start_date)}</td>
+      <td class="num">${fmtDate(t.end_date)}</td>
+      <td class="r num">${days}</td>
+      <td><div class="bar ${pct >= 100 ? 'ok' : ''}" style="min-width:120px"><i style="width:${pct}%"></i></div></td>
+      <td class="r num">${pct}%</td>
+      <td><span class="badge ${STATUS_BADGE[st]}">${st}</span></td>
+    </tr>`;
+  }).join('');
+
+  $('#main').innerHTML = `
+    <div class="page-h">
+      <h2>Schedule</h2>
+      <button class="btn primary sm" data-act="new-task">+ Add Task</button>
+    </div>
+    <div class="la-grid">${look}</div>
+    <div class="page-h" style="margin-top:4px">
+      <h3>All Tasks</h3>
+      <span class="small muted">${tasks.length} ${tasks.length === 1 ? 'task' : 'tasks'} · ${avg.toFixed(0)}% average complete</span>
+    </div>
+    ${tasks.length ? `<div class="card" style="padding:0;overflow-x:auto">
+      <table class="sheet-tbl">
+        <thead><tr><th class="desc">Task</th><th>Start</th><th>End</th><th class="r">Days</th><th>Progress</th><th class="r">%</th><th>Status</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>` : `<div class="empty">No tasks yet. Add a task with its start and end dates to see it in the look-ahead.</div>`}`;
+}
+
+function taskSheet(task, P){
+  const opts = `<option value="">None</option>` + P.lines.map(l =>
+    `<option value="${l.id}" ${task && task.budget_line_id === l.id ? 'selected' : ''}>${esc(lineName(l))}</option>`).join('');
+  sheet({
+    title: task ? task.name : 'Add Task',
+    html: `<div class="grid">
+      <label class="full">Task Name<input name="name" value="${esc(task ? task.name : '')}" placeholder="e.g. Framing, Roof Dry-In"></label>
+      <label>Start Date<input type="date" name="start_date" value="${task ? task.start_date : ''}"></label>
+      <label>End Date<input type="date" name="end_date" value="${task ? task.end_date : ''}"></label>
+      <label>% Complete<input type="number" name="percent_complete" min="0" max="100" step="1" value="${task ? num(task.percent_complete) : 0}"></label>
+      <label>Budget Line<select name="budget_line_id">${opts}</select></label>
+      <label class="full">Notes<input name="notes" value="${esc(task ? task.notes : '')}" placeholder="Crew, inspection, or reference"></label>
+    </div>`,
+    danger: task ? {label: 'Delete Task', run: async () => check(await sb.from('schedule_tasks').delete().eq('id', task.id))} : null,
+    onSubmit: async form => {
+      const v = form.elements;
+      const name = v.name.value.trim();
+      const start = v.start_date.value, end = v.end_date.value;
+      const pct = num(v.percent_complete.value);
+      if (!name) throw new Error('Name the task.');
+      if (!start) throw new Error('Enter the start date.');
+      if (!end) throw new Error('Enter the end date.');
+      if (end < start) throw new Error('End date cannot be before the start date.');
+      if (pct < 0 || pct > 100) throw new Error('% complete must be between 0 and 100.');
+      const row = {project_id: P.project.id, name, start_date: start, end_date: end, percent_complete: pct,
+        budget_line_id: v.budget_line_id.value || null, notes: v.notes.value.trim()};
+      if (task) check(await sb.from('schedule_tasks').update(row).eq('id', task.id));
+      else check(await sb.from('schedule_tasks').insert(row));
+    }
+  });
+}
+
 // ---------- Routing ----------
 function route(){
   const [a, b, c] = location.hash.replace(/^#\/?/, '').split('/');
@@ -1361,6 +1473,7 @@ function renderSide(r){
       <div class="side-group">
         <div class="side-sec">Project</div>
         ${link(`#/project/${id}/budget`, 'Budget', r.tab === 'budget', 'child')}
+        ${link(`#/project/${id}/schedule`, 'Schedule', r.tab === 'schedule', 'child')}
         ${link(`#/project/${id}/payments`, 'Payments', r.tab === 'payments', 'child')}
         ${link(`#/project/${id}/contractors`, 'Contractors', r.tab === 'contractors', 'child')}
       </div>

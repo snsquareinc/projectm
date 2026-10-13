@@ -11,6 +11,8 @@ It runs on Netlify (hosting) and Supabase (database, login, and file storage). Y
 - `supabase/001_phase1.sql`: tables, access rules, library seed (21 divisions, 212 sub-tasks).
 - `supabase/002_project_vendors.sql`: contractor assignments to projects.
 - `supabase/003_qty_rate.sql`: Sq.Ft. / Qty and Rate on budget lines (budget = qty × rate).
+- `supabase/004_line_fields.sql`: unit and notes on budget lines.
+- `supabase/005_schedule.sql`: project schedule tasks with dates, progress, and budget line links.
 
 ## One-time setup
 
@@ -18,7 +20,7 @@ It runs on Netlify (hosting) and Supabase (database, login, and file storage). Y
 1. Go to supabase.com, sign in, and create a new project. Choose a region near Massachusetts and save the database password.
 2. Open **SQL Editor**, paste `supabase/001_phase1.sql`, and click **Run**.
 3. In a new query, paste `supabase/002_project_vendors.sql` and click **Run**.
-4. In a new query, paste `supabase/003_qty_rate.sql` and click **Run**.
+4. In new queries, paste `supabase/003_qty_rate.sql`, then `004_line_fields.sql`, then `005_schedule.sql`, clicking **Run** on each.
 
 ### 2. Lock down sign-ups and add yourself
 1. In Supabase, go to **Authentication > Sign In / Providers > Email**, keep Email enabled, and turn off "Allow new users to sign up".
@@ -36,6 +38,8 @@ Push the repository. Netlify redeploys the site. Open `https://snsquareinc.com/t
 - **Projects**: create a project, then open it. Project details can be edited any time.
 - **Budget**: add sub-tasks from the Library, or a custom line. Division totals roll up from their lines.
   Record a revision on a line with a reason. Lines with payments cannot be deleted.
+- **Schedule**: add tasks with start and end dates, % complete, and an optional budget line. The look-ahead
+  shows what is active this week, next week, this month, and next month.
 - **Payments**: every payment needs a budget line. If the description does not match an existing line,
   pick one or choose "+ New line" to add it. Receipts and invoices attach to each payment.
 - **Contractors**: assign a contractor to a project. Each one needs a certificate of insurance. The reminder
@@ -48,6 +52,6 @@ Push the repository. Netlify redeploys the site. Open `https://snsquareinc.com/t
 - Only signed-in users can read or write data. The public key in `config.js` is safe to publish;
   the access rules in the SQL files are what protect the data.
 - Files are stored privately. Opening one creates a link that expires after 10 minutes.
-- Not yet built: draws, schedule and look-ahead, the bank draw report, vendor confirmation pages,
+- Not yet built: draws, the bank draw report, vendor confirmation pages,
   statements by email, the Reports tab, and the Files tab. These are the next phases.
 - Backups: keep your own copy of important files. Check current Supabase and Netlify limits and pricing before relying on them.
