@@ -1346,20 +1346,21 @@ function renderSide(r){
         <div class="side-sec" style="padding:0 0 6px">Current Project</div>
         <div class="side-pname">${esc(pr.name)}</div>
         <div class="side-sub">${esc(pr.address || pr.status)}</div>
+        <button class="side-btn" data-act="edit-project" style="margin-top:8px">Project Details</button>
       </div>
       <div class="side-sec">Project</div>
       ${link(`#/project/${id}/budget`, 'Budget', r.tab === 'budget')}
       ${link(`#/project/${id}/payments`, 'Payments', r.tab === 'payments')}
       ${link(`#/project/${id}/contractors`, 'Contractors', r.tab === 'contractors')}
-      <button class="side-btn" data-act="edit-project">Project Details</button>
-      <div class="side-sec">Workspace</div>
+      <div class="side-sec">Shared Across Projects</div>
       ${link('#/library', 'Library', false)}
-      ${link('#/vendors', 'Contractors', false)}`;
+      ${link('#/vendors', 'Contractor Directory', false)}`;
   } else {
-    html += `<div class="side-sec">Workspace</div>
+    html += `<div class="side-sec">Home</div>
       ${link('#/projects', 'All Projects', r.view === 'projects')}
+      <div class="side-sec">Shared Across Projects</div>
       ${link('#/library', 'Library', r.view === 'library')}
-      ${link('#/vendors', 'Contractors', r.view === 'vendors')}`;
+      ${link('#/vendors', 'Contractor Directory', r.view === 'vendors')}`;
   }
   html += `<div class="side-foot"><button class="side-btn" data-act="sign-out">Sign Out</button></div>`;
   $('#side').innerHTML = html;
