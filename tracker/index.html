@@ -40,6 +40,32 @@ main{padding:14px 16px 110px;display:flex;flex-direction:column;gap:12px;max-wid
 .section-t{font-size:11px;font-weight:700;color:var(--ink2);text-transform:uppercase;letter-spacing:1px;margin:6px 0 -4px}
 .card{background:var(--card);border-radius:16px;padding:16px;box-shadow:0 1px 2px rgba(15,23,42,.05),0 4px 14px rgba(15,23,42,.04);display:flex;flex-direction:column;gap:10px}
 .card.clickable{text-decoration:none;color:inherit;display:block}
+.g-wrap{background:var(--card);border-radius:16px;box-shadow:0 1px 2px rgba(15,23,42,.05),0 4px 14px rgba(15,23,42,.04);overflow:auto;max-height:68vh;position:relative}
+.g-row{display:flex;height:34px;border-bottom:1px solid var(--soft);min-width:max-content;box-sizing:border-box}
+.g-row.g-click{cursor:pointer}
+.g-row.g-click:hover>*{background:#F8FAFC}
+.g-left{position:sticky;left:0;z-index:2;flex:0 0 560px;width:560px;display:flex;align-items:center;background:var(--card);border-right:1px solid var(--line);font-size:13px;box-sizing:border-box}
+.g-row.g-kind-div .g-left{background:#F1F5F9;font-weight:700}
+.g-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.g-bud{width:100px;text-align:right;padding-right:12px}
+.g-st{width:84px;text-align:right;padding-right:12px}
+.g-days{width:56px;text-align:right;padding-right:12px}
+.g-pct{width:120px;display:flex;align-items:center;gap:6px;padding:0 12px;box-sizing:border-box}
+.g-mini{flex:1;height:6px;background:var(--line);border-radius:999px;overflow:hidden}
+.g-mini i{display:block;height:100%;background:var(--teal)}
+.g-right{position:relative;flex:0 0 auto;height:100%}
+.g-row.g-kind-div .g-right{background:#F1F5F9}
+.g-bar{position:absolute;top:9px;height:16px;border-radius:5px;background:#99F6E4;overflow:hidden}
+.g-bar i{display:block;height:100%;background:#0D9488}
+.g-bar.g-sum{top:11px;height:12px;background:#334155}
+.g-bar.g-sum i{display:none}
+.g-today{position:absolute;top:0;bottom:0;width:2px;background:#E11D48;opacity:.55}
+.g-row.g-head{position:sticky;top:0;z-index:4;height:26px;background:var(--card)}
+.g-row.g-sub{position:sticky;top:26px;z-index:4;height:22px;background:var(--card);border-bottom:1px solid var(--line)}
+.g-head .g-left,.g-sub .g-left{background:var(--card);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted)}
+.g-hdr{display:flex;overflow:hidden;height:100%}
+.g-mon{font-size:11px;font-weight:700;color:var(--ink2);border-left:1px solid var(--line);padding-left:6px;line-height:26px;overflow:hidden;white-space:nowrap;box-sizing:border-box;flex:none}
+.g-day{font-size:10px;color:var(--muted);text-align:center;line-height:22px;flex:none}
 .la-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin:14px 0 22px}
 .la-card{gap:6px}
 .la-n{font-size:30px;font-weight:800;line-height:1;margin-top:6px}
@@ -1407,6 +1433,26 @@ function taskStatus(t, today){
 }
 const STATUS_BADGE = {Complete:'b-ok', Late:'b-bad', 'In Progress':'b-info', 'Not Started':''};
 
+function ganttRows(P){
+  const rows = [];
+  const byDiv = {};
+  P.lines.forEach(l => { (byDiv[l.division_code] ||= []).push(l); });
+  const span = ts => ts.length ? {
+    start_date: ts.map(t => t.start_date).sort()[0],
+    end_date: ts.map(t => t.end_date).sort().slice(-1)[0],
+    percent_complete: ts.reduce((a, t) => a + num(t.percent_complete), 0) / ts.length
+  } : null;
+  Object.keys(byDiv).sort().forEach(code => {
+    const ls = byDiv[code];
+    rows.push({kind: 'div', label: `${code}  ${S.divMap[code]?.name || 'Unnamed Division'}`,
+      budget: ls.reduce((a, l) => a + budgetOf(l), 0),
+      task: span(ls.map(l => taskForLine(P, l.id)).filter(Boolean))});
+    ls.forEach(l => rows.push({kind: 'line', label: lineName(l), budget: budgetOf(l), line: l, task: taskForLine(P, l.id)}));
+  });
+  (P.tasks || []).filter(t => !t.budget_line_id).forEach(t => rows.push({kind: 'task', label: t.name, budget: null, task: t}));
+  return rows;
+}
+
 async function renderSchedule(P){
   const tasks = P.tasks || [];
   const today = atNoon(new Date());
@@ -1429,22 +1475,65 @@ async function renderSchedule(P){
     </div>`;
   }).join('');
 
+  const rows = ganttRows(P);
+  const dated = rows.filter(r => r.task);
   const avg = tasks.length ? tasks.reduce((a, t) => a + num(t.percent_complete), 0) / tasks.length : 0;
-  const rows = tasks.map(t => {
-    const st = taskStatus(t, today);
-    const pct = Math.min(100, Math.max(0, num(t.percent_complete)));
-    const line = P.lines.find(l => l.id === t.budget_line_id);
-    const days = Math.round((toDate(t.end_date) - toDate(t.start_date)) / 86400000) + 1;
-    return `<tr class="item tr-click" data-act="edit-task" data-id="${t.id}">
-      <td><strong>${esc(t.name)}</strong>${line ? `<div class="small muted">${esc(lineName(line))}</div>` : ''}</td>
-      <td class="num">${fmtDate(t.start_date)}</td>
-      <td class="num">${fmtDate(t.end_date)}</td>
-      <td class="r num">${days}</td>
-      <td><div class="bar ${pct >= 100 ? 'ok' : ''}" style="min-width:120px"><i style="width:${pct}%"></i></div></td>
-      <td class="r num">${pct}%</td>
-      <td><span class="badge ${STATUS_BADGE[st]}">${st}</span></td>
-    </tr>`;
-  }).join('');
+
+  let timeline;
+  if (!dated.length){
+    timeline = `<div class="empty">No dates yet. Add a start and end date to a budget line or a task to see it on the timeline.</div>`;
+  } else {
+    const DW = 14;
+    const rs = addDays(toDate(dated.map(r => r.task.start_date).sort()[0]), -3);
+    const re = addDays(toDate(dated.map(r => r.task.end_date).sort().slice(-1)[0]), 7);
+    const N = Math.round((re - rs) / 86400000) + 1;
+    const W = N * DW;
+    const offset = s => Math.round((toDate(s) - rs) / 86400000);
+    const todayOff = Math.round((today - rs) / 86400000);
+    const todayLine = todayOff >= 0 && todayOff < N ? `<div class="g-today" style="left:${todayOff * DW + DW / 2}px"></div>` : '';
+
+    let mHead = '', dHead = '';
+    for (let i = 0; i < N;){
+      const d = addDays(rs, i);
+      let len = 0;
+      while (i + len < N && addDays(rs, i + len).getMonth() === d.getMonth()) len++;
+      mHead += `<div class="g-mon" style="width:${len * DW}px">${d.toLocaleDateString('en-US', {month: 'short', year: 'numeric'})}</div>`;
+      i += len;
+    }
+    for (let k = 0; k < N; k++) dHead += `<div class="g-day" style="width:${DW}px">${addDays(rs, k).getDate()}</div>`;
+
+    const body = rows.map(r => {
+      const t = r.task;
+      const pct = t ? Math.min(100, Math.max(0, Math.round(num(t.percent_complete)))) : null;
+      const days = t ? Math.round((toDate(t.end_date) - toDate(t.start_date)) / 86400000) + 1 : '';
+      const act = r.kind === 'line' ? `data-act="edit-line" data-id="${r.line.id}"`
+        : r.kind === 'task' ? `data-act="edit-task" data-id="${r.task.id}"` : '';
+      const pad = r.kind === 'line' ? 22 : 0;
+      const bar = t ? `<div class="g-bar ${r.kind === 'div' ? 'g-sum' : ''}" style="left:${offset(t.start_date) * DW}px;width:${days * DW}px"><i style="width:${pct}%"></i></div>` : '';
+      return `<div class="g-row g-kind-${r.kind} ${act ? 'g-click' : ''}" ${act}>
+        <div class="g-left">
+          <div class="g-name" style="padding-left:${10 + pad}px">${esc(r.label)}</div>
+          <div class="g-bud num">${r.budget == null ? '' : money(r.budget)}</div>
+          <div class="g-st num">${t ? dateOr(t.start_date) : ''}</div>
+          <div class="g-days num">${days}</div>
+          <div class="g-pct">${t ? `<span class="g-mini"><i style="width:${pct}%"></i></span><span class="num">${pct}%</span>` : ''}</div>
+        </div>
+        <div class="g-right" style="width:${W}px">${todayLine}${bar}</div>
+      </div>`;
+    }).join('');
+
+    timeline = `<div class="g-wrap">
+      <div class="g-row g-head">
+        <div class="g-left"><div class="g-name" style="padding-left:10px">Budget Item</div><div class="g-bud">Budget</div><div class="g-st">Start</div><div class="g-days">Days</div><div class="g-pct">% Complete</div></div>
+        <div class="g-right g-hdr" style="width:${W}px">${mHead}</div>
+      </div>
+      <div class="g-row g-sub">
+        <div class="g-left"></div>
+        <div class="g-right g-hdr" style="width:${W}px">${dHead}</div>
+      </div>
+      ${body}
+    </div>`;
+  }
 
   $('#main').innerHTML = `
     ${P.tasksError ? `<div class="notice bad">Schedule is not set up yet. Run supabase/005_schedule.sql in Supabase. (${esc(P.tasksError)})</div>` : ''}
@@ -1454,15 +1543,11 @@ async function renderSchedule(P){
     </div>
     <div class="la-grid">${look}</div>
     <div class="page-h" style="margin-top:4px">
-      <h3>All Tasks</h3>
+      <h3>Timeline</h3>
       <span class="small muted">${tasks.length} ${tasks.length === 1 ? 'task' : 'tasks'} · ${avg.toFixed(0)}% average complete</span>
     </div>
-    ${tasks.length ? `<div class="card" style="padding:0;overflow-x:auto">
-      <table class="sheet-tbl">
-        <thead><tr><th class="desc">Task</th><th>Start</th><th>End</th><th class="r">Days</th><th>Progress</th><th class="r">%</th><th>Status</th></tr></thead>
-        <tbody>${rows}</tbody>
-      </table>
-    </div>` : `<div class="empty">No tasks yet. Add a task with its start and end dates to see it in the look-ahead.</div>`}`;
+    ${timeline}
+    <div class="small muted" style="text-align:center;margin-top:8px">Tap a line to set its dates. Dates here and on the budget are the same.</div>`;
 }
 
 function taskSheet(task, P){
