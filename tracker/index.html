@@ -139,8 +139,8 @@ main{padding:14px 16px 110px;display:flex;flex-direction:column;gap:12px;max-wid
 .bud-entry input:focus,.bud-entry select:focus{border-color:var(--teal);outline:none;box-shadow:inset 0 0 0 1px var(--teal)}
 .bud-entry td:nth-child(1) select{width:100px}
 .bud-entry td:nth-child(2) select{width:100%;min-width:120px}
-.bud-entry td:nth-child(3) select{width:56px;padding:0 2px}
-.bud-entry td:nth-child(6) input,.bud-entry td:nth-child(7) input{width:104px;font-size:12px;padding:0 3px}
+.bud-entry td:nth-child(3) select{width:60px;padding:0 2px}
+.bud-entry td:nth-child(6) input,.bud-entry td:nth-child(7) input{width:92px;font-size:11px;padding:0 2px}
 .bud-entry td:nth-child(4) input,.bud-entry td:nth-child(5) input{width:64px}
 .bud-entry td:nth-child(8){white-space:nowrap}
 .bud-wrap .bud-tbl tr.tr-grand td{color:var(--ink)}
@@ -708,7 +708,7 @@ function budgetTableHtml(P, paid, byDiv, codes, filtered){
   </tr>`);
   return `<div class="card bud-wrap" style="padding:0;overflow-x:auto">
     <table class="sheet-tbl bud-tbl${S.showBank ? '' : ' no-bank'}">
-      <colgroup>${[104, null, 56, 72, 64, 88, 88, 92, 92, 84, 88, 88, 72].slice(0, S.showBank ? 13 : 12).map(w => w ? `<col style="width:${w}px">` : '<col>').join('')}</colgroup>
+      <colgroup>${[96, null, 64, 88, 72, 96, 96, 88, 88, 80, 80, 80, 64].slice(0, S.showBank ? 13 : 12).map(w => w ? `<col style="width:${w}px">` : '<col>').join('')}</colgroup>
       <thead>
         <tr class="band"><th class="code"></th><th class="desc"></th>
           <th colspan="3" class="gh g-start">Quantity</th>
