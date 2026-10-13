@@ -188,9 +188,15 @@ dialog.sheet form{display:flex;flex-direction:column;gap:14px;padding:18px}
   .side-name{font-weight:700;font-size:15px}
   .side-sub{font-size:11px;color:#94A3B8;letter-spacing:.4px}
   .side-sec{font-size:11px;text-transform:uppercase;letter-spacing:1px;color:#94A3B8;padding:12px 10px 4px;font-weight:700;overflow-wrap:anywhere}
-  .side a{display:block;padding:9px 12px;border-radius:10px;color:#CBD5E1;text-decoration:none;font-weight:600;font-size:14px}
-  .side a:hover{background:rgba(255,255,255,.07)}
-  .side a[aria-current="page"]{background:#fff;color:var(--navy)}
+  .side a{display:block;text-decoration:none;color:#CBD5E1;border-radius:8px;position:relative}
+  .side a:hover{background:rgba(255,255,255,.06);color:#fff}
+  .side a.top{padding:10px 12px;font-size:15px;font-weight:600}
+  .side a.child{padding:8px 12px 8px 20px;margin-left:12px;border-left:2px solid #2E3B57;border-radius:0 8px 8px 0;font-size:14px;font-weight:500}
+  .side a[aria-current="page"]{background:rgba(45,212,191,.16);color:#fff;font-weight:700}
+  .side a.child[aria-current="page"]{border-left-color:#2DD4BF}
+  .side a.top[aria-current="page"]::before{content:"";position:absolute;left:-14px;top:8px;bottom:8px;width:3px;border-radius:3px;background:#2DD4BF}
+  .side-group{display:flex;flex-direction:column;gap:2px;margin-top:6px}
+  .side-group>.side-sec{margin-top:14px}
   .side-btn{width:100%;margin-top:6px;padding:9px 12px;border-radius:10px;border:1px solid #334155;background:transparent;color:#CBD5E1;font-weight:600;font-size:13px;cursor:pointer;text-align:left}
   .side-foot{margin-top:auto}
   .back-link{color:#CBD5E1 !important;font-size:13px !important;padding:6px 12px !important;background:none !important}
@@ -1336,7 +1342,7 @@ function route(){
 }
 
 function renderSide(r){
-  const link = (href, label, active) => `<a href="${href}" ${active ? 'aria-current="page"' : ''}>${esc(label)}</a>`;
+  const link = (href, label, active, kind) => `<a class="${kind}" href="${href}" ${active ? 'aria-current="page"' : ''}>${esc(label)}</a>`;
   let html = `<div class="side-brand"><div class="side-mark">SN</div><div><div class="side-name">SN Square</div><div class="side-sub">Project Tracker</div></div></div>`;
   if (r.view === 'project' && S.proj){
     const pr = S.proj.project;
@@ -1348,19 +1354,27 @@ function renderSide(r){
         <div class="side-sub">${esc(pr.address || pr.status)}</div>
         <button class="side-btn" data-act="edit-project" style="margin-top:8px">Project Details</button>
       </div>
-      <div class="side-sec">Project</div>
-      ${link(`#/project/${id}/budget`, 'Budget', r.tab === 'budget')}
-      ${link(`#/project/${id}/payments`, 'Payments', r.tab === 'payments')}
-      ${link(`#/project/${id}/contractors`, 'Contractors', r.tab === 'contractors')}
-      <div class="side-sec">Shared Across Projects</div>
-      ${link('#/library', 'Library', false)}
-      ${link('#/vendors', 'Contractor Directory', false)}`;
+      <div class="side-group">
+        <div class="side-sec">Project</div>
+        ${link(`#/project/${id}/budget`, 'Budget', r.tab === 'budget', 'child')}
+        ${link(`#/project/${id}/payments`, 'Payments', r.tab === 'payments', 'child')}
+        ${link(`#/project/${id}/contractors`, 'Contractors', r.tab === 'contractors', 'child')}
+      </div>
+      <div class="side-group">
+        <div class="side-sec">Shared Across Projects</div>
+        ${link('#/library', 'Library', r.view === 'library', 'top')}
+        ${link('#/vendors', 'Contractor Directory', r.view === 'vendors', 'top')}
+      </div>`;
   } else {
-    html += `<div class="side-sec">Home</div>
-      ${link('#/projects', 'All Projects', r.view === 'projects')}
-      <div class="side-sec">Shared Across Projects</div>
-      ${link('#/library', 'Library', r.view === 'library')}
-      ${link('#/vendors', 'Contractor Directory', r.view === 'vendors')}`;
+    html += `<div class="side-group">
+        <div class="side-sec">Home</div>
+        ${link('#/projects', 'All Projects', r.view === 'projects', 'top')}
+      </div>
+      <div class="side-group">
+        <div class="side-sec">Shared Across Projects</div>
+        ${link('#/library', 'Library', r.view === 'library', 'top')}
+        ${link('#/vendors', 'Contractor Directory', r.view === 'vendors', 'top')}
+      </div>`;
   }
   html += `<div class="side-foot"><button class="side-btn" data-act="sign-out">Sign Out</button></div>`;
   $('#side').innerHTML = html;
