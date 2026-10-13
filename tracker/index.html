@@ -122,6 +122,8 @@ main{padding:14px 16px 110px;display:flex;flex-direction:column;gap:12px;max-wid
 .bud-tbl .g-start{border-left:2px solid #CBD5E1}
 .bud-tbl thead tr.band th.g-start{border-left:1px solid rgba(255,255,255,.35)}
 .bud-tbl .caret{display:inline-block;width:14px;color:var(--teal-d);font-size:11px}
+.bud-tbl .line-del{float:right;padding:2px 4px;margin-left:6px;opacity:.55}
+.bud-tbl tr.item:hover .line-del{opacity:1}
 .bud-tbl .var-neg{color:#B91C1C;font-weight:600}
 .bud-tbl .var-pos{color:inherit}
 .bud-wrap .bud-tbl tr.grp{cursor:pointer}
@@ -673,7 +675,7 @@ function budgetTableHtml(P, paid, byDiv, codes, filtered){
       const t = taskForLine(P, l.id);
       body.push(`<tr class="item tr-click" data-act="edit-line" data-id="${l.id}" data-div="${esc(code)}"${isC ? ' hidden' : ''}>
         <td class="code">${esc(l.subtask_code || '')}</td>
-        <td class="desc wrap m-name">${esc(lineName(l))}${l.notes ? `<div class="note">${esc(l.notes)}</div>` : ''}</td>
+        <td class="desc wrap m-name">${esc(lineName(l))}${l.notes ? `<div class="note">${esc(l.notes)}</div>` : ''}<button class="icon-btn line-del" data-act="delete-line" data-id="${l.id}" title="Delete budget line" aria-label="Delete budget line">${ICON_TRASH}</button></td>
         <td class="g-start">${esc(l.unit || '')}</td>
         <td class="r">${fmtQty(l.qty)}</td>
         <td class="r">${money(l.rate)}</td>
@@ -1824,6 +1826,18 @@ const actions = {
     S.txDiv = l.division_code;
     S.txPreTask = l.id;
     location.hash = `#/project/${S.proj.project.id}/payments`;
+  },
+  'delete-line': async (t, id) => {
+    const P = S.proj;
+    const l = P.lines.find(x => x.id === id);
+    if (!l) return;
+    if (P.pays.some(p => p.budget_line_id === id)) throw new Error('This line has payments, so it cannot be deleted. Remove its transactions first.');
+    if (!confirm(`Delete "${lineName(l)}" from the budget? This cannot be undone.`)) return;
+    const task = taskForLine(P, id);
+    if (task) check(await sb.from('schedule_tasks').delete().eq('id', task.id));
+    check(await sb.from('project_lines').delete().eq('id', id));
+    toast('Budget line deleted.');
+    await render();
   },
   'toggle-div': t => {
     const code = t.dataset.code;
