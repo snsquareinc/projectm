@@ -118,12 +118,20 @@ main{padding:14px 16px 110px;display:flex;flex-direction:column;gap:12px;max-wid
 .bud-entry input,.bud-entry select{height:26px;font-size:13px;padding:0 6px;width:100%;min-width:0;border:1px solid #D1FAE5;border-radius:3px;background:#fff;color:var(--ink)}
 .bud-entry input[type=checkbox]{width:auto;height:auto;margin:0}
 .bud-tbl.no-bank th:last-child,.bud-tbl.no-bank td:last-child{display:none}
+.bud-tbl thead tr.band th.gh{border-bottom:2px solid #5EEAD4;padding-top:6px}
+.bud-tbl .g-start{border-left:2px solid #CBD5E1}
+.bud-tbl thead tr.band th.g-start{border-left:1px solid rgba(255,255,255,.35)}
+.bud-tbl .caret{display:inline-block;width:14px;color:var(--teal-d);font-size:11px}
+.bud-tbl .var-neg{color:#B91C1C;font-weight:600}
+.bud-tbl .var-pos{color:#047857}
+.bud-wrap .bud-tbl tr.grp{cursor:pointer}
+.bud-wrap .bud-tbl tr.grp:hover td{background:#E8F3F1}
 .bud-entry input:focus,.bud-entry select:focus{border-color:var(--teal);outline:none;box-shadow:inset 0 0 0 1px var(--teal)}
 .bud-entry td:nth-child(1) select{width:100px}
 .bud-entry td:nth-child(2) select{width:100%;min-width:120px}
 .bud-entry td:nth-child(3) select{width:64px;padding:0 2px}
-.bud-entry td:nth-child(4) input,.bud-entry td:nth-child(5) input{width:112px;font-size:12px;padding:0 4px}
-.bud-entry td:nth-child(6) input,.bud-entry td:nth-child(7) input{width:64px}
+.bud-entry td:nth-child(6) input,.bud-entry td:nth-child(7) input{width:112px;font-size:12px;padding:0 4px}
+.bud-entry td:nth-child(4) input,.bud-entry td:nth-child(5) input{width:64px}
 .bud-entry td:nth-child(8){white-space:nowrap}
 .bud-wrap .bud-tbl tr.tr-grand td{color:var(--ink)}
 .tx-no{color:var(--muted);font-size:12px;width:44px}
@@ -636,69 +644,72 @@ function fmtQty(n){ return Number(n || 0).toLocaleString('en-US', {maximumFracti
 
 function budgetTableHtml(P, paid, byDiv, codes, filtered){
   const body = [];
-  let gBud = 0, gRev = 0, gPaid = 0;
+  let gBud = 0, gTot = 0, gPaid = 0;
+  const collapsed = S.collapsedDivs || (S.collapsedDivs = new Set());
+  // Variance = Total minus Paid. Over budget shows in red brackets.
+  const varHtml = v => v < -0.005 ? `<span class="var-neg">(${money(-v)})</span>` : `<span class="var-pos">${money(v)}</span>`;
   codes.forEach(code => {
     const ls = byDiv[code];
     const dBud = ls.reduce((a, l) => a + num(l.budget), 0);
-    const dRev = ls.reduce((a, l) => a + num(l.revision), 0);
-    const dTot = dBud + dRev;
+    const dTot = ls.reduce((a, l) => a + budgetOf(l), 0);
     const dPaid = ls.reduce((a, l) => a + (paid[l.id] || 0), 0);
     const dates = ls.map(l => taskForLine(P, l.id)).filter(Boolean);
     const dStart = dates.map(t => t.start_date).sort()[0];
     const dEnd = dates.map(t => t.end_date).sort().slice(-1)[0];
-    body.push(`<tr class="grp">
-      <td class="code">${esc(code)}</td>
+    const isC = collapsed.has(code);
+    body.push(`<tr class="grp" data-act="toggle-div" data-code="${esc(code)}" title="Show or hide the sub-tasks">
+      <td class="code"><span class="caret">${isC ? '▸' : '▾'}</span>${esc(code)}</td>
       <td class="desc m-name">${esc((S.divMap[code]?.name || 'Unnamed Division').toUpperCase())}</td>
-      <td></td><td>${dateOr(dStart)}</td><td>${dateOr(dEnd)}</td><td></td><td></td>
-      <td class="r">${money(dBud)}</td>
-      <td class="r">${dRev ? money(dRev) : ''}</td>
-      <td class="r m-amt">${money(dTot)}</td>
-      <td class="r">${money(dPaid)}</td>
-      <td class="r m-owed">${money(Math.max(0, dTot - dPaid))}</td>
-      <td></td>
+      <td class="g-start"></td><td></td><td></td>
+      <td class="g-start">${dateOr(dStart)}</td><td>${dateOr(dEnd)}</td>
+      <td class="r g-start">${money(dBud)}</td><td class="r">${money(dTot)}</td>
+      <td class="r g-start">${money(dPaid)}</td><td class="r m-owed">${money(Math.max(0, dTot - dPaid))}</td><td class="r var">${varHtml(dTot - dPaid)}</td>
+      <td class="g-start"></td>
     </tr>`);
     ls.forEach(l => {
       const bl = budgetOf(l), lp = paid[l.id] || 0;
-      body.push(`<tr class="item tr-click" data-act="edit-line" data-id="${l.id}">
+      const t = taskForLine(P, l.id);
+      body.push(`<tr class="item tr-click" data-act="edit-line" data-id="${l.id}" data-div="${esc(code)}"${isC ? ' hidden' : ''}>
         <td class="code">${esc(l.subtask_code || '')}</td>
         <td class="desc wrap m-name">${esc(lineName(l))}${l.notes ? `<div class="note">${esc(l.notes)}</div>` : ''}</td>
-        <td>${esc(l.unit || '')}</td>
-        <td>${dateOr(taskForLine(P, l.id)?.start_date)}</td>
-        <td>${dateOr(taskForLine(P, l.id)?.end_date)}</td>
+        <td class="g-start">${esc(l.unit || '')}</td>
         <td class="r">${fmtQty(l.qty)}</td>
         <td class="r">${money(l.rate)}</td>
-        <td class="r">${money(l.budget)}</td>
-        <td class="r">${Number(l.revision) ? money(l.revision) : ''}</td>
+        <td class="g-start">${dateOr(t?.start_date)}</td>
+        <td>${dateOr(t?.end_date)}</td>
+        <td class="r g-start">${money(l.budget)}</td>
         <td class="r m-amt">${money(bl)}</td>
-        <td class="r m-meta">${money(lp)}</td>
+        <td class="r g-start m-meta">${money(lp)}</td>
         <td class="r m-owed">${money(Math.max(0, bl - lp))}</td>
-        <td class="ctr">${l.bank_funded ? 'Yes' : 'No'}</td>
+        <td class="r var">${varHtml(bl - lp)}</td>
+        <td class="ctr g-start">${l.bank_funded ? 'Yes' : 'No'}</td>
       </tr>`);
     });
-    gBud += dBud; gRev += dRev; gPaid += dPaid;
+    gBud += dBud; gTot += dTot; gPaid += dPaid;
   });
-  const gTot = gBud + gRev;
   body.push(`<tr class="tr-grand">
     <td colspan="3" class="m-name">${filtered ? 'Shown Total' : 'Total Budget'}</td>
-    <td></td><td></td><td></td><td></td>
-    <td class="r">${money(gBud)}</td>
-    <td class="r">${gRev ? money(gRev) : ''}</td>
-    <td class="r m-amt">${money(gTot)}</td>
-    <td class="r">${money(gPaid)}</td>
-    <td class="r m-owed">${money(Math.max(0, gTot - gPaid))}</td>
-    <td></td>
+    <td></td><td></td><td class="g-start"></td><td></td>
+    <td class="r g-start">${money(gBud)}</td><td class="r">${money(gTot)}</td>
+    <td class="r g-start">${money(gPaid)}</td><td class="r m-owed">${money(Math.max(0, gTot - gPaid))}</td><td class="r var">${varHtml(gTot - gPaid)}</td>
+    <td class="g-start"></td>
   </tr>`);
   return `<div class="card bud-wrap" style="padding:0;overflow-x:auto">
     <table class="sheet-tbl bud-tbl${S.showBank ? '' : ' no-bank'}">
       <thead>
-        <tr class="band"><th class="code"></th><th class="desc"></th><th></th><th colspan="2">Schedule</th><th colspan="2">Quantity</th><th colspan="3">Estimated Cost</th><th colspan="2">Paid To Date</th><th>Funding</th></tr>
-        <tr><th class="code">Code</th><th class="desc">Description</th><th>Unit</th><th>Start</th><th>End</th><th class="r">Sq.Ft. / Qty</th><th class="r">Rate</th><th class="r">Budget</th><th class="r">Revision</th><th class="r">Total</th><th class="r">Paid</th><th class="r">Owed</th><th class="ctr">Bank Funded</th></tr>
+        <tr class="band"><th class="code"></th><th class="desc"></th>
+          <th colspan="3" class="gh g-start">Quantity</th>
+          <th colspan="2" class="gh g-start">Schedule</th>
+          <th colspan="2" class="gh g-start">Estimated Cost</th>
+          <th colspan="3" class="gh g-start">Paid To Date</th>
+          <th class="gh g-start">Funding</th></tr>
+        <tr><th class="code">Code</th><th class="desc">Description</th><th class="g-start">Unit</th><th class="r">Sq.Ft. / Qty</th><th class="r">Rate</th><th class="g-start">Start</th><th>End</th><th class="r g-start">Budget</th><th class="r">Total</th><th class="r g-start">Paid</th><th class="r">Owed</th><th class="r">Variance</th><th class="ctr g-start">Bank Funded</th></tr>
       </thead>
       ${budDraftRow()}
       <tbody>${body.join('')}</tbody>
     </table>
   </div>
-  <div class="small muted" style="text-align:center">Tap a line to edit it. Export CSV opens in Excel.</div>`;
+  <div class="small muted" style="text-align:center">Click a division to show or hide its sub-tasks. Variance is Total minus Paid; red brackets mean over budget. Tap a line to edit it.</div>`;
 }
 
 function exportBudgetCsv(){
@@ -724,7 +735,7 @@ function budSubOptions(div){
   if (!div) return '<option value="">Choose A Division First</option>';
   const used = new Set(S.proj.lines.map(l => l.subtask_code).filter(Boolean));
   const subs = S.subs.filter(s => s.division_code === div && !used.has(s.code));
-  return '<option value="">Choose A Sub-Task</option>' +
+  return '<option value="__div">Division Level (No Sub-Task)</option>' +
     subs.map(s => `<option value="${esc(s.code)}">${esc(s.name)}</option>`).join('') +
     '<option value="__custom">Custom Line…</option>';
 }
@@ -733,20 +744,20 @@ function budDraftRow(){
   return `<tbody class="bud-entry"><tr>
     <td><select data-b="div" aria-label="Division"><option value="">Choose A Division</option>${divOptions('')}</select></td>
     <td><select data-b="sub" aria-label="Sub-task">${budSubOptions('')}</select><input data-b="custom" placeholder="Name the custom line" hidden aria-label="Custom line name"></td>
-    <td>${unit}</td>
-    <td><input type="date" data-b="start" aria-label="Start date"></td>
-    <td><input type="date" data-b="end" aria-label="End date"></td>
+    <td class="g-start">${unit}</td>
     <td class="r"><input type="text" class="money r" data-b="qty" value="1" inputmode="decimal" aria-label="Sq.Ft. or qty"></td>
     <td class="r"><input type="text" class="money r" data-b="rate" value="0" inputmode="decimal" aria-label="Rate"></td>
-    <td class="r" data-b="budget">${money(0)}</td>
-    <td></td><td></td><td></td>
+    <td class="g-start"><input type="date" data-b="start" aria-label="Start date"></td>
+    <td><input type="date" data-b="end" aria-label="End date"></td>
+    <td class="r g-start" data-b="budget">${money(0)}</td>
+    <td></td><td class="g-start"></td><td></td>
     <td class="ctr"><button class="btn primary sm" data-act="save-bud">Save</button></td>
-    <td class="ctr"><input type="checkbox" data-b="bank" checked aria-label="Bank funded"></td>
+    <td class="ctr g-start"><input type="checkbox" data-b="bank" checked aria-label="Bank funded"></td>
   </tr></tbody>`;
 }
 function budChange(t){
   const body = t.closest('.bud-entry');
-  if (t.dataset.b === 'div') fillSelect(body.querySelector('[data-b=sub]'), budSubOptions(t.value), '');
+  if (t.dataset.b === 'div') fillSelect(body.querySelector('[data-b=sub]'), budSubOptions(t.value), '__div');
   if (t.dataset.b === 'sub'){
     const c = body.querySelector('[data-b=custom]');
     c.hidden = t.value !== '__custom';
@@ -763,7 +774,7 @@ async function saveBudDraft(P, body){
   const div = q('div').value;
   if (!div) throw new Error('Choose the division for this line.');
   const sub = q('sub').value;
-  if (!sub) throw new Error('Choose the sub-task for this line.');
+  if (!sub) throw new Error('Choose a sub-task, or Division Level if you do not have a breakdown.');
   const custom = sub === '__custom' ? q('custom').value.trim() : '';
   if (sub === '__custom' && !custom) throw new Error('Name the custom line.');
   const start = q('start').value, end = q('end').value;
@@ -772,12 +783,14 @@ async function saveBudDraft(P, body){
     if (end < start) throw new Error('End date cannot be before the start date.');
   }
   const qty = num(q('qty').value), rate = num(q('rate').value);
+  const divLevel = sub === '__div';
+  const label = sub === '__custom' ? custom : divLevel ? `${S.divMap[div]?.name || 'Division'} Budget` : '';
   const line = check(await sb.from('project_lines').insert({
-    project_id: P.project.id, division_code: div, subtask_code: sub === '__custom' ? null : sub, label: custom,
+    project_id: P.project.id, division_code: div, subtask_code: sub === '__custom' || divLevel ? null : sub, label,
     unit: q('unit').value.trim(), notes: '', qty, rate, budget: qty * rate, bank_funded: q('bank').checked
   }).select().single());
   await syncLineTask(P, line.id, line, {start_date: {value: start}, end_date: {value: end}, percent_complete: {value: '0'}});
-  toast('Budget line added. Tap the line to set a revision or notes.');
+  toast(divLevel ? 'Division budget added. Break it into sub-tasks later if you need to.' : 'Budget line added. Tap the line to set a revision or notes.');
   await render();
   document.querySelector('.bud-entry [data-b=div]')?.focus();
 }
@@ -1161,10 +1174,10 @@ function bindCalc(form){
   v.qty.addEventListener('input', upd);
   v.rate.addEventListener('input', upd);
 }
-const UNIT_HINTS = ['SF', 'LF', 'EA', 'LS', 'HR', 'CY', 'SY', 'Day', 'Month'];
+const UNIT_HINTS = ['SF', 'EA', 'HR'];
 const unitSelect = (current = '') => {
   const cur = String(current || '').trim();
-  const opts = UNIT_HINTS.includes(cur) || !cur ? UNIT_HINTS : [...UNIT_HINTS, cur];
+  const opts = UNIT_HINTS;
   return `<select name="unit"><option value="">Select Unit</option>${opts.map(u => `<option value="${esc(u)}" ${u === cur ? 'selected' : ''}>${esc(u)}</option>`).join('')}</select>`;
 };
 
@@ -1799,6 +1812,14 @@ const actions = {
     el?.focus();
   },
   'save-bud': t => saveBudDraft(S.proj, t.closest('.bud-entry')),
+  'toggle-div': t => {
+    const code = t.dataset.code;
+    const set = S.collapsedDivs || (S.collapsedDivs = new Set());
+    const hide = !set.has(code);
+    hide ? set.add(code) : set.delete(code);
+    document.querySelectorAll('.bud-tbl tr.item').forEach(r => { if (r.dataset.div === code) r.hidden = hide; });
+    t.querySelector('.caret').textContent = hide ? '▸' : '▾';
+  },
   'edit-line': (t, id) => lineSheet(S.proj.lines.find(l => l.id === id)),
   'new-payment': () => {
     if (window.matchMedia('(max-width:640px)').matches) return paymentSheet();
