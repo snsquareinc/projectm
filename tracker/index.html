@@ -70,17 +70,26 @@ main{padding:14px 16px 110px;display:flex;flex-direction:column;gap:12px;max-wid
 .look{gap:8px;margin:12px 0 16px}
 .look .card-h>div{white-space:nowrap}
 .look select{width:auto;min-width:150px;flex:none;font:inherit;font-size:14px;font-weight:600;padding:6px 10px;border:1px solid var(--line);border-radius:10px;background:#fff;color:var(--ink)}
+.tx-tools{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;align-items:center}
+.tx-tools .tx-q{flex:1 1 220px;margin:0}
+.tx-tools select{width:auto;flex:0 0 auto;padding:8px 10px;font:inherit;font-size:14px}
 .tx-q{width:100%;margin-bottom:12px}
 .tx-draft td{background:#F0FDFA;padding:6px 8px;vertical-align:middle}
-.tx-draft input,.tx-draft select{width:100%;min-width:90px;font:inherit;font-size:13px;padding:6px 8px;border:1px solid var(--line);border-radius:8px;background:#fff;color:var(--ink)}
+.tx-draft input,.tx-draft select{width:100%;min-width:80px;font:inherit;font-size:13px;padding:6px 6px;border:1px solid var(--line);border-radius:8px;background:#fff;color:var(--ink)}
 .tx-draft .hint{font-size:11px;color:var(--muted);margin-top:2px;min-height:0}
 .tx-draft .small{font-size:13px}
 .tx-edit td{padding:4px 6px;vertical-align:middle}
-.tx-edit input,.tx-edit select{width:100%;min-width:90px;font:inherit;font-size:13px;padding:6px 8px;border:1px solid #E2E8F0;border-radius:8px;background:#fff;color:var(--ink)}
+.tx-edit input,.tx-edit select{width:100%;min-width:80px;font:inherit;font-size:13px;padding:6px 6px;border:1px solid #E2E8F0;border-radius:8px;background:#fff;color:var(--ink)}
 .tx-edit input:hover,.tx-edit select:hover{border-color:#94A3B8}
 .tx-edit input:focus,.tx-edit select:focus{border-color:var(--teal);background:#fff;outline:none}
 .tx-edit input.r{text-align:right}
-.tx-edit td:nth-child(2){width:120px}
+.tx-edit td:nth-child(2){width:96px}
+.tx-edit td:nth-child(3) select{min-width:140px}
+.tx-edit td:nth-child(4) input{min-width:140px}
+.tx-edit td:nth-child(5) input{min-width:110px}
+.tx-edit td:nth-child(6) select{min-width:80px}
+.tx-edit td:nth-child(7) input{min-width:90px}
+.tx-edit td:nth-child(1) input{min-width:0;width:112px}
 .tx-unc td{background:#FEF9C3}
 .link-btn{background:none;border:0;color:var(--teal-d);font:inherit;font-size:13px;font-weight:600;cursor:pointer;padding:4px 6px}
 .tx-edit select{padding-right:4px}
@@ -92,6 +101,7 @@ main{padding:14px 16px 110px;display:flex;flex-direction:column;gap:12px;max-wid
 .bud-tbl th,.bud-tbl td{padding-left:8px;padding-right:8px;white-space:nowrap}
 .sheet-tbl.bud-tbl td.desc,.sheet-tbl.bud-tbl th.desc{white-space:normal;min-width:150px;max-width:196px}
 .bud-tbl td.code,.bud-tbl th.code{white-space:nowrap}
+.tx-tbl th,.tx-tbl td{padding-left:8px;padding-right:8px}
 .tx-tbl tfoot td{font-weight:700;border-top:2px solid var(--line)}
 .tx-tbl td.num{white-space:nowrap}
 .tx-cards{display:none}
@@ -684,15 +694,33 @@ function txRows(P){
 }
 function txFiltered(P){
   const q = (S.txQ || '').trim().toLowerCase();
-  return txRows(P).filter(r => !q || [r.p.pay_date, r.amt, divName(r.div), r.task, r.vendor, r.method, r.ref, r.notes].join(' ').toLowerCase().includes(q));
+  const div = S.txFilterDiv || '';
+  return txRows(P).filter(r => {
+    if (div && r.div !== div) return false;
+    return !q || [r.p.pay_date, r.amt, divName(r.div), r.task, r.vendor, r.method, r.ref, r.notes].join(' ').toLowerCase().includes(q);
+  });
+}
+function txSorted(P){
+  const rows = txFiltered(P);
+  const by = {
+    date_desc: (a, b) => (b.p.pay_date || '').localeCompare(a.p.pay_date || ''),
+    date_asc: (a, b) => (a.p.pay_date || '').localeCompare(b.p.pay_date || ''),
+    amount_desc: (a, b) => b.amt - a.amt,
+    amount_asc: (a, b) => a.amt - b.amt,
+    division: (a, b) => (a.div || '').localeCompare(b.div || '') || (a.p.pay_date || '').localeCompare(b.p.pay_date || ''),
+    task: (a, b) => a.task.localeCompare(b.task),
+    vendor: (a, b) => a.vendor.localeCompare(b.vendor)
+  };
+  return rows.sort(by[S.txSort || 'date_desc']);
 }
 function txFoot(P){
-  const rows = txFiltered(P);
-  const total = rows.reduce((a, r) => a + num(r.p.amount), 0);
+  const rows = txSorted(P);
+  const total = rows.reduce((a, r) => a + r.amt, 0);
   const foot = $('#txFoot');
-  if (foot) foot.innerHTML = rows.length ? `<tr><td>Total</td><td class="r num">${money(total)}</td><td colspan="7" class="small muted">${rows.length} of ${P.pays.length} shown</td></tr>` : '';
+  if (foot) foot.innerHTML = rows.length ? `<tr><td>Total</td><td class="r num">${money(total)}</td><td colspan="8" class="small muted">${rows.length} of ${P.pays.length} shown</td></tr>` : '';
 }
 const ICON_CLIP = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/></svg>`;
+const ICON_TRASH = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></svg>`;
 const ICON_NOTE = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 4h16v12l-4 4H4z"/><path d="M8 9h8M8 13h5"/></svg>`;
 function txRowHtml(r){
   const methods = PAY_METHODS.includes(r.method) ? PAY_METHODS : [r.method, ...PAY_METHODS];
@@ -704,27 +732,53 @@ function txRowHtml(r){
     <td><input data-f="vendor" list="txVendors" value="${esc(r.vendor)}" placeholder="Contractor" autocomplete="off" aria-label="Paid to"></td>
     <td><select data-f="method" aria-label="Method">${methods.map(m => `<option ${m === r.method ? 'selected' : ''}>${esc(m)}</option>`).join('')}</select></td>
     <td><input data-f="ref" value="${esc(r.ref)}" aria-label="Check number"></td>
+    <td class="ctr"><button class="icon-btn ${r.notes ? 'has' : ''}" data-act="edit-notes" data-id="${r.p.id}" title="${r.notes ? 'Edit notes' : 'Add notes'}" aria-label="${r.notes ? 'Edit notes' : 'Add notes'}">${ICON_NOTE}</button></td>
     <td class="ctr tx-icons">
       <button class="icon-btn ${r.files ? 'has' : ''}" data-act="attach-receipt" data-id="${r.p.id}" title="Attach files" aria-label="Attach files">${ICON_CLIP}</button>
       ${r.files ? `<button class="link-btn" data-act="open-pay" data-id="${r.p.id}">${r.files}</button>` : ''}
     </td>
-    <td class="ctr"><button class="icon-btn ${r.notes ? 'has' : ''}" data-act="edit-notes" data-id="${r.p.id}" title="${r.notes ? 'Edit notes' : 'Add notes'}" aria-label="${r.notes ? 'Edit notes' : 'Add notes'}">${ICON_NOTE}</button></td>
+    <td class="ctr"><button class="icon-btn" data-act="delete-payment" data-id="${r.p.id}" title="Delete transaction" aria-label="Delete transaction">${ICON_TRASH}</button></td>
   </tr>`;
 }
 function txFill(P){
-  const rows = txFiltered(P);
-  const empty = P.pays.length ? 'No transactions match this search.' : 'No transactions yet. Add one above.';
+  const rows = txSorted(P);
+  const empty = P.pays.length ? 'No transactions match these filters.' : 'No transactions yet. Add one above.';
   const desk = $('#txRows'), cards = $('#txCards');
   if (!desk) return;
-  desk.innerHTML = rows.length ? rows.map(txRowHtml).join('') : `<tr><td colspan="9" class="small muted" style="text-align:center;padding:20px">${empty}</td></tr>`;
+  desk.innerHTML = rows.length ? rows.map(txRowHtml).join('') : `<tr><td colspan="10" class="small muted" style="text-align:center;padding:20px">${empty}</td></tr>`;
   cards.innerHTML = rows.length ? rows.map(r => `
     <button class="row" data-act="open-pay" data-id="${r.p.id}">
       <div><div class="t">${esc(r.vendor || 'No vendor')}</div>
         <div class="s">${fmtDate(r.p.pay_date)} · ${r.line ? esc(divName(r.div) + ' · ' + r.task) : '<span class="badge b-warn">Unclassified</span>'}</div>
-        <div class="s">${esc(r.method)}${r.ref ? ' #' + esc(r.ref) : ''}${r.files ? ' · ' + r.files + (r.files > 1 ? ' files' : ' file') : ''}</div></div>
+        <div class="s">${esc(r.method)}${r.ref ? ' #' + esc(r.ref) : ''}${r.notes ? ' · Notes' : ''}${r.files ? ' · ' + r.files + (r.files > 1 ? ' files' : ' file') : ''}</div></div>
       <div class="amt">${money(r.amt)}</div>
     </button>`).join('') : `<div class="empty">${empty}</div>`;
   txFoot(P);
+}
+
+function exportTxCsv(){
+  const P = S.proj;
+  const rows = [['Date', 'Amount', 'Division', 'Task', 'Paid To', 'Method', 'Check #', 'Invoice #', 'Notes', 'Receipts']];
+  const shown = txSorted(P);
+  shown.forEach(r => rows.push([r.p.pay_date, r.amt, divName(r.div), r.task, r.vendor, r.method, r.ref, r.p.invoice_number || '', r.notes, r.files]));
+  rows.push(['Total', shown.reduce((a, r) => a + r.amt, 0)]);
+  const csv = rows.map(r => r.map(c => `"${String(c ?? '').replace(/"/g, '""')}"`).join(',')).join('\r\n');
+  const blob = new Blob(['﻿' + csv], {type: 'text/csv;charset=utf-8'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = (P.project.name + ' Transactions.csv').replace(/[\\/:*?"<>|]/g, '-');
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+async function deletePayment(id){
+  if (!confirm('Delete this transaction and its receipts? This cannot be undone.')) return;
+  const files = S.proj.receipts.filter(r => r.payment_id === id);
+  if (files.length) await sb.storage.from('receipts').remove(files.map(f => f.path));
+  check(await sb.from('payments').delete().eq('id', id));
+  toast('Transaction deleted.');
+  await render();
 }
 
 function renderPayments(P){
@@ -736,11 +790,22 @@ function renderPayments(P){
     </div>
     <div class="small muted" style="margin:-4px 0 12px">${P.pays.length} ${P.pays.length === 1 ? 'transaction' : 'transactions'} · ${money(total)} total</div>
     ${txDatalists(P)}
-    <input type="search" id="txQ" class="tx-q" placeholder="Search all transactions" value="${esc(S.txQ || '')}">
+    <div class="tx-tools">
+      <input type="search" id="txQ" class="tx-q" placeholder="Search transactions" value="${esc(S.txQ || '')}" aria-label="Search transactions">
+      <select id="txDivSel" aria-label="Filter by division">
+        <option value="">All Divisions</option>
+        ${[...new Set(P.lines.map(l => l.division_code))].sort().map(c => `<option value="${c}" ${S.txFilterDiv === c ? 'selected' : ''}>${esc(divName(c))}</option>`).join('')}
+      </select>
+      <select id="txSortSel" aria-label="Sort transactions">
+        ${[['date_desc', 'Date: Newest First'], ['date_asc', 'Date: Oldest First'], ['amount_desc', 'Amount: High to Low'], ['amount_asc', 'Amount: Low to High'], ['division', 'Division'], ['task', 'Task'], ['vendor', 'Paid To']]
+          .map(([v, l]) => `<option value="${v}" ${(S.txSort || 'date_desc') === v ? 'selected' : ''}>${l}</option>`).join('')}
+      </select>
+      <button class="btn sm" data-act="export-tx">Export Excel (CSV)</button>
+    </div>
     <div class="card tx-wrap" id="txTableWrap" style="padding:0;overflow-x:auto">
       <table class="sheet-tbl tx-tbl">
         <thead>
-          <tr><th>Date</th><th class="r">Amount</th><th>Expense Classification</th><th>Task</th><th>Paid To</th><th>Method</th><th>Check #</th><th class="ctr">Receipts</th><th class="ctr">Notes</th></tr>
+          <tr><th>Date</th><th class="r">Amount</th><th>Expense Classification</th><th>Task</th><th>Paid To</th><th>Method</th><th>Check #</th><th class="ctr">Notes</th><th class="ctr">Receipts</th><th class="ctr"></th></tr>
         </thead>
         <tbody id="txDraftBody">${draftRow()}</tbody>
         <tbody id="txRows"></tbody>
@@ -1171,6 +1236,7 @@ function draftRow(){
     <td><select data-d="method" aria-label="Method">${methodOpts}</select></td>
     <td><input data-d="ref" placeholder="Check or ref #" aria-label="Check number"></td>
     <td class="ctr"></td>
+    <td class="ctr"></td>
     <td class="ctr"><button class="btn primary sm" data-act="save-draft">Save</button></td>
   </tr>`;
 }
@@ -1532,6 +1598,8 @@ const actions = {
   },
   'save-draft': () => saveDraft(),
   'edit-notes': (t, id) => notesSheet(S.proj.pays.find(p => p.id === id)),
+  'delete-payment': (t, id) => deletePayment(id),
+  'export-tx': () => exportTxCsv(),
   'attach-receipt': (t, id) => {
     const inp = document.createElement('input');
     inp.type = 'file'; inp.multiple = true; inp.accept = 'image/*,application/pdf';
@@ -1582,8 +1650,34 @@ document.addEventListener('keydown', e => {
 });
 
 document.addEventListener('change', e => {
-  const tr = e.target.closest && e.target.closest('#txRows tr');
-  if (tr && S.proj) saveRow(tr).catch(err => toast(msg(err), true));
+  const t = e.target;
+  if (t.id === 'txDivSel' || t.id === 'txSortSel'){
+    if (t.id === 'txDivSel') S.txFilterDiv = t.value; else S.txSort = t.value;
+    if (S.proj) txFill(S.proj);
+    return;
+  }
+  const tr = t.closest && t.closest('#txRows tr');
+  if (!tr || !S.proj) return;
+  if (t.dataset.f === 'div'){
+    // A different division means a different task list: clear the task and ask for it.
+    const task = tr.querySelector('[data-f=task]');
+    task.value = '';
+    tr.classList.add('tx-unc');
+    task.focus();
+    return;
+  }
+  saveRow(tr).catch(err => toast(msg(err), true));
+});
+
+// The task suggestions only show tasks in the row's division.
+document.addEventListener('focusin', e => {
+  const t = e.target;
+  if (!S.proj || !t.dataset || !(t.dataset.f === 'task' || t.dataset.d === 'task')) return;
+  const row = t.closest('tr');
+  const div = row?.querySelector('[data-f=div], [data-d=div]')?.value || '';
+  const names = [...new Set(S.proj.lines.filter(l => l.division_code === div).map(l => lineName(l)))];
+  const list = $('#txLines');
+  if (list) list.innerHTML = names.map(n => `<option value="${esc(n)}">`).join('');
 });
 
 document.addEventListener('input', e => {
