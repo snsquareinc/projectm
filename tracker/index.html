@@ -41,32 +41,33 @@ main{padding:14px 16px 110px;display:flex;flex-direction:column;gap:12px;max-wid
 .card{background:var(--card);border-radius:16px;padding:16px;box-shadow:0 1px 2px rgba(15,23,42,.05),0 4px 14px rgba(15,23,42,.04);display:flex;flex-direction:column;gap:10px}
 .card.clickable{text-decoration:none;color:inherit;display:block}
 .g-wrap{background:var(--card);border-radius:16px;box-shadow:0 1px 2px rgba(15,23,42,.05),0 4px 14px rgba(15,23,42,.04);overflow:auto;max-height:68vh;position:relative}
-.g-row{display:flex;height:34px;border-bottom:1px solid var(--soft);min-width:max-content;box-sizing:border-box}
+.g-row{display:flex;height:34px;border-bottom:1px solid var(--soft);width:max-content;min-width:100%;box-sizing:border-box}
 .g-row.g-click{cursor:pointer}
 .g-row.g-click:hover>*{background:#F8FAFC}
-.g-left{position:sticky;left:0;z-index:2;flex:0 0 560px;width:560px;display:flex;align-items:center;background:var(--card);border-right:1px solid var(--line);font-size:13px;box-sizing:border-box}
+.g-left{position:sticky;left:0;z-index:2;flex:0 0 540px;width:540px;display:flex;align-items:center;background:var(--card);border-right:1px solid var(--line);font-size:13px;box-sizing:border-box}
 .g-row.g-kind-div .g-left{background:#F1F5F9;font-weight:700}
 .g-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .g-bud{width:100px;text-align:right;padding-right:12px}
 .g-st{width:84px;text-align:right;padding-right:12px}
 .g-days{width:56px;text-align:right;padding-right:12px}
-.g-pct{width:120px;display:flex;align-items:center;gap:6px;padding:0 12px;box-sizing:border-box}
+.g-pct{width:116px;display:flex;align-items:center;gap:8px;padding:0 12px;box-sizing:border-box}
 .g-mini{flex:1;height:6px;background:var(--line);border-radius:999px;overflow:hidden}
 .g-mini i{display:block;height:100%;background:var(--teal)}
 .g-right{position:relative;flex:0 0 auto;height:100%}
-.g-row.g-kind-div .g-right{background:#F1F5F9}
+.g-row.g-kind-div{background:#F1F5F9}
+.g-row.g-kind-div .g-left{background:#F1F5F9}
 .g-bar{position:absolute;top:9px;height:16px;border-radius:5px;background:#99F6E4;overflow:hidden}
 .g-bar i{display:block;height:100%;background:#0D9488}
 .g-bar.g-sum{top:11px;height:12px;background:#334155}
 .g-bar.g-sum i{display:none}
 .g-today{position:absolute;top:0;bottom:0;width:2px;background:#E11D48;opacity:.55}
-.g-row.g-head{position:sticky;top:0;z-index:4;height:26px;background:var(--card)}
-.g-row.g-sub{position:sticky;top:26px;z-index:4;height:22px;background:var(--card);border-bottom:1px solid var(--line)}
+.g-row.g-head{position:sticky;top:0;z-index:4;height:26px;background:var(--card);border-bottom:0}
+.g-row.g-sub{position:sticky;top:26px;z-index:4;height:26px;background:var(--card);border-bottom:1px solid var(--line)}
 .g-head .g-left,.g-sub .g-left{background:var(--card);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted)}
 .g-hdr{display:flex;overflow:hidden;height:100%}
 .g-mon{font-size:11px;font-weight:700;color:var(--ink2);border-left:1px solid var(--line);padding-left:6px;line-height:26px;overflow:hidden;white-space:nowrap;box-sizing:border-box;flex:none}
-.g-day{font-size:10px;color:var(--muted);text-align:center;line-height:22px;flex:none}
-.la-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin:14px 0 22px}
+.g-day{font-size:10px;color:var(--muted);text-align:center;line-height:26px;flex:none}
+.la-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin:12px 0 16px}
 .la-card{gap:6px}
 .la-n{font-size:30px;font-weight:800;line-height:1;margin-top:6px}
 .la-t{font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -1483,7 +1484,7 @@ async function renderSchedule(P){
   if (!dated.length){
     timeline = `<div class="empty">No dates yet. Add a start and end date to a budget line or a task to see it on the timeline.</div>`;
   } else {
-    const DW = 14;
+    const DW = 16;
     const rs = addDays(toDate(dated.map(r => r.task.start_date).sort()[0]), -3);
     const re = addDays(toDate(dated.map(r => r.task.end_date).sort().slice(-1)[0]), 7);
     const N = Math.round((re - rs) / 86400000) + 1;
@@ -1497,7 +1498,10 @@ async function renderSchedule(P){
       const d = addDays(rs, i);
       let len = 0;
       while (i + len < N && addDays(rs, i + len).getMonth() === d.getMonth()) len++;
-      mHead += `<div class="g-mon" style="width:${len * DW}px">${d.toLocaleDateString('en-US', {month: 'short', year: 'numeric'})}</div>`;
+      const seg = len * DW;
+      const mLabel = seg >= 90 ? d.toLocaleDateString('en-US', {month: 'short', year: 'numeric'})
+        : seg >= 30 ? d.toLocaleDateString('en-US', {month: 'short'}) : '';
+      mHead += `<div class="g-mon" style="width:${seg}px">${mLabel}</div>`;
       i += len;
     }
     for (let k = 0; k < N; k++) dHead += `<div class="g-day" style="width:${DW}px">${addDays(rs, k).getDate()}</div>`;
@@ -1524,11 +1528,11 @@ async function renderSchedule(P){
 
     timeline = `<div class="g-wrap">
       <div class="g-row g-head">
-        <div class="g-left"><div class="g-name" style="padding-left:10px">Budget Item</div><div class="g-bud">Budget</div><div class="g-st">Start</div><div class="g-days">Days</div><div class="g-pct">% Complete</div></div>
+        <div class="g-left"></div>
         <div class="g-right g-hdr" style="width:${W}px">${mHead}</div>
       </div>
       <div class="g-row g-sub">
-        <div class="g-left"></div>
+        <div class="g-left"><div class="g-name" style="padding-left:10px">Budget Item</div><div class="g-bud">Budget</div><div class="g-st">Start</div><div class="g-days">Days</div><div class="g-pct">% Complete</div></div>
         <div class="g-right g-hdr" style="width:${W}px">${dHead}</div>
       </div>
       ${body}
@@ -1542,12 +1546,12 @@ async function renderSchedule(P){
       <button class="btn primary sm" data-act="new-task">+ Add Task</button>
     </div>
     <div class="la-grid">${look}</div>
-    <div class="page-h" style="margin-top:4px">
+    <div class="page-h">
       <h3>Timeline</h3>
       <span class="small muted">${tasks.length} ${tasks.length === 1 ? 'task' : 'tasks'} · ${avg.toFixed(0)}% average complete</span>
     </div>
     ${timeline}
-    <div class="small muted" style="text-align:center;margin-top:8px">Tap a line to set its dates. Dates here and on the budget are the same.</div>`;
+    <div class="small muted" style="text-align:center;margin-top:10px">Tap a line to set its dates. Dates here and on the budget are the same.</div>`;
 }
 
 function taskSheet(task, P){
