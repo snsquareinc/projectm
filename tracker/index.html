@@ -75,13 +75,19 @@ main{padding:14px 16px 110px;display:flex;flex-direction:column;gap:12px;max-wid
 .tx-draft input,.tx-draft select{width:100%;min-width:90px;font:inherit;font-size:13px;padding:6px 8px;border:1px solid var(--line);border-radius:8px;background:#fff;color:var(--ink)}
 .tx-draft .hint{font-size:11px;color:var(--muted);margin-top:2px;min-height:0}
 .tx-draft .small{font-size:13px}
-.tx-filter-row th{text-transform:none;letter-spacing:0;padding:6px 8px;background:var(--card)}
-.tx-filter-row input{width:100%;min-width:90px;font:inherit;font-size:12px;font-weight:400;padding:6px 8px;border:1px solid var(--line);border-radius:8px;background:#fff;color:var(--ink)}
+.tx-edit td{padding:4px 6px;vertical-align:middle}
+.tx-edit input,.tx-edit select{width:100%;min-width:90px;font:inherit;font-size:13px;padding:6px 8px;border:1px solid #E2E8F0;border-radius:8px;background:#fff;color:var(--ink)}
+.tx-edit input:hover,.tx-edit select:hover{border-color:#94A3B8}
+.tx-edit input:focus,.tx-edit select:focus{border-color:var(--teal);background:#fff;outline:none}
+.tx-edit input.r{text-align:right}
+.tx-edit td:nth-child(2){width:120px}
+.tx-unc td{background:#FEF9C3}
+.link-btn{background:none;border:0;color:var(--teal-d);font:inherit;font-size:13px;font-weight:600;cursor:pointer;padding:4px 6px}
 .tx-tbl tfoot td{font-weight:700;border-top:2px solid var(--line)}
 .tx-tbl td.num{white-space:nowrap}
 .tx-cards{display:none}
 @media (max-width:640px){
-  .tx-filter-row,.tx-wrap{display:none}
+  .tx-wrap{display:none}
   .tx-cards{display:block}
   .tx-q{margin-bottom:10px}
 }
@@ -658,53 +664,56 @@ function txRows(P){
   return P.pays.map(p => {
     const line = P.lines.find(l => l.id === p.budget_line_id);
     return {p, line,
-      date: fmtDate(p.pay_date), amt: num(p.amount),
+      amt: num(p.amount),
       cls: line ? lineName(line) : '',
       purpose: line ? divName(line.division_code) : '',
-      vendor: p.vendors?.name || 'No vendor',
+      vendor: p.vendors?.name || '',
       method: p.method || '', ref: p.reference || '',
       files: rc[p.id] || 0};
   });
 }
 function txFiltered(P){
   const q = (S.txQ || '').trim().toLowerCase();
-  const f = S.txF || {};
-  const cols = r => ({date: r.date, amount: String(r.amt), cls: r.cls, purpose: r.purpose, vendor: r.vendor, method: r.method, ref: r.ref});
-  return txRows(P).filter(r => {
-    if (q && ![r.date, r.amt, r.cls, r.purpose, r.vendor, r.method, r.ref].join(' ').toLowerCase().includes(q)) return false;
-    const c = cols(r);
-    return Object.keys(f).every(k => !f[k] || String(c[k] || '').toLowerCase().includes(f[k].toLowerCase()));
-  });
+  return txRows(P).filter(r => !q || [r.p.pay_date, r.amt, r.cls, r.purpose, r.vendor, r.method, r.ref].join(' ').toLowerCase().includes(q));
+}
+function txFoot(P){
+  const rows = txFiltered(P);
+  const total = rows.reduce((a, r) => a + num(r.p.amount), 0);
+  const foot = $('#txFoot');
+  if (foot) foot.innerHTML = rows.length ? `<tr><td>Total</td><td class="r num">${money(total)}</td><td colspan="6" class="small muted">${rows.length} of ${P.pays.length} shown</td></tr>` : '';
+}
+function txRowHtml(r){
+  const P = S.proj;
+  const methods = PAY_METHODS.includes(r.method) ? PAY_METHODS : [r.method, ...PAY_METHODS];
+  return `<tr data-id="${r.p.id}" class="tx-edit ${r.line ? '' : 'tx-unc'}">
+    <td><input type="date" data-f="date" value="${r.p.pay_date || ''}" aria-label="Date"></td>
+    <td><input type="text" class="money r" data-f="amount" value="${fmtInput(r.amt)}" aria-label="Amount"></td>
+    <td><input data-f="cls" list="txLines" value="${esc(r.cls)}" placeholder="Pick a budget line" autocomplete="off" aria-label="Expense classification"></td>
+    <td><span class="small" data-f="purposeTxt">${esc(r.purpose)}</span><select data-f="newDiv" hidden aria-label="Division for the new line"><option value="">Choose A Division</option>${divOptions()}</select></td>
+    <td><input data-f="vendor" list="txVendors" value="${esc(r.vendor)}" placeholder="Contractor" autocomplete="off" aria-label="Paid to"></td>
+    <td><select data-f="method" aria-label="Method">${methods.map(m => `<option ${m === r.method ? 'selected' : ''}>${esc(m)}</option>`).join('')}</select></td>
+    <td><input data-f="ref" value="${esc(r.ref)}" aria-label="Check number"></td>
+    <td class="ctr"><button class="link-btn" data-act="open-pay" data-id="${r.p.id}">${r.files ? r.files + (r.files > 1 ? ' files' : ' file') : 'Add files'}</button></td>
+  </tr>`;
 }
 function txFill(P){
   const rows = txFiltered(P);
-  const total = rows.reduce((a, r) => a + r.amt, 0);
-  const empty = P.pays.length ? 'No transactions match these filters.' : 'No transactions yet. Every transaction needs a budget line before it is saved.';
-  const desk = $('#txRows'), foot = $('#txFoot'), cards = $('#txCards');
+  const empty = P.pays.length ? 'No transactions match this search.' : 'No transactions yet. Add one above.';
+  const desk = $('#txRows'), cards = $('#txCards');
   if (!desk) return;
-  desk.innerHTML = rows.length ? rows.map(r => `<tr class="item tr-click" data-act="open-pay" data-id="${r.p.id}">
-      <td class="num">${r.date}</td>
-      <td class="r num">${money(r.amt)}</td>
-      <td>${r.line ? esc(r.cls) : '<span class="badge b-warn">Unclassified</span>'}</td>
-      <td>${esc(r.purpose)}</td>
-      <td>${esc(r.vendor)}</td>
-      <td>${esc(r.method)}</td>
-      <td>${esc(r.ref)}</td>
-      <td class="ctr">${r.files ? r.files + (r.files > 1 ? ' files' : ' file') : ''}</td>
-    </tr>`).join('') : `<tr><td colspan="8" class="small muted" style="text-align:center;padding:20px">${empty}</td></tr>`;
-  foot.innerHTML = rows.length ? `<tr><td>Total</td><td class="r num">${money(total)}</td><td colspan="6" class="small muted">${rows.length} of ${P.pays.length} shown</td></tr>` : '';
+  desk.innerHTML = rows.length ? rows.map(txRowHtml).join('') : `<tr><td colspan="8" class="small muted" style="text-align:center;padding:20px">${empty}</td></tr>`;
   cards.innerHTML = rows.length ? rows.map(r => `
     <button class="row" data-act="open-pay" data-id="${r.p.id}">
-      <div><div class="t">${esc(r.vendor)}</div>
-        <div class="s">${r.date} · ${r.line ? esc(r.cls) : '<span class="badge b-warn">Unclassified</span>'}</div>
+      <div><div class="t">${esc(r.vendor || 'No vendor')}</div>
+        <div class="s">${fmtDate(r.p.pay_date)} · ${r.line ? esc(r.cls) : '<span class="badge b-warn">Unclassified</span>'}</div>
         <div class="s">${esc(r.method)}${r.ref ? ' #' + esc(r.ref) : ''}${r.files ? ' · ' + r.files + (r.files > 1 ? ' files' : ' file') : ''}</div></div>
       <div class="amt">${money(r.amt)}</div>
     </button>`).join('') : `<div class="empty">${empty}</div>`;
+  txFoot(P);
 }
 
 function renderPayments(P){
   const total = P.pays.reduce((a, p) => a + num(p.amount), 0);
-  const col = (k, label, cls = '') => `<th class="${cls}"><input data-tx-col="${k}" value="${esc((S.txF || {})[k] || '')}" placeholder="Search" aria-label="Filter ${label}"></th>`;
   $('#main').innerHTML = `
     <div class="page-h">
       <h2>Transactions</h2>
@@ -717,7 +726,6 @@ function renderPayments(P){
       <table class="sheet-tbl tx-tbl">
         <thead>
           <tr><th>Date</th><th class="r">Amount</th><th>Expense Classification</th><th>Notes / Purpose</th><th>Paid To</th><th>Method</th><th>Check #</th><th class="ctr">Receipts</th></tr>
-          <tr class="tx-filter-row">${col('date', 'date')}${col('amount', 'amount', 'r')}${col('cls', 'classification')}${col('purpose', 'purpose')}${col('vendor', 'paid to')}${col('method', 'method')}${col('ref', 'check number')}<th></th></tr>
         </thead>
         <tbody id="txDraftBody">${draftRow()}</tbody>
         <tbody id="txRows"></tbody>
@@ -1059,57 +1067,86 @@ function lineSheet(line){
 }
 
 // Payment (classification required)
-// Shared by the desktop entry row and the phone form.
+// Shared by the entry row, the editable rows, and the phone form.
+async function resolveVendorId(P, name){
+  const vName = (name || '').trim();
+  if (!vName) return {vendorId: null, name: '', created: false};
+  const hit = S.vendors.find(v => v.name.toLowerCase() === vName.toLowerCase());
+  let vendorId = hit ? hit.id : null, created = false, shown = hit ? hit.name : vName;
+  if (!hit){
+    const nv = check(await sb.from('vendors').insert({name: vName}).select().single());
+    S.vendors.push(nv);
+    S.vendors.sort((a, b) => a.name.localeCompare(b.name));
+    vendorId = nv.id; created = true;
+  }
+  check(await sb.from('project_vendors').upsert({project_id: P.project.id, vendor_id: vendorId}, {onConflict: 'project_id,vendor_id', ignoreDuplicates: true}));
+  return {vendorId, name: shown, created};
+}
+async function resolveLineId(P, cls, newDiv){
+  const c = (cls || '').trim();
+  if (!c) throw new Error('Not classified. Choose a budget line first. Nothing is saved without one.');
+  const hit = P.lines.find(l => lineName(l).toLowerCase() === c.toLowerCase());
+  if (hit) return {lineId: hit.id, created: false};
+  if (!newDiv) throw new Error('Choose the division for the new budget line.');
+  const line = check(await sb.from('project_lines').insert({
+    project_id: P.project.id, division_code: newDiv, subtask_code: null, label: c,
+    budget: 0, bank_funded: !!S.divMap[newDiv]?.bank_funded
+  }).select().single());
+  P.lines.push(line);
+  return {lineId: line.id, created: true, label: c};
+}
+function txNotes(v, l){
+  const notes = [];
+  if (v && v.created) notes.push(`Added ${v.name} to the Contractor Directory`);
+  if (l && l.created) notes.push(`Added "${l.label}" as a budget line. Set its budget on the Budget tab`);
+  return notes.length ? notes.join('. ') + '.' : '';
+}
+
 async function savePaymentRecord(P, d){
   if (!d.date) throw new Error('Enter the payment date.');
   if (!(d.amount > 0)) throw new Error('Enter the amount.');
-  const projectId = P.project.id;
-  const out = {newVendor: false, newLine: false, vName: '', cls: ''};
-
-  let vendorId = null;
-  const vName = (d.vendorName || '').trim();
-  if (vName){
-    const hit = S.vendors.find(v => v.name.toLowerCase() === vName.toLowerCase());
-    if (hit) vendorId = hit.id;
-    else {
-      const nv = check(await sb.from('vendors').insert({name: vName}).select().single());
-      S.vendors.push(nv);
-      S.vendors.sort((a, b) => a.name.localeCompare(b.name));
-      vendorId = nv.id;
-      out.newVendor = true; out.vName = vName;
-    }
-    check(await sb.from('project_vendors').upsert({project_id: projectId, vendor_id: vendorId}, {onConflict: 'project_id,vendor_id', ignoreDuplicates: true}));
-  }
-
-  let lineId = null;
-  const cls = (d.classText || '').trim();
-  if (cls){
-    const hit = P.lines.find(l => lineName(l).toLowerCase() === cls.toLowerCase());
-    if (hit) lineId = hit.id;
-    else {
-      if (!d.newDiv) throw new Error('Choose the division for the new budget line.');
-      const line = check(await sb.from('project_lines').insert({
-        project_id: projectId, division_code: d.newDiv, subtask_code: null, label: cls,
-        budget: 0, bank_funded: !!S.divMap[d.newDiv]?.bank_funded
-      }).select().single());
-      lineId = line.id;
-      out.newLine = true; out.cls = cls;
-    }
-  }
-  if (!lineId) throw new Error('Not classified. Choose a budget line first. Nothing is saved without one.');
-
+  const v = await resolveVendorId(P, d.vendorName);
+  const l = await resolveLineId(P, d.classText, d.newDiv);
   const pay = check(await sb.from('payments').insert({
-    project_id: projectId, vendor_id: vendorId, budget_line_id: lineId,
+    project_id: P.project.id, vendor_id: v.vendorId, budget_line_id: l.lineId,
     pay_date: d.date, amount: d.amount, method: d.method,
     reference: (d.reference || '').trim(), invoice_number: (d.invoice || '').trim()
   }).select().single());
   if (d.files && d.files.length) await attachFiles(`payments/${pay.id}`, pay.id, d.files);
-
   S.txDate = d.date; S.txMethod = d.method;
-  const notes = [];
-  if (out.newVendor) notes.push(`Added ${out.vName} to the Contractor Directory`);
-  if (out.newLine) notes.push(`Added "${out.cls}" as a budget line. Set its budget on the Budget tab`);
-  return notes.length ? notes.join('. ') + '.' : 'Transaction saved.';
+  return txNotes(v, l) || 'Transaction saved.';
+}
+
+// Saves one existing row when a cell is changed (Excel-style).
+async function saveRow(tr){
+  const P = S.proj;
+  const pay = P.pays.find(p => p.id === tr.dataset.id);
+  if (!pay) return;
+  const q = f => tr.querySelector(`[data-f="${f}"]`);
+  const date = q('date').value, amount = num(q('amount').value);
+  const cls = q('cls').value.trim();
+  if (!date) throw new Error('Enter the payment date.');
+  if (!(amount > 0)) throw new Error('Enter the amount.');
+  const known = cls && P.lines.some(l => lineName(l).toLowerCase() === cls.toLowerCase());
+  if (cls && !known && !q('newDiv').value){
+    q('newDiv').hidden = false;
+    q('purposeTxt').textContent = 'New budget line';
+    throw new Error('Choose the division for the new budget line.');
+  }
+  const v = await resolveVendorId(P, q('vendor').value);
+  const l = await resolveLineId(P, cls, q('newDiv').value);
+  const row = {pay_date: date, amount, method: q('method').value, reference: q('ref').value.trim(),
+    vendor_id: v.vendorId, budget_line_id: l.lineId};
+  check(await sb.from('payments').update(row).eq('id', pay.id));
+  Object.assign(pay, row);
+  pay.vendors = v.vendorId ? {name: v.name} : null;
+  const line = P.lines.find(x => x.id === l.lineId);
+  q('purposeTxt').textContent = line ? divName(line.division_code) : '';
+  q('newDiv').hidden = true;
+  tr.classList.remove('tx-unc');
+  txFoot(P);
+  const note = txNotes(v, l);
+  if (note) toast(note);
 }
 
 function txDatalists(P){
@@ -1124,7 +1161,7 @@ function draftRow(){
     <td><input type="date" data-d="date" value="${S.txDate || todayISO()}" aria-label="Date"></td>
     <td><input type="text" class="money" data-d="amount" inputmode="decimal" placeholder="0.00" aria-label="Amount"></td>
     <td><input data-d="cls" list="txLines" placeholder="Pick or type a budget line" autocomplete="off" aria-label="Expense classification"></td>
-    <td><span class="small muted" data-d="purposeTxt"></span><select data-d="newDiv" hidden aria-label="Division for the new line">${divOptions()}</select></td>
+    <td><span class="small muted" data-d="purposeTxt"></span><select data-d="newDiv" hidden aria-label="Division for the new line"><option value="">Choose A Division</option>${divOptions()}</select></td>
     <td><input data-d="vendor" list="txVendors" placeholder="Contractor" autocomplete="off" aria-label="Paid to"><div class="hint" data-d="vhint"></div></td>
     <td><select data-d="method" aria-label="Method">${methodOpts}</select></td>
     <td><input data-d="ref" placeholder="Check or ref #" aria-label="Check number"></td>
@@ -1177,7 +1214,7 @@ function paymentSheet(){
       <label>Amount ($)<input type="text" class="money" name="amount" inputmode="decimal"></label>
       <label class="full">Paid To<input name="vendor" list="txVendors" autocomplete="off" placeholder="Contractor"></label>
       <label class="full">Expense Classification<input name="cls" list="txLines" autocomplete="off" placeholder="Pick or type a budget line"></label>
-      <label class="full" data-newdiv hidden>Division For The New Line<select name="new_division">${divOptions()}</select></label>
+      <label class="full" data-newdiv hidden>Division For The New Line<select name="new_division"><option value="">Choose A Division</option>${divOptions()}</select></label>
       <label>Method<select name="method">${PAY_METHODS.map(m => `<option ${m === (S.txMethod || 'Check') ? 'selected' : ''}>${m}</option>`).join('')}</select></label>
       <label>Check Or Reference #<input name="reference"></label>
       <label>Invoice #<input name="invoice_number"></label>
@@ -1533,7 +1570,15 @@ document.addEventListener('keydown', e => {
   if (e.key === 'Escape'){ e.target.value = ''; updateDraftPurpose(); updateDraftVendorHint(); }
 });
 
+document.addEventListener('change', e => {
+  const tr = e.target.closest && e.target.closest('#txRows tr');
+  if (tr && S.proj) saveRow(tr).catch(err => toast(msg(err), true));
+});
+
 document.addEventListener('input', e => {
+  if (e.target.closest && e.target.closest('#txRows') && e.target.classList.contains('money')){
+    e.target.value = formatMoneyText(e.target.value);
+  }
   if (e.target.closest && e.target.closest('#txDraftBody')){
     if (e.target.classList.contains('money')) e.target.value = formatMoneyText(e.target.value);
     if (e.target.dataset.d === 'cls') updateDraftPurpose();
@@ -1541,10 +1586,6 @@ document.addEventListener('input', e => {
   }
   if (e.target.id === 'txQ' && S.proj){
     S.txQ = e.target.value;
-    txFill(S.proj);
-  }
-  if (e.target.matches && e.target.matches('[data-tx-col]') && S.proj){
-    S.txF = {...(S.txF || {}), [e.target.dataset.txCol]: e.target.value};
     txFill(S.proj);
   }
   if (e.target.id === 'budgetSearch' && S.proj){
