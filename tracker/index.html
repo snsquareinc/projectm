@@ -682,8 +682,8 @@ function budgetTableHtml(P, paid, byDiv, codes, filtered){
         <td class="r g-start">${money(l.budget)}</td>
         <td class="r m-amt">${money(bl)}</td>
         <td class="r g-start m-meta"><button class="link-btn" data-act="pay-line" data-id="${l.id}" title="Record a payment on this line">${money(lp)}</button></td>
-        <td class="r m-owed">${money(bl - lp)}</td>
-        <td class="r var">${varHtml(num(l.budget) - bl)}</td>
+        <td class="r m-owed" data-noact>${money(bl - lp)}</td>
+        <td class="r var" data-noact>${varHtml(num(l.budget) - bl)}</td>
         <td class="ctr g-start">${l.bank_funded ? 'Yes' : 'No'}</td>
       </tr>`);
     });
@@ -1879,6 +1879,8 @@ const actions = {
 };
 
 document.addEventListener('click', async e => {
+  // Calculated cells (Owed, Variance) do nothing when clicked.
+  if (e.target.closest && e.target.closest('[data-noact]')) return;
   const t = e.target.closest('[data-act]');
   if (!t) return;
   const fn = actions[t.dataset.act];
