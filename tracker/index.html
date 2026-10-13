@@ -125,14 +125,12 @@ main{padding:14px 16px 110px;display:flex;flex-direction:column;gap:12px;max-wid
 .bud-wrap .bud-tbl .bud-name{display:inline-block;max-width:calc(100% - 22px);overflow:hidden;text-overflow:ellipsis;vertical-align:middle}
 .bud-wrap .bud-tbl .bud-note{display:inline-flex;vertical-align:middle;color:#059669;margin-left:4px}
 .bud-wrap .bud-tbl .bud-note svg{width:14px;height:14px}
-.bud-tbl.no-bank col:last-child{visibility:collapse}
-.bud-tbl.no-bank col:nth-child(2){width:252px !important}
 .bud-tbl thead tr.band th.gh{border-bottom:2px solid #5EEAD4;padding-top:6px}
 .bud-tbl .g-start{border-left:2px solid #CBD5E1}
 .bud-tbl thead tr.band th.g-start{border-left:1px solid rgba(255,255,255,.35)}
 .bud-tbl td:nth-child(8),.bud-tbl td:nth-child(9),.bud-tbl th:nth-child(8),.bud-tbl th:nth-child(9){width:96px;min-width:96px;max-width:96px}
 .bud-tbl .caret{display:inline-block;width:14px;color:var(--teal-d);font-size:11px}
-.bud-tbl .line-del{padding:0 2px;margin-left:4px;opacity:.5;vertical-align:middle}
+.bud-tbl .line-del{float:right;padding:0 2px;margin:2px 0 0 4px;opacity:.5}
 .bud-tbl tr.item:hover .line-del{opacity:1}
 .bud-tbl .var-neg{color:#B91C1C;font-weight:600}
 .bud-tbl .var-pos{color:inherit}
@@ -710,7 +708,7 @@ function budgetTableHtml(P, paid, byDiv, codes, filtered){
   </tr>`);
   return `<div class="card bud-wrap" style="padding:0;overflow-x:auto">
     <table class="sheet-tbl bud-tbl${S.showBank ? '' : ' no-bank'}">
-      <colgroup>${[88, 180, 56, 72, 64, 88, 88, 92, 92, 84, 88, 88, 72].map(w => w ? `<col style="width:${w}px">` : '<col>').join('')}</colgroup>
+      <colgroup>${[104, null, 56, 72, 64, 88, 88, 92, 92, 84, 88, 88, 72].slice(0, S.showBank ? 13 : 12).map(w => w ? `<col style="width:${w}px">` : '<col>').join('')}</colgroup>
       <thead>
         <tr class="band"><th class="code"></th><th class="desc"></th>
           <th colspan="3" class="gh g-start">Quantity</th>
