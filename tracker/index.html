@@ -3,572 +3,2332 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>Construction Project Tracker</title>
 <meta name="robots" content="noindex,nofollow">
+<title>SN Square Projects</title>
 <style>
 :root{
-  --bg:#f4f3ef; --panel:#ffffff; --ink:#1c2326; --muted:#65707a; --line:#d9dce0; --soft:#e9ebed;
-  --accent:#b45309; --accent-ink:#ffffff; --good:#2f7d4f; --bad:#b42318; --info:#2563eb;
+  --navy:#14213D; --teal:#0D9488; --teal-d:#0F766E; --indigo:#4F46E5; --emerald:#059669; --amber:#D97706; --rose:#E11D48;
+  --ink:#0F172A; --ink2:#334155; --muted:#64748B; --line:#E2E8F0; --soft:#F1F5F9; --card:#FFFFFF; --bg:#F1F5F9;
+  --amber-bg:#FFFBEB; --amber-ink:#92400E; --rose-bg:#FFF1F2; --rose-ink:#BE123C;
+  --emerald-bg:#ECFDF5; --emerald-ink:#047857; --indigo-bg:#EEF2FF; --indigo-ink:#4338CA;
   color-scheme:light;
 }
-@media (prefers-color-scheme: dark){
-  :root:not([data-theme="light"]){
-    --bg:#131719; --panel:#1b2124; --ink:#e7eaec; --muted:#97a2ab; --line:#2d353a; --soft:#252d31;
-    --accent:#f59e0b; --accent-ink:#1a1204; --good:#4ade80; --bad:#f87171; --info:#60a5fa; color-scheme:dark;
-  }
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 Inter,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;min-height:100vh;-webkit-text-size-adjust:100%}
+button,input,select,textarea{font:inherit;color:inherit}
+.num{font-variant-numeric:tabular-nums;white-space:nowrap}
+.muted{color:var(--muted)} .small{font-size:12px} .bad{color:var(--rose-ink)} .warnText{color:var(--amber-ink)}
+
+/* Header and navigation */
+.top{background:var(--navy);color:#fff;padding:12px 16px 12px;border-radius:0 0 20px 20px;position:sticky;top:0;z-index:4}
+.top-row{display:flex;justify-content:space-between;align-items:center;gap:12px}
+.brand{font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:#94A3B8;font-weight:600}
+.top h1{margin:4px 0 0;font-size:22px;line-height:1.2;font-weight:700;overflow-wrap:anywhere}
+.top .sub{margin:4px 0 0;color:#94A3B8;font-size:13px}
+.tabs{display:flex;gap:4px;margin-top:10px;background:rgba(255,255,255,.08);border-radius:12px;padding:4px}
+.tabs a{flex:1;text-align:center;text-decoration:none;color:#CBD5E1;padding:7px 6px;border-radius:9px;font-size:14px;font-weight:600;white-space:nowrap}
+.tabs a[aria-current="page"]{background:#fff;color:var(--navy)}
+.back{color:#94A3B8;text-decoration:none;font-size:13px;font-weight:600}
+main{padding:14px 16px 110px;display:flex;flex-direction:column;gap:12px;max-width:1180px;margin:0 auto}
+.bottomnav{position:fixed;left:0;right:0;bottom:0;background:#fff;border-top:1px solid var(--line);display:flex;justify-content:space-around;padding:8px 8px calc(8px + env(safe-area-inset-bottom,0px));z-index:4}
+.bottomnav a{flex:1;text-align:center;text-decoration:none;color:var(--muted);font-size:12px;font-weight:600;padding:6px 0;border-radius:10px}
+.bottomnav a[aria-current="page"]{color:var(--teal-d);background:#F0FDFA}
+
+/* Page pieces */
+.page-h{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+.page-h h2{margin:0;font-size:18px;font-weight:700}
+.section-t{font-size:11px;font-weight:700;color:var(--ink2);text-transform:uppercase;letter-spacing:1px;margin:6px 0 -4px}
+.card{background:var(--card);border-radius:16px;padding:16px;box-shadow:0 1px 2px rgba(15,23,42,.05),0 4px 14px rgba(15,23,42,.04);display:flex;flex-direction:column;gap:10px}
+.card.clickable{text-decoration:none;color:inherit;display:block}
+.g-wrap{background:var(--card);border-radius:16px;box-shadow:0 1px 2px rgba(15,23,42,.05),0 4px 14px rgba(15,23,42,.04);overflow:auto;max-height:68vh;position:relative}
+.g-row{display:flex;height:34px;border-bottom:1px solid var(--soft);width:max-content;min-width:100%;box-sizing:border-box}
+.g-row.g-click{cursor:pointer}
+.g-row.g-click:hover>*{background:#F8FAFC}
+.g-left{position:sticky;left:0;z-index:2;flex:0 0 540px;width:540px;display:flex;align-items:center;background:var(--card);border-right:1px solid var(--line);font-size:13px;box-sizing:border-box}
+.g-row.g-kind-div .g-left{background:#F1F5F9;font-weight:700}
+.g-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.g-bud{width:100px;text-align:right;padding-right:12px}
+.g-st{width:84px;text-align:right;padding-right:12px}
+.g-days{width:56px;text-align:right;padding-right:12px}
+.g-pct{width:116px;display:flex;align-items:center;gap:8px;padding:0 12px;box-sizing:border-box}
+.g-mini{flex:1;height:6px;background:var(--line);border-radius:999px;overflow:hidden}
+.g-mini i{display:block;height:100%;background:var(--teal)}
+.g-right{position:relative;flex:0 0 auto;height:100%}
+.g-row.g-kind-div{background:#F1F5F9}
+.g-row.g-kind-div .g-left{background:#F1F5F9}
+.g-bar{position:absolute;top:9px;height:16px;border-radius:5px;background:#99F6E4;overflow:hidden}
+.g-bar i{display:block;height:100%;background:#0D9488}
+.g-bar.g-sum{top:11px;height:12px;background:#334155}
+.g-bar.g-sum i{display:none}
+.g-today{position:absolute;top:0;bottom:0;width:2px;background:#E11D48;opacity:.55}
+.g-row.g-head{position:sticky;top:0;z-index:4;height:26px;background:var(--card);border-bottom:0}
+.g-row.g-sub{position:sticky;top:26px;z-index:4;height:26px;background:var(--card);border-bottom:1px solid var(--line)}
+.g-head .g-left,.g-sub .g-left{background:var(--card);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted)}
+.g-hdr{display:flex;overflow:hidden;height:100%}
+.g-mon{font-size:11px;font-weight:700;color:var(--ink2);border-left:1px solid var(--line);padding-left:6px;line-height:26px;overflow:hidden;white-space:nowrap;box-sizing:border-box;flex:none}
+.g-day{font-size:10px;color:var(--muted);text-align:center;line-height:26px;flex:none}
+.look{gap:8px;margin:12px 0 16px}
+.look .card-h>div{white-space:nowrap}
+.look select{width:auto;min-width:150px;flex:none;font:inherit;font-size:14px;font-weight:600;padding:6px 10px;border:1px solid var(--line);border-radius:10px;background:#fff;color:var(--ink)}
+.page-h .tx-add-btn{display:none}
+@media (max-width:640px){.page-h .tx-add-btn{display:inline-flex}}
+.tx-tools{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;align-items:center}
+.tx-tools .tx-q{flex:1 1 220px;margin:0}
+.tx-tools select{width:auto;flex:0 0 auto;padding:8px 10px;font:inherit;font-size:14px}
+.tx-q{width:100%;margin-bottom:12px}
+.tx-draft td{background:#F0FDFA;padding:6px 8px;vertical-align:middle}
+.tx-draft input,.tx-draft select{width:100%;min-width:80px;font:inherit;font-size:13px;padding:6px 6px;border:1px solid var(--line);border-radius:8px;background:#fff;color:var(--ink)}
+.tx-draft .hint{font-size:11px;color:var(--muted);margin-top:2px;min-height:0}
+.tx-draft .small{font-size:13px}
+.tx-edit td{padding:4px 6px;vertical-align:middle}
+.tx-edit input,.tx-edit select{width:100%;min-width:80px;font:inherit;font-size:13px;padding:6px 6px;border:1px solid #E2E8F0;border-radius:8px;background:#fff;color:var(--ink)}
+.tx-edit input:hover,.tx-edit select:hover{border-color:#94A3B8}
+.tx-edit input:focus,.tx-edit select:focus{border-color:var(--teal);background:#fff;outline:none}
+.tx-edit input.r{text-align:right}
+.tx-edit td:nth-child(2){width:96px}
+.tx-edit td:nth-child(3) select{min-width:140px}
+.tx-edit td:nth-child(4) input{min-width:140px}
+.tx-edit td:nth-child(5) input{min-width:110px}
+.tx-edit td:nth-child(6) select{min-width:80px}
+.tx-edit td:nth-child(7) input{min-width:90px}
+.tx-edit td:nth-child(1) input{min-width:0;width:112px}
+.tx-unc td{background:#FEF9C3}
+.link-btn{background:none;border:0;color:var(--teal-d);font:inherit;font-size:13px;font-weight:600;cursor:pointer;padding:4px 6px}
+.tx-edit select{padding-right:4px}
+.icon-btn{display:inline-flex;align-items:center;justify-content:center;background:none;border:1px solid transparent;border-radius:8px;padding:6px;color:#94A3B8;cursor:pointer}
+.icon-btn:hover{border-color:var(--line);color:var(--ink2)}
+.icon-btn.has{color:#059669}
+.tx-icons{white-space:nowrap}
+.sheet textarea{width:100%;font:inherit;padding:10px 12px;border:1px solid var(--line);border-radius:10px;resize:vertical}
+.bud-tbl th,.bud-tbl td{padding-left:8px;padding-right:8px;white-space:nowrap}
+.sheet-tbl.bud-tbl td.desc,.sheet-tbl.bud-tbl th.desc{white-space:normal;min-width:120px;max-width:150px}
+.bud-tbl td.code,.bud-tbl th.code{white-space:nowrap}
+.tx-tbl th,.tx-tbl td{padding-left:8px;padding-right:8px}
+.tx-tbl tfoot td{font-weight:700;border-top:2px solid var(--line)}
+.tx-tbl td.num{white-space:nowrap}
+/* Budget as a spreadsheet: sticky header, compact rows, inline entry row */
+.bud-wrap{max-height:calc(100vh - 250px);overflow:auto}
+.bud-wrap thead tr:first-child th{position:sticky;top:0;z-index:3}
+.bud-wrap thead tr:nth-child(2) th{position:sticky;top:30px;z-index:3;background:#F1F5F9;border-bottom:1px solid #CBD5E1}
+.bud-wrap .bud-tbl tbody td{height:28px;padding:2px 4px;border-bottom:1px solid #E2E8F0;border-right:1px solid #EEF2F6;vertical-align:middle}
+.bud-wrap .bud-tbl tr.grp td{background:#F8FAFC;font-weight:600}
+.bud-wrap .bud-tbl tr.item:hover td{background:#F8FAFC;cursor:pointer}
+.bud-wrap .bud-tbl tr.tr-grand td{position:sticky;bottom:0;background:#F1F5F9;border-top:2px solid #CBD5E1}
+.bud-entry td{background:#ECFDF5;padding:2px 3px;height:32px;border-bottom:2px solid #A7F3D0;vertical-align:middle}
+.bud-entry input,.bud-entry select{height:26px;font-size:13px;padding:0 6px;width:100%;min-width:0;border:1px solid #D1FAE5;border-radius:3px;background:#fff;color:var(--ink)}
+.bud-entry input[type=checkbox]{width:auto;height:auto;margin:0}
+.bud-tbl.no-bank th:last-child,.bud-tbl.no-bank td:last-child{display:none}
+.bud-tbl{table-layout:fixed;width:100%}
+.bud-wrap .bud-tbl tr.item td,.bud-wrap .bud-tbl tr.grp td,.bud-wrap .bud-tbl tr.tr-grand td{height:28px;padding-top:0;padding-bottom:0;line-height:1.25;vertical-align:middle}
+.bud-wrap .bud-tbl td.desc{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sheet-tbl.bud-tbl td.desc,.sheet-tbl.bud-tbl th.desc{min-width:0;max-width:none}
+.bud-wrap .bud-tbl .bud-name{display:inline-block;max-width:calc(100% - 22px);overflow:hidden;text-overflow:ellipsis;vertical-align:middle}
+.bud-wrap .bud-tbl .bud-note{display:inline-flex;vertical-align:middle;color:#059669;margin-left:4px}
+.bud-wrap .bud-tbl .bud-note svg{width:14px;height:14px}
+.bud-tbl.no-bank col:last-child{visibility:collapse}
+.bud-tbl.no-bank col:nth-child(2){width:252px !important}
+.bud-tbl thead tr.band th.gh{border-bottom:2px solid #5EEAD4;padding-top:6px}
+.bud-tbl .g-start{border-left:2px solid #CBD5E1}
+.bud-tbl thead tr.band th.g-start{border-left:1px solid rgba(255,255,255,.35)}
+.bud-tbl td:nth-child(8),.bud-tbl td:nth-child(9),.bud-tbl th:nth-child(8),.bud-tbl th:nth-child(9){width:96px;min-width:96px;max-width:96px}
+.bud-tbl .caret{display:inline-block;width:14px;color:var(--teal-d);font-size:11px}
+.bud-tbl .line-del{padding:0 2px;margin-left:4px;opacity:.5;vertical-align:middle}
+.bud-tbl tr.item:hover .line-del{opacity:1}
+.bud-tbl .var-neg{color:#B91C1C;font-weight:600}
+.bud-tbl .var-pos{color:inherit}
+.bud-wrap .bud-tbl tr.grp{cursor:pointer}
+.bud-wrap .bud-tbl tr.grp:hover td{background:#E8F3F1}
+.bud-entry input:focus,.bud-entry select:focus{border-color:var(--teal);outline:none;box-shadow:inset 0 0 0 1px var(--teal)}
+.bud-entry td:nth-child(1) select{width:100px}
+.bud-entry td:nth-child(2) select{width:100%;min-width:120px}
+.bud-entry td:nth-child(3) select{width:56px;padding:0 2px}
+.bud-entry td:nth-child(6) input,.bud-entry td:nth-child(7) input{width:104px;font-size:12px;padding:0 3px}
+.bud-entry td:nth-child(4) input,.bud-entry td:nth-child(5) input{width:64px}
+.bud-entry td:nth-child(8){white-space:nowrap}
+.bud-wrap .bud-tbl tr.tr-grand td{color:var(--ink)}
+.tx-no{color:var(--muted);font-size:12px;width:44px}
+/* Excel-style grid: compact rows, grey sticky header, cells with light gridlines */
+.tx-wrap{max-height:calc(100vh - 230px);overflow:auto}
+.tx-tbl{border-collapse:separate;border-spacing:0}
+.tx-tbl thead th{position:sticky;top:0;z-index:3;background:#F1F5F9;border-bottom:1px solid #CBD5E1;border-right:1px solid #E2E8F0;padding:6px 8px;font-size:11px;line-height:1.2;white-space:nowrap}
+.tx-tbl thead th:last-child{border-right:0}
+.tx-tbl tbody td{border-bottom:1px solid #E2E8F0;border-right:1px solid #EEF2F6;vertical-align:middle}
+.tx-tbl tbody td:last-child{border-right:0}
+.tx-tbl .tx-draft td{background:#ECFDF5;height:32px;padding:2px 3px;border-bottom:2px solid #A7F3D0}
+.tx-tbl .tx-edit td{height:28px;padding:0 3px}
+.tx-tbl .tx-edit:hover td{background:#F8FAFC}
+.tx-tbl .tx-edit input,.tx-tbl .tx-edit select,.tx-tbl .tx-draft input,.tx-tbl .tx-draft select{height:26px;padding:0 6px;font-size:13px;border:1px solid transparent;border-radius:3px;background:transparent}
+.tx-tbl .tx-draft input,.tx-tbl .tx-draft select{background:#fff;border-color:#D1FAE5}
+.tx-tbl .tx-edit input:hover,.tx-tbl .tx-edit select:hover{border-color:#CBD5E1;background:#fff}
+.tx-tbl .tx-edit input:focus,.tx-tbl .tx-edit select:focus,.tx-tbl .tx-draft input:focus,.tx-tbl .tx-draft select:focus{border-color:var(--teal);background:#fff;outline:none;box-shadow:inset 0 0 0 1px var(--teal)}
+.tx-tbl .tx-unc td{background:#FEF9C3}
+.tx-tbl .tx-unc:hover td{background:#FEF08A}
+.tx-tbl .icon-btn,.tx-tbl .link-btn{padding:2px 4px}
+.tx-tbl tfoot td{position:sticky;bottom:0;z-index:3;background:#F1F5F9;border-top:2px solid #CBD5E1;height:auto;padding:6px 8px}
+.tx-cards{display:none}
+@media (max-width:640px){
+  .tx-wrap{display:none}
+  .tx-cards{display:block}
+  .tx-q{margin-bottom:10px}
 }
-body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.45 ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;min-height:100vh}
-.wrap{max-width:1180px;margin:0 auto;padding-block:20px 96px;padding-inline:16px}
-.top{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap}
-.eyebrow{margin:0;color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.06em}
-h1{margin:2px 0 0;font-size:22px;line-height:1.2;text-wrap:balance}
-h2{margin:0;font-size:16px}
-.meta{margin:4px 0 0;color:var(--muted)}
-.muted{color:var(--muted)} .small{font-size:12px} .neg{color:var(--bad)}
-.banner{margin-top:14px;padding:10px 12px;border-radius:6px;background:var(--soft);border:1px solid var(--line)}
-.banner.err{color:var(--bad)}
-.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-top:16px}
-.tile{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:14px;min-width:0}
-.tile .l{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
-.tile .v{font-size:22px;font-weight:650;margin-top:4px;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
-.tile .s{font-size:12px;color:var(--muted);margin-top:2px}
-.card{background:var(--panel);border:1px solid var(--line);border-radius:8px;margin-top:16px;padding:16px}
-.card-h{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:12px}
-.scroll{overflow-x:auto}
-table{width:100%;border-collapse:collapse;min-width:640px}
-th,td{padding:9px 8px;border-bottom:1px solid var(--line);text-align:left;vertical-align:middle}
-th{font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;white-space:nowrap}
-td.num,th.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
-td.acts{text-align:right;white-space:nowrap}
-td.empty{padding:24px 8px;color:var(--muted);text-align:center}
-tr:last-child td{border-bottom:0}
-.bar{height:6px;background:var(--soft);border-radius:3px;overflow:hidden;min-width:70px}
-.bar>i{display:block;height:100%;background:var(--info)}
-.bar.done>i{background:var(--good)} .bar.over>i{background:var(--bad)}
-.badge{display:inline-flex;align-items:center;gap:6px;padding:2px 8px;border-radius:999px;background:var(--soft);font-size:12px;white-space:nowrap;--dot:var(--muted)}
-.badge::before{content:"";width:7px;height:7px;border-radius:50%;background:var(--dot)}
-.badge[data-status="Complete"],.badge[data-status="Billed"]{--dot:var(--good)}
-.badge[data-status="Ongoing"]{--dot:var(--info)}
-.badge[data-status="Delayed"]{--dot:var(--bad)}
-.btn{font:inherit;padding:8px 12px;border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:6px;cursor:pointer;white-space:nowrap}
-.btn-primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);font-weight:600}
-.btn-link{font:inherit;border:0;background:none;color:var(--info);padding:4px 6px;cursor:pointer}
-.btn-link.danger,.danger{color:var(--bad)}
-.fab{position:fixed;right:16px;bottom:calc(16px + env(safe-area-inset-bottom,0px));z-index:5;font-size:16px;padding:14px 20px;border-radius:999px;box-shadow:0 6px 18px rgba(0,0,0,.25)}
-button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
-input,select{font:inherit;padding:7px 9px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--ink);min-width:0;width:100%;box-sizing:border-box}
-input[type=number].amt{width:110px;text-align:right}
-.inline{display:flex;gap:8px;flex-wrap:wrap} .inline input{width:auto;min-width:180px}
-dialog{background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:10px;width:min(680px,calc(100vw - 32px));padding:20px;box-sizing:border-box;max-height:90vh;overflow:auto}
-dialog::backdrop{background:rgba(0,0,0,.45)}
-.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin-top:12px}
-label{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--muted);min-width:0}
-label.full{grid-column:1/-1}
-.actions{display:flex;justify-content:flex-end;gap:8px;margin-top:16px;flex-wrap:wrap}
-.err-line{color:var(--bad);margin:10px 0 0}
-.hint{margin:4px 0 0;font-size:12px;color:var(--muted)}
-.receipts{margin-top:16px;border-top:1px solid var(--line);padding-top:12px}
-.receipts ul{list-style:none;padding:0;margin:8px 0 0}
-.receipts li{display:flex;justify-content:space-between;gap:8px;align-items:center;padding:6px 0;border-bottom:1px solid var(--line)}
-.receipts li span{overflow-wrap:anywhere}
-.gate{max-width:360px;margin:12vh auto 0;padding:0 16px}
-.gate form{display:grid;gap:10px;margin-top:16px}
-.quick .grid{grid-template-columns:1fr 1fr}
-.quick input,.quick select{font-size:16px;padding:10px}
-@media (max-width:520px){ .quick .grid{grid-template-columns:1fr} }
+.la-row{display:flex;justify-content:space-between;gap:12px;padding:8px 0;border-top:1px solid var(--soft);font-size:14px}
+.card-h{display:flex;justify-content:space-between;align-items:baseline;gap:10px}
+.card-h strong{font-size:16px;font-weight:700;overflow-wrap:anywhere}
+.tiles{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.strip{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));background:var(--card);border-radius:14px;box-shadow:0 1px 2px rgba(15,23,42,.05);overflow:hidden}
+.strip>div{padding:12px 14px;border-left:1px solid var(--soft);min-width:0}
+.strip>div:first-child{border-left:0}
+.strip .l{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.strip .v{font-size:17px;font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.strip .small{font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.strip .warnText{color:var(--amber-ink)}
+.strip.teal{background:var(--teal)}
+@media (max-width:560px){ .strip{grid-template-columns:repeat(2,minmax(0,1fr))} .strip>div:nth-child(3){border-left:0} .strip>div:nth-child(n+3){border-top:1px solid var(--soft)} }
+.tile{background:var(--card);border-radius:14px;padding:12px 14px;box-shadow:0 1px 2px rgba(15,23,42,.05)}
+.tile .l{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;font-weight:600}
+.tile .v{font-size:19px;font-weight:700;margin-top:3px;font-variant-numeric:tabular-nums}
+.tile.teal{background:var(--teal);color:#fff} .tile.teal .l{color:#CCFBF1}
+.bar{height:8px;background:var(--line);border-radius:999px;overflow:hidden}
+.bar>i{display:block;height:100%;background:var(--teal);border-radius:999px}
+.bar.ok>i{background:var(--emerald)}
+.badge{display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:999px;font-size:12px;font-weight:600;white-space:nowrap;background:var(--soft);color:var(--ink2)}
+.b-ok{background:var(--emerald-bg);color:var(--emerald-ink)}
+.b-warn{background:var(--amber-bg);color:var(--amber-ink)}
+.b-bad{background:var(--rose-bg);color:var(--rose-ink)}
+.b-info{background:var(--indigo-bg);color:var(--indigo-ink)}
+.b-mute{background:var(--soft);color:var(--muted)}
+.notice{border-radius:12px;padding:10px 12px;font-size:13px;background:var(--amber-bg);color:var(--amber-ink);border:1px solid #FDE68A}
+.notice.bad{background:var(--rose-bg);color:var(--rose-ink);border-color:#FECDD3}
+.notice.ok{background:var(--emerald-bg);color:var(--emerald-ink);border-color:#A7F3D0}
+.rows{display:flex;flex-direction:column}
+.row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px 12px;align-items:center;padding:12px 0;border-top:1px solid var(--soft);background:none;border-left:0;border-right:0;border-bottom:0;text-align:left;width:100%;cursor:pointer}
+.row:first-child{border-top:0}
+.row .t{font-weight:600;overflow-wrap:anywhere}
+.row .s{font-size:12px;color:var(--muted);overflow-wrap:anywhere}
+.row .amt{font-weight:700;font-variant-numeric:tabular-nums;text-align:right}
+.line{display:grid;grid-template-columns:minmax(0,1fr) auto auto 14px;gap:2px 12px;padding:10px 0;border-top:1px solid var(--soft);font-size:13px;background:none;border-left:0;border-right:0;border-bottom:0;width:100%;text-align:left;cursor:pointer;align-items:center}
+.line .n{overflow-wrap:anywhere;color:var(--ink)}
+.line .c{font-size:12px;color:var(--muted)}
+.line .v{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+.line .chev{color:var(--teal-d);font-size:18px;line-height:1;font-weight:700}
+.hint-line{font-size:12px;color:var(--muted);margin-top:2px}
+.sheet-tbl{width:100%;border-collapse:collapse;font-size:13px;min-width:640px;font-variant-numeric:tabular-nums}
+.sheet-tbl th,.sheet-tbl td{padding:8px 10px;border-bottom:1px solid var(--soft);text-align:left;white-space:nowrap;vertical-align:middle}
+.sheet-tbl thead th{background:#fff;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);font-weight:700;position:sticky;top:0;border-bottom:1px solid var(--line)}
+.sheet-tbl thead tr.band th{background:var(--navy);color:#fff;text-align:center;font-size:11px;letter-spacing:.8px;border-bottom:1px solid #2B3A5E}
+.sheet-tbl .r{text-align:right}
+.sheet-tbl .ctr{text-align:center}
+.sheet-tbl td.code{width:86px;color:var(--muted);font-weight:600}
+.sheet-tbl td.desc{min-width:240px}
+.sheet-tbl td.wrap{white-space:normal}
+.sheet-tbl tr.item td.desc{padding-left:26px}
+.sheet-tbl tr.item td{vertical-align:top;padding-top:10px;padding-bottom:10px}
+.sheet-tbl tr.grp td{background:#E8F3F1;font-weight:700;color:var(--navy);border-top:1px solid #CFE7E3;padding-top:10px;padding-bottom:10px}
+.sheet-tbl tr.grp td.code{color:var(--teal-d)}
+.sheet-tbl tr.grp td.desc{text-transform:uppercase;letter-spacing:.3px;font-size:12px}
+.sheet-tbl tr.tr-click{cursor:pointer}
+.sheet-tbl tr.tr-click:hover td{background:#F8FAFC}
+.sheet-tbl tr.tr-grand td{background:var(--navy);color:#fff;font-weight:700;border-bottom:0}
+@media (max-width:640px){
+  .sheet-tbl, .sheet-tbl tbody{display:block;min-width:0}
+  .sheet-tbl thead{display:none}
+  .sheet-tbl tr{display:flex;flex-wrap:wrap;align-items:center;gap:4px 12px;padding:12px 14px;border-bottom:1px solid var(--soft)}
+  .sheet-tbl td{display:none;border:0;padding:0;white-space:normal;min-width:0}
+  .sheet-tbl td.m-name,.sheet-tbl td.m-amt,.sheet-tbl td.m-meta,.sheet-tbl td.m-owed{display:block}
+  .sheet-tbl tr.item{display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"name amt" "meta owed";gap:2px 12px}
+  .sheet-tbl tr.item td.m-name{grid-area:name;font-weight:600;padding-left:0}
+  .sheet-tbl tr.item td.m-amt{grid-area:amt;text-align:right;font-weight:700}
+  .sheet-tbl tr.item td.m-meta{grid-area:meta;color:var(--muted);font-size:12px}
+  .sheet-tbl tr.item td.m-owed{grid-area:owed;text-align:right;font-size:12px;color:var(--muted)}
+  .sheet-tbl tr.grp{background:#E8F3F1;justify-content:space-between;padding:10px 14px}
+  .sheet-tbl tr.grp td.m-name{flex:1 1 55%;font-size:12px}
+  .sheet-tbl tr.grp td.m-amt{font-weight:700;color:var(--navy)}
+  .sheet-tbl tr.grp td.m-owed{font-size:12px;color:var(--muted)}
+  .sheet-tbl tr.tr-grand{background:var(--navy);color:#fff;justify-content:space-between}
+  .sheet-tbl tr.tr-grand td.m-name{flex:1 1 55%}
+  .sheet-tbl tr.tr-grand td.m-amt{font-weight:700}
+  .sheet-tbl tr.tr-grand td.m-owed{font-size:12px;color:#CBD5E1}
+}
+.note{font-size:12px;color:var(--muted);font-weight:400;white-space:normal;margin-top:2px}
+.calc{display:flex;justify-content:space-between;align-items:center;gap:12px;background:var(--soft);border-radius:12px;padding:12px 14px}
+.calc strong{font-size:18px}
+
+.line-h{display:grid;grid-template-columns:minmax(0,1fr) auto auto 14px;gap:12px;font-size:11px;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);font-weight:600;padding-top:6px}
+.line-h span:not(:first-child){text-align:right}
+details{background:var(--card);border-radius:16px;padding:14px 16px;box-shadow:0 1px 2px rgba(15,23,42,.05)}
+summary{cursor:pointer;font-weight:700;list-style:none;display:flex;justify-content:space-between;gap:10px;align-items:center}
+summary::-webkit-details-marker{display:none}
+summary::after{content:"+";color:var(--teal-d);font-size:20px;line-height:1}
+details[open] summary::after{content:"–"}
+details .sub-li{display:flex;justify-content:space-between;gap:10px;padding:9px 0;border-top:1px solid var(--soft);font-size:14px}
+details .sub-li span:first-child{overflow-wrap:anywhere}
+
+/* Buttons and fields */
+.btn{padding:11px 14px;border:1px solid var(--line);background:#fff;border-radius:12px;font-weight:600;font-size:14px;cursor:pointer;white-space:nowrap;text-decoration:none;color:var(--navy);display:inline-flex;align-items:center;justify-content:center;gap:6px}
+.btn.primary{background:var(--teal);border-color:var(--teal);color:#fff}
+.btn.navy{background:var(--navy);border-color:var(--navy);color:#fff}
+.btn.danger{color:var(--rose-ink);border-color:#FECDD3;background:#fff}
+.btn.sm{padding:7px 10px;font-size:13px;border-radius:10px}
+.btn:disabled{opacity:.6}
+.btn-row{display:flex;gap:8px;flex-wrap:wrap}
+.btn-row .btn{flex:1}
+.empty{background:var(--card);border-radius:16px;padding:22px 16px;text-align:center;color:var(--muted);box-shadow:0 1px 2px rgba(15,23,42,.05)}
+input,select{width:100%;padding:11px 12px;border:1px solid #CBD5E1;border-radius:12px;background:#fff;font-size:16px;min-width:0}
+input[type=checkbox]{width:auto;padding:0;accent-color:var(--teal)}
+input[type=file]{padding:9px;font-size:14px}
+input:focus,select:focus,button:focus-visible,a:focus-visible{outline:2px solid var(--teal);outline-offset:2px}
+label{display:flex;flex-direction:column;gap:5px;font-size:12px;font-weight:600;color:var(--ink2);min-width:0}
+label.check{flex-direction:row;align-items:center;gap:8px;font-size:14px;font-weight:500}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.grid .full{grid-column:1/-1}
+@media (max-width:520px){.grid{grid-template-columns:1fr}}
+.seg{display:flex;gap:4px;background:var(--line);border-radius:12px;padding:4px;overflow-x:auto}
+.seg button{flex:1;border:0;background:none;padding:9px 10px;border-radius:9px;font-weight:600;font-size:13px;color:var(--ink2);cursor:pointer;white-space:nowrap}
+.seg button[aria-pressed="true"]{background:#fff;color:var(--ink)}
+
+/* Sheet (bottom sheet on phone, dialog on wide screens) */
+dialog.sheet{border:0;border-radius:18px;padding:0;width:min(620px,calc(100vw - 24px));max-height:92vh;overflow:auto;color:var(--ink);background:#fff;box-shadow:0 20px 50px rgba(15,23,42,.3)}
+dialog.sheet::backdrop{background:rgba(15,23,42,.5)}
+dialog.sheet form{display:flex;flex-direction:column;gap:14px;padding:18px}
+.sheet-h{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.sheet-h h2{margin:0;font-size:18px;font-weight:700;overflow-wrap:anywhere}
+.x{border:0;background:var(--soft);width:34px;height:34px;border-radius:50%;font-size:18px;cursor:pointer;color:var(--ink2)}
+.sheet .actions{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;align-items:center}
+.sheet .actions .spacer{flex:1}
+.err{margin:0;color:var(--rose-ink);font-size:14px;font-weight:600}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:6px 14px;font-size:14px}
+.kv dt{color:var(--muted)} .kv dd{margin:0;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.file-li{display:flex;justify-content:space-between;gap:10px;align-items:center;padding:8px 0;border-top:1px solid var(--soft);font-size:14px}
+.file-li span{overflow-wrap:anywhere}
+@media (max-width:600px){
+  dialog.sheet{position:fixed;margin:0;top:auto;bottom:0;left:0;right:0;width:100%;max-width:none;max-height:92vh;border-radius:18px 18px 0 0}
+}
+
+/* Toast */
+.toast{position:fixed;left:16px;right:16px;bottom:84px;max-width:560px;margin:0 auto;background:var(--navy);color:#fff;border-radius:12px;padding:12px 14px;font-size:14px;z-index:6;box-shadow:0 10px 30px rgba(15,23,42,.3)}
+.toast.bad{background:var(--rose-ink)}
+
+/* Desktop app shell */
+.side{display:none}
+.toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.toolbar input[type=search]{width:240px;padding:8px 12px;font-size:14px}
+@media (min-width:900px){
+  .side{box-sizing:border-box;display:flex;flex-direction:column;gap:18px;position:fixed;left:0;top:0;bottom:0;width:232px;background:var(--navy);color:#fff;padding:20px 14px;overflow:auto;overflow-x:hidden;z-index:5}
+  .side>*{min-width:0;margin-left:0;margin-right:0}
+  .side-brand{display:flex;gap:10px;align-items:center;padding:4px 8px 6px}
+  .side-mark{width:34px;height:34px;border-radius:10px;background:var(--teal);display:grid;place-items:center;font-weight:800;font-size:13px}
+  .side-name{font-weight:700;font-size:15px}
+  .side-sub{font-size:11px;color:#94A3B8;letter-spacing:.4px}
+  .side a{display:block;text-decoration:none;color:#CBD5E1;border-radius:8px;position:relative}
+  .side a:hover{background:rgba(255,255,255,.06);color:#fff}
+  .side a.top{padding:10px 12px;font-size:15px;font-weight:600}
+  .side a.child{padding:8px 12px 8px 20px;margin-left:12px;border-left:2px solid #2E3B57;border-radius:0 8px 8px 0;font-size:14px;font-weight:500}
+  .side a[aria-current="page"]{background:rgba(45,212,191,.16);color:#fff;font-weight:700}
+  .side a.child[aria-current="page"]{border-left-color:#2DD4BF}
+  .side a.top[aria-current="page"]::before{content:"";position:absolute;left:-14px;top:8px;bottom:8px;width:3px;border-radius:3px;background:#2DD4BF}
+  .side-group{display:flex;flex-direction:column;gap:2px;margin-top:6px}
+  .side-group>.side-sec{margin-top:14px}
+  .side-sec{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#8A97AD;padding:12px 12px 6px;margin:0;line-height:1.2;overflow-wrap:anywhere}
+  .side-group>.side-sec:first-child{margin-top:0}
+  .side-btn{width:100%;margin-top:6px;padding:9px 12px;border-radius:10px;border:1px solid #334155;background:transparent;color:#CBD5E1;font-weight:600;font-size:13px;cursor:pointer;text-align:left}
+  .side-foot{margin-top:auto}
+  .back-link{color:#CBD5E1 !important;font-size:13px !important;padding:6px 12px !important;background:none !important}
+  .back-link:hover{color:#fff !important}
+  .side-proj{background:rgba(255,255,255,.07);border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:2px}
+  .side-pname{font-weight:700;font-size:15px;overflow-wrap:anywhere}
+  .shell{margin-left:232px;min-height:100vh}
+  .bottomnav{display:none}
+  .top .tabs,.top .back{display:none}
+  .top{border-radius:0;padding:14px 28px}
+  main{max-width:none;padding:20px 28px 60px}
+  .tiles{grid-template-columns:repeat(4,minmax(0,1fr))}
+}
+
+/* Gate */
+.gate{max-width:380px;margin:12vh auto 0;padding:0 16px}
+.gate .card{margin-top:10px}
 .hidden{display:none !important}
 </style>
 </head>
 <body>
 
-<!-- Sign-in screen -->
-<section id="gate" class="gate hidden" aria-labelledby="gateH">
-  <h1 id="gateH">Construction Project Tracker</h1>
-  <p class="meta">Sign in to view and edit the project.</p>
-  <form id="loginForm">
-    <label>Email<input type="email" name="email" autocomplete="username" required></label>
-    <label>Password<input type="password" name="password" autocomplete="current-password" required></label>
-    <button class="btn btn-primary">Sign in</button>
-    <p class="err-line" id="loginErr" hidden></p>
-  </form>
+<!-- Sign-in -->
+<section id="gate" class="gate hidden">
+  <div class="brand">SN Square Group</div>
+  <h1 style="margin:6px 0 0;font-size:24px;color:var(--navy)">Project Tracker</h1>
+  <div class="card">
+    <form id="loginForm" style="display:flex;flex-direction:column;gap:12px">
+      <label>Email<input type="email" name="email" autocomplete="username" required></label>
+      <label>Password<input type="password" name="password" autocomplete="current-password" required></label>
+      <button class="btn navy" type="submit">Sign In</button>
+      <p class="err" id="loginErr" hidden></p>
+    </form>
+  </div>
 </section>
 
-<!-- Tracker -->
-<div class="wrap hidden" id="app">
-  <header class="top">
-    <div>
-      <p class="eyebrow" id="client"></p>
-      <h1 id="pname">Loading…</h1>
-      <p class="meta" id="pmeta"></p>
-    </div>
-    <div class="inline">
-      <button class="btn" data-act="edit-project">Project details</button>
-      <button class="btn" data-act="sign-out">Sign out</button>
-    </div>
-  </header>
-
-  <div id="banner" class="banner" hidden></div>
-
-  <section class="tiles" id="tiles" aria-label="Summary"></section>
-
-  <section class="card" aria-labelledby="catH">
-    <div class="card-h">
-      <h2 id="catH">Budget by category</h2>
-      <form id="catForm" class="inline">
-        <input id="catName" placeholder="New category, e.g. Labor" aria-label="New category name" required>
-        <button class="btn">Add category</button>
-      </form>
-    </div>
-    <div class="scroll"><table id="catTable"></table></div>
-  </section>
-
-  <section class="card" aria-labelledby="taskH">
-    <div class="card-h">
-      <h2 id="taskH">Tasks</h2>
-      <button class="btn btn-primary" data-act="add-task">Add task</button>
-    </div>
-    <div class="scroll"><table id="taskTable"></table></div>
-  </section>
+<!-- App shell -->
+<div id="app" class="hidden">
+  <aside class="side" id="side"></aside>
+  <div class="shell">
+    <header class="top" id="topbar"></header>
+    <main id="main"></main>
+    <nav class="bottomnav" id="bottomnav">
+      <a href="#/projects" data-nav="projects">Projects</a>
+      <a href="#/library" data-nav="library">Library</a>
+      <a href="#/vendors" data-nav="vendors">Contractors</a>
+    </nav>
+  </div>
 </div>
-
-<button class="btn btn-primary fab hidden" id="quickBtn" data-act="quick-add">+ Quick add</button>
-
-<!-- Quick add -->
-<dialog id="quickDlg" class="quick" aria-labelledby="quickTitle">
-  <form id="quickForm">
-    <h2 id="quickTitle">Quick add</h2>
-    <p class="hint">Only the task name is required. Add the rest later with Edit.</p>
-    <div class="grid">
-      <label class="full">Task<input name="name" required autocomplete="off"></label>
-      <label>Category<input name="category" list="catList" autocomplete="off"></label>
-      <label>Status
-        <select name="status"><option>Ongoing</option><option>Complete</option><option>Delayed</option><option>Billed</option><option>Cancelled</option></select>
-      </label>
-      <label>Actual cost ($)<input type="number" name="actual" inputmode="decimal" min="0" step="any" placeholder="0"></label>
-      <label>Paid so far ($)<input type="number" name="paid" inputmode="decimal" min="0" step="any" placeholder="0"></label>
-      <label class="full">Date<input type="date" name="start_date"></label>
-    </div>
-    <p class="err-line" id="quickErr" hidden></p>
-    <div class="actions">
-      <button type="button" class="btn" data-close>Cancel</button>
-      <button class="btn btn-primary">Save</button>
-    </div>
-  </form>
-</dialog>
-
-<!-- Task -->
-<dialog id="taskDlg" aria-labelledby="taskTitle">
-  <form id="taskForm">
-    <h2 id="taskTitle">Add task</h2>
-    <div class="grid">
-      <label class="full">Task<input name="name" required></label>
-      <label>Phase<input name="phase" list="phaseList"></label>
-      <label>Category<input name="category" list="catList"></label>
-      <label>Assigned to<input name="assigned_to" list="whoList"></label>
-      <label>Status
-        <select name="status"><option>Ongoing</option><option>Complete</option><option>Delayed</option><option>Billed</option><option>Cancelled</option></select>
-      </label>
-      <label>Start date<input type="date" name="start_date"></label>
-      <label>Duration (days)<input type="number" name="duration_days" min="0" step="1"></label>
-      <label>Delayed by (days)<input type="number" name="delay_days" min="0" step="1"></label>
-      <label>Progress (%)<input type="number" name="progress" min="0" max="100" step="1"></label>
-      <label>Quantity<input type="number" name="qty" min="0" step="any"></label>
-      <label>Unit<input name="unit" placeholder="hr, sq ft, ea"></label>
-      <label>Cost per unit<input type="number" name="unit_cost" min="0" step="any"></label>
-      <label>Actual cost<input type="number" name="actual" min="0" step="any"></label>
-      <label>Paid so far<input type="number" name="paid" min="0" step="any"></label>
-    </div>
-    <div class="receipts" id="receiptsBox">
-      <h2 style="font-size:14px">Receipts</h2>
-      <p class="hint" id="receiptHint">Save the task first, then attach receipts.</p>
-      <input type="file" id="receiptInput" accept="image/*,application/pdf" multiple hidden>
-      <div class="inline" style="margin-top:8px"><button type="button" class="btn" id="attachBtn" hidden>Attach receipts</button></div>
-      <ul id="receiptList"></ul>
-    </div>
-    <p class="err-line" id="taskErr" hidden></p>
-    <div class="actions">
-      <button type="button" class="btn" data-close>Cancel</button>
-      <button class="btn btn-primary">Save task</button>
-    </div>
-  </form>
-</dialog>
-
-<!-- Project -->
-<dialog id="projDlg" aria-labelledby="projTitle">
-  <form id="projForm" novalidate>
-    <h2 id="projTitle">Project details</h2>
-    <div class="grid">
-      <label class="full">Project name<input name="name" required></label>
-      <label>Client<input name="client"></label>
-      <label>Project manager<input name="manager"></label>
-      <label>Start date<input type="date" name="start_date"></label>
-      <label>Expected end date<input type="date" name="end_date"></label>
-    </div>
-    <p class="err-line" id="projErr" hidden></p>
-    <div class="actions">
-      <button type="button" class="btn" data-close>Cancel</button>
-      <button class="btn btn-primary">Save details</button>
-    </div>
-  </form>
-</dialog>
-
-<datalist id="catList"></datalist>
-<datalist id="phaseList"></datalist>
-<datalist id="whoList"></datalist>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
 <script src="../config.js"></script>
 <script>
-const STATUSES = ['Ongoing','Complete','Delayed','Billed','Cancelled'];
-const $ = s => document.querySelector(s);
-const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]);
-const num = v => { const n = parseFloat(v); return isNaN(n) ? 0 : n; };
-const clamp = (n, a, b) => Math.min(b, Math.max(a, n));
-const money = n => Number(n || 0).toLocaleString('en-US', {style:'currency', currency:'USD'});
-const toDate = s => s ? new Date(s + 'T00:00:00') : null;
-const addDays = (d, n) => { const x = new Date(d); x.setDate(x.getDate() + n); return x; };
-const fmtDate = d => d ? d.toLocaleDateString('en-US', {month:'short', day:'numeric', year:'numeric'}) : '—';
-const sum = (arr, k) => arr.reduce((a, t) => a + (Number(t[k]) || 0), 0);
-const dateOrNull = v => v || null;
-const isoOf = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+'use strict';
+
+// ---------- Helpers ----------
+const $ = (s, r = document) => r.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const num = v => { if (v === '' || v == null) return 0; const n = Number(String(v).replace(/[$,\s]/g, '')); return Number.isFinite(n) ? n : 0; };
+const money = n => Number(n || 0).toLocaleString('en-US', {style:'currency', currency:'USD', minimumFractionDigits:0, maximumFractionDigits:2});
+const fmtInput = n => (n === '' || n == null) ? '' : Number(n).toLocaleString('en-US', {maximumFractionDigits:2});
+function formatMoneyText(raw){
+  const cleaned = String(raw).replace(/[^0-9.]/g, '');
+  if (!cleaned) return '';
+  const parts = cleaned.split('.');
+  const whole = (parts[0] || '').replace(/^0+(?=\d)/, '').replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  const dec = parts.length > 1 ? '.' + parts.slice(1).join('').slice(0, 2) : '';
+  return whole + dec;
+}
+const todayISO = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; };
+const fmtDate = s => s ? new Date(s + 'T12:00:00').toLocaleDateString('en-US', {month:'short', day:'numeric', year:'numeric'}) : '—';
+const daysBetween = (a, b) => Math.round((new Date(b + 'T12:00:00') - new Date(a + 'T12:00:00')) / 86400000);
+const msg = e => (e && (e.message || e.error_description)) || String(e);
+const pct = (a, b) => b > 0 ? Math.min(100, Math.round(a / b * 100)) : 0;
+
+const DISMISS_REASONS = [
+  'Vendor has no employees (owner-operator)',
+  'Covered under another policy or umbrella',
+  'Vendor is not doing work on site',
+  'Owner is handling insurance for this scope',
+  'Other (explain below)'
+];
+const PAY_METHODS = ['Check', 'ACH', 'Wire', 'Cash', 'Card'];
+const PROJECT_STATUS = ['Planning', 'Active', 'Sold'];
 
 const sb = supabase.createClient(window.TRACKER_CONFIG.url, window.TRACKER_CONFIG.anonKey);
+let session = null;
 
-// null = still loading
-const state = { project: null, cats: null, tasks: null, receipts: [] };
-let signedIn = false;
+// Library cache (global) and current project cache
+const S = { divs: [], subs: [], divMap: {}, subMap: {}, vendors: [], proj: null, year: new Date().getFullYear() };
 
-function banner(msg, isErr = true){
-  const b = $('#banner'); b.textContent = msg; b.classList.toggle('err', isErr); b.hidden = !msg;
+function setLibrary(divs, subs){
+  S.divs = divs; S.subs = subs;
+  S.divMap = Object.fromEntries(divs.map(d => [d.code, d]));
+  S.subMap = Object.fromEntries(subs.map(s => [s.code, s]));
 }
-function fail(error){ banner(error?.message || 'Something went wrong. Try again.'); }
+const divName = code => S.divMap[code] ? `${code} ${S.divMap[code].name}` : code;
+const lineName = l => l.subtask_code ? (S.subMap[l.subtask_code]?.name || l.subtask_code) : (l.label || 'Custom line');
+// Total = signed contract when one is entered; until then, budget plus any revision.
+const budgetOf = l => num(l.contract_amount) > 0 ? num(l.contract_amount) : num(l.budget) + num(l.revision);
+const dateOr = s => s ? toDate(s).toLocaleDateString('en-US', {month:'numeric', day:'numeric', year:'2-digit'}) : '';
 
-function derive(t){
-  const planned = num(t.qty) * num(t.unit_cost);
-  const actual = num(t.actual), paid = num(t.paid);
-  const sd = toDate(t.start_date);
-  return {
-    ...t, planned, actual, paid, due: actual - paid,
-    startD: sd,
-    endD: sd ? addDays(sd, num(t.duration_days) + num(t.delay_days)) : null,
-    progress: clamp(num(t.progress), 0, 100)
+function toast(text, bad = false){
+  document.querySelectorAll('.toast').forEach(t => t.remove());
+  const t = document.createElement('div');
+  t.className = 'toast' + (bad ? ' bad' : '');
+  t.textContent = text;
+  document.body.append(t);
+  setTimeout(() => t.remove(), 5000);
+}
+
+function check(res){ if (res.error) throw res.error; return res.data; }
+
+// Certificate of insurance status for one vendor on one project
+function latestInsMap(rows){
+  const m = {};
+  rows.forEach(r => { const k = r.vendor_id + '|' + r.project_id; if (!(k in m)) m[k] = r; });
+  return m;
+}
+function coiStatus(r){
+  if (!r) return 'missing';
+  if (r.dismissed_reason) return 'dismissed';
+  if (!r.file_path) return 'missing';
+  if (r.expires_on && r.expires_on < todayISO()) return 'expired';
+  if (r.expires_on && daysBetween(todayISO(), r.expires_on) <= 30) return 'soon';
+  return 'ok';
+}
+const COI_BADGE = {
+  missing: ['b-bad', 'COI missing'], expired: ['b-bad', 'COI expired'], soon: ['b-warn', 'COI expiring soon'],
+  ok: ['b-ok', 'COI on file'], dismissed: ['b-mute', 'Reminder dismissed']
+};
+const coiBadge = st => `<span class="badge ${COI_BADGE[st][0]}">${COI_BADGE[st][1]}</span>`;
+
+// ---------- Library (global) ----------
+async function loadLibrary(){
+  const [d, s] = await Promise.all([
+    sb.from('library_divisions').select('*').eq('retired', false).order('code'),
+    sb.from('library_subtasks').select('*').eq('retired', false).order('code')
+  ]);
+  setLibrary(check(d), check(s));
+}
+
+// ---------- Projects list ----------
+async function renderProjects(){
+  const [p, l, pay, pv, ins] = await Promise.all([
+    sb.from('projects').select('*').order('created_at', {ascending:false}),
+    sb.from('project_lines').select('project_id, division_code, subtask_code, label, budget, revision, bank_funded, id'),
+    sb.from('payments').select('project_id, amount'),
+    sb.from('project_vendors').select('project_id, vendor_id, vendors(name)'),
+    sb.from('vendor_insurance').select('*').order('created_at', {ascending:false})
+  ]);
+  const projects = check(p), lines = check(l), pays = check(pay), pvs = check(pv), insRows = check(ins);
+  const insMap = latestInsMap(insRows);
+
+  const reminders = [];
+  pvs.forEach(row => {
+    const st = coiStatus(insMap[row.vendor_id + '|' + row.project_id]);
+    if (st === 'missing' || st === 'expired'){
+      reminders.push({projectId: row.project_id, vendor: row.vendors?.name || 'Contractor', st});
+    }
+  });
+  const projName = Object.fromEntries(projects.map(x => [x.id, x.name]));
+
+  let html = `
+    <div class="page-h">
+      <h2>Projects</h2>
+      <button class="btn primary" data-act="new-project">New Project</button>
+    </div>`;
+
+  if (reminders.length){
+    html += `<div class="notice bad"><strong>${reminders.length} contractor${reminders.length > 1 ? 's' : ''} need a certificate of insurance.</strong>
+      <div style="margin-top:6px">${reminders.map(r => `<div><a href="#/project/${r.projectId}/contractors" style="color:inherit">${esc(r.vendor)} · ${esc(projName[r.projectId] || 'Project')}</a></div>`).join('')}</div>
+      <div class="small" style="margin-top:6px">This reminder shows every day until the certificate is added or dismissed with a reason.</div></div>`;
+  }
+
+  if (!projects.length){
+    html += `<div class="empty">No projects yet. Create one to start the budget.</div>`;
+  }
+
+  projects.forEach(pr => {
+    const ls = lines.filter(x => x.project_id === pr.id);
+    const budget = ls.reduce((a, x) => a + budgetOf(x), 0);
+    const paid = pays.filter(x => x.project_id === pr.id).reduce((a, x) => a + num(x.amount), 0);
+    const owed = Math.max(0, budget - paid);
+    const missing = reminders.filter(r => r.projectId === pr.id).length;
+    html += `
+      <a class="card clickable" href="#/project/${pr.id}/budget">
+        <div class="card-h"><strong>${esc(pr.name)}</strong><span class="badge ${pr.status === 'Active' ? 'b-info' : ''}">${esc(pr.status)}</span></div>
+        ${pr.address ? `<div class="small muted">${esc(pr.address)}</div>` : ''}
+        <div class="bar ${budget && paid >= budget ? 'ok' : ''}"><i style="width:${pct(paid, budget)}%"></i></div>
+        <div class="card-h" style="font-size:13px">
+          <span class="muted">Budget <span class="num" style="color:var(--ink)">${money(budget)}</span></span>
+          <span class="muted">Paid <span class="num" style="color:var(--ink)">${money(paid)}</span></span>
+          <span class="muted">Owed <span class="num" style="color:var(--ink)">${money(owed)}</span></span>
+        </div>
+        ${missing ? `<span class="badge b-bad" style="align-self:flex-start">${missing} COI missing</span>` : ''}
+      </a>`;
+  });
+
+  $('#main').innerHTML = html;
+  setTopbar('SN Square Group', 'Projects', `${projects.length} project${projects.length === 1 ? '' : 's'}`, '');
+}
+
+// ---------- Project shell ----------
+async function loadProject(id){
+  const [p, l, pay, pv, ins, v, tk] = await Promise.all([
+    sb.from('projects').select('*').eq('id', id).single(),
+    sb.from('project_lines').select('*').eq('project_id', id).order('created_at'),
+    sb.from('payments').select('*, vendors(name)').eq('project_id', id).order('pay_date', {ascending:false}),
+    sb.from('project_vendors').select('vendor_id').eq('project_id', id),
+    sb.from('vendor_insurance').select('*').eq('project_id', id).order('created_at', {ascending:false}),
+    sb.from('vendors').select('*').order('name'),
+    sb.from('schedule_tasks').select('*').eq('project_id', id).order('start_date')
+  ]);
+  const pays = check(pay);
+  const ids = pays.map(x => x.id);
+  const receipts = ids.length ? check(await sb.from('payment_receipts').select('*').in('payment_id', ids).order('created_at')) : [];
+  S.vendors = check(v);
+  S.proj = {
+    project: check(p),
+    lines: check(l),
+    pays,
+    receipts,
+    assignedIds: new Set(check(pv).map(x => x.vendor_id)),
+    insMap: latestInsMap(check(ins)),
+    tasks: tk.error ? [] : (tk.data || []),
+    tasksError: tk.error ? tk.error.message : ''
   };
 }
-const tasksD = () => (state.tasks || []).map(derive).sort((a, b) =>
-  String(a.start_date || '9999').localeCompare(String(b.start_date || '9999')) || String(a.name).localeCompare(String(b.name)));
 
-async function loadAll(){
-  const [p, c, t, r] = await Promise.all([
-    sb.from('project').select('*').eq('id', 1).maybeSingle(),
-    sb.from('categories').select('*').order('name'),
-    sb.from('tasks').select('*'),
-    sb.from('receipts').select('*')
+async function renderProject(r){
+  await loadProject(r.id);
+  renderSide(r);
+  const P = S.proj;
+  const pr = P.project;
+  setTopbar(pr.name, pr.address || '', `${pr.status}${pr.general_contractor ? ' · GC: ' + pr.general_contractor : ''}`, `
+    <a href="#/projects" class="back">← Projects</a>
+    <div class="tabs" role="tablist">
+      <a href="#/project/${pr.id}/budget" ${r.tab === 'budget' ? 'aria-current="page"' : ''}>Budget</a>
+      <a href="#/project/${pr.id}/schedule" ${r.tab === 'schedule' ? 'aria-current="page"' : ''}>Schedule</a>
+      <a href="#/project/${pr.id}/payments" ${r.tab === 'payments' ? 'aria-current="page"' : ''}>Transactions</a>
+      <a href="#/project/${pr.id}/contractors" ${r.tab === 'contractors' ? 'aria-current="page"' : ''}>Contractors</a>
+    </div>`);
+  if (r.tab === 'payments') renderPayments(P);
+  else if (r.tab === 'contractors') renderContractors(P);
+  else if (r.tab === 'schedule') await renderSchedule(P);
+  else renderBudget(P);
+}
+
+function setTopbar(brand, title, sub, extra){
+  $('#topbar').innerHTML = `
+    <div class="top-row">
+      <div class="brand">${esc(brand)}</div>
+      <button class="btn sm" data-act="sign-out" style="background:transparent;color:#CBD5E1;border-color:#334155">Sign Out</button>
+    </div>
+    <h1>${esc(title)}</h1>
+    ${sub ? `<p class="sub">${esc(sub)}</p>` : ''}
+    ${extra || ''}`;
+}
+
+// ---------- Budget ----------
+function paidByLine(P){
+  const m = {};
+  P.pays.forEach(p => { m[p.budget_line_id] = (m[p.budget_line_id] || 0) + num(p.amount); });
+  return m;
+}
+
+function budgetGroups(P){
+  const q = (S.budgetQuery || '').trim().toLowerCase();
+  const lines = q ? P.lines.filter(l => [lineName(l), l.subtask_code, l.division_code, divName(l.division_code), l.unit, l.notes]
+    .some(x => String(x || '').toLowerCase().includes(q))) : P.lines;
+  const byDiv = {};
+  lines.forEach(l => { (byDiv[l.division_code] ||= []).push(l); });
+  return {byDiv, codes: Object.keys(byDiv).sort(), filtered: !!q};
+}
+
+function renderBudget(P){
+  const paid = paidByLine(P);
+  const totalBudget = P.lines.reduce((a, l) => a + num(l.budget), 0);
+  const totalContract = P.lines.reduce((a, l) => a + budgetOf(l), 0);
+  const totalPaid = P.pays.reduce((a, p) => a + num(p.amount), 0);
+  const bankBudget = P.lines.filter(l => l.bank_funded).reduce((a, l) => a + budgetOf(l), 0);
+  const notBank = totalContract - bankBudget;
+  const divCount = new Set(P.lines.map(l => l.division_code)).size;
+
+  let html = `
+    <div class="strip">
+      <div><div class="l">Total Budget</div><div class="v">${money(totalBudget)}</div></div>
+      <div><div class="l">Paid Out</div><div class="v">${money(totalPaid)}</div></div>
+      <div><div class="l">Still Owed</div><div class="v warnText">${money(totalContract - totalPaid)}</div></div>
+      <div><div class="l">Bank Funded</div><div class="v">${money(bankBudget)}</div>${notBank ? `<div class="small muted">${money(notBank)} not bank funded</div>` : ''}</div>
+    </div>
+    <div class="page-h">
+      <div>
+        <h2>Budget</h2>
+        <div class="small muted">${divCount} division${divCount === 1 ? '' : 's'} · ${P.lines.length} line${P.lines.length === 1 ? '' : 's'}</div>
+      </div>
+      <div class="toolbar">
+        <input type="search" id="budgetSearch" placeholder="Search lines, codes, notes" value="${esc(S.budgetQuery || '')}" aria-label="Search budget lines">
+        <label class="check small" style="margin:0 4px"><input type="checkbox" id="showBank" ${S.showBank ? 'checked' : ''}> Show Bank Funded</label>
+        <button class="btn sm" data-act="export-csv">Export CSV</button>
+        <button class="btn primary sm" data-act="add-line">+ Budget Line</button>
+      </div>
+    </div>`;
+
+  if (!P.lines.length){
+    html += `<div class="small muted" style="margin:-4px 0 10px">No budget yet. Enter the first line in the row below, or pick sub-tasks from the Library.</div>
+      <div id="budgetTable">${budgetTableHtml(P, {}, {}, [], false)}</div>`;
+    $('#main').innerHTML = html;
+    return;
+  }
+  html += `<div id="budgetTable">${budgetBody(P)}</div>`;
+  $('#main').innerHTML = html;
+}
+
+function budgetBody(P){
+  const {byDiv, codes, filtered} = budgetGroups(P);
+  if (!codes.length){
+    return `<div class="empty">No lines match “${esc(S.budgetQuery)}”.</div>`;
+  }
+  return budgetTableHtml(P, paidByLine(P), byDiv, codes, filtered);
+}
+
+// ---------- Budget spreadsheet view ----------
+function fmtQty(n){ return Number(n || 0).toLocaleString('en-US', {maximumFractionDigits: 2}); }
+
+function budgetTableHtml(P, paid, byDiv, codes, filtered){
+  const body = [];
+  let gBud = 0, gTot = 0, gPaid = 0;
+  const collapsed = S.collapsedDivs || (S.collapsedDivs = new Set());
+  // Variance = Budget minus Total. Negative (red, in brackets) means the total is over the budget.
+  const varHtml = v => v < -0.005 ? `<span class="var-neg">(${money(-v)})</span>` : `<span class="var-pos">${money(v)}</span>`;
+  codes.forEach(code => {
+    const ls = byDiv[code];
+    const dBud = ls.reduce((a, l) => a + num(l.budget), 0);
+    const dTot = ls.reduce((a, l) => a + budgetOf(l), 0);
+    const dPaid = ls.reduce((a, l) => a + (paid[l.id] || 0), 0);
+    const dates = ls.map(l => taskForLine(P, l.id)).filter(Boolean);
+    const dStart = dates.map(t => t.start_date).sort()[0];
+    const dEnd = dates.map(t => t.end_date).sort().slice(-1)[0];
+    const isC = collapsed.has(code);
+    body.push(`<tr class="grp" data-act="toggle-div" data-code="${esc(code)}" title="Show or hide the sub-tasks">
+      <td class="code"><span class="caret">${isC ? '▸' : '▾'}</span>${esc(code)}</td>
+      <td class="desc m-name">${esc((S.divMap[code]?.name || 'Unnamed Division').toUpperCase())}</td>
+      <td class="g-start"></td><td></td><td></td>
+      <td class="g-start">${dateOr(dStart)}</td><td>${dateOr(dEnd)}</td>
+      <td class="r g-start">${money(dBud)}</td><td class="r">${money(dTot)}</td>
+      <td class="r g-start">${money(dPaid)}</td><td class="r m-owed">${money(dTot - dPaid)}</td><td class="r var">${varHtml(dBud - dTot)}</td>
+      <td class="g-start"></td>
+    </tr>`);
+    ls.forEach(l => {
+      const bl = budgetOf(l), lp = paid[l.id] || 0;
+      const t = taskForLine(P, l.id);
+      body.push(`<tr class="item tr-click" data-act="edit-line" data-id="${l.id}" data-div="${esc(code)}"${isC ? ' hidden' : ''}>
+        <td class="code">${esc(l.subtask_code || '')}<button class="icon-btn line-del" data-act="delete-line" data-id="${l.id}" title="Delete budget line" aria-label="Delete budget line">${ICON_TRASH}</button></td>
+        <td class="desc m-name"><span class="bud-name">${esc(lineName(l))}</span>${l.notes ? ` <span class="bud-note" title="${esc(l.notes)}">${ICON_NOTE}</span>` : ''}</td>
+        <td class="g-start">${esc(l.unit || '')}</td>
+        <td class="r">${fmtQty(l.qty)}</td>
+        <td class="r">${money(l.rate)}</td>
+        <td class="g-start">${dateOr(t?.start_date)}</td>
+        <td>${dateOr(t?.end_date)}</td>
+        <td class="r g-start">${money(l.budget)}</td>
+        <td class="r m-amt">${money(bl)}</td>
+        <td class="r g-start m-meta"><button class="link-btn" data-act="pay-line" data-id="${l.id}" title="Record a payment on this line">${money(lp)}</button></td>
+        <td class="r m-owed" data-noact>${money(bl - lp)}</td>
+        <td class="r var" data-noact>${varHtml(num(l.budget) - bl)}</td>
+        <td class="ctr g-start">${l.bank_funded ? 'Yes' : 'No'}</td>
+      </tr>`);
+    });
+    gBud += dBud; gTot += dTot; gPaid += dPaid;
+  });
+  body.push(`<tr class="tr-grand">
+    <td colspan="3" class="m-name">${filtered ? 'Shown Total' : 'Total Budget'}</td>
+    <td></td><td></td><td class="g-start"></td><td></td>
+    <td class="r g-start">${money(gBud)}</td><td class="r">${money(gTot)}</td>
+    <td class="r g-start">${money(gPaid)}</td><td class="r m-owed">${money(gTot - gPaid)}</td><td class="r var">${varHtml(gBud - gTot)}</td>
+    <td class="g-start"></td>
+  </tr>`);
+  return `<div class="card bud-wrap" style="padding:0;overflow-x:auto">
+    <table class="sheet-tbl bud-tbl${S.showBank ? '' : ' no-bank'}">
+      <colgroup>${[88, 180, 56, 72, 64, 88, 88, 92, 92, 84, 88, 88, 72].map(w => w ? `<col style="width:${w}px">` : '<col>').join('')}</colgroup>
+      <thead>
+        <tr class="band"><th class="code"></th><th class="desc"></th>
+          <th colspan="3" class="gh g-start">Quantity</th>
+          <th colspan="2" class="gh g-start">Schedule</th>
+          <th colspan="2" class="gh g-start">Cost</th>
+          <th colspan="3" class="gh g-start">Paid To Date</th>
+          <th class="gh g-start">Funding</th></tr>
+        <tr><th class="code">Code</th><th class="desc">Description</th><th class="g-start">Unit</th><th class="r">Sq.Ft. / Qty</th><th class="r">Rate</th><th class="g-start">Start</th><th>End</th><th class="r g-start">Budget</th><th class="r">Contract</th><th class="r g-start">Paid</th><th class="r">Owed</th><th class="r">Variance</th><th class="ctr g-start">Bank Funded</th></tr>
+      </thead>
+      ${budDraftRow()}
+      <tbody>${body.join('')}</tbody>
+    </table>
+  </div>
+  <div class="small muted" style="text-align:center">Click a division to show or hide its sub-tasks. Budget is the amount set aside. Contract is the signed amount. Owed = Contract minus Paid. Variance = Budget minus Contract; red brackets mean over budget. Tap a line to edit it.</div>`;
+}
+
+function exportBudgetCsv(){
+  const P = S.proj;
+  const paid = paidByLine(P);
+  const rows = [['Division', 'Code', 'Sub-Task', 'Unit', 'Start', 'End', 'Sq.Ft. / Qty', 'Rate', 'Budget', 'Revision', 'Total', 'Paid', 'Owed', 'Bank Funded', 'Notes']];
+  P.lines.slice().sort((a, b) => a.division_code.localeCompare(b.division_code)).forEach(l => {
+    const bl = budgetOf(l), lp = paid[l.id] || 0;
+    rows.push([divName(l.division_code), l.subtask_code || 'Custom', lineName(l), l.unit || '', taskForLine(P, l.id)?.start_date || '', taskForLine(P, l.id)?.end_date || '', num(l.qty), num(l.rate), num(l.budget), num(l.revision), bl, lp, bl - lp, l.bank_funded ? 'Yes' : 'No', l.notes || '']);
+  });
+  const csv = rows.map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\r\n');
+  const blob = new Blob(['﻿' + csv], {type: 'text/csv;charset=utf-8'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = (P.project.name + ' Budget.csv').replace(/[\\/:*?"<>|]/g, '-');
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+// ---------- Budget entry row (inline, like Transactions) ----------
+function budSubOptions(div){
+  if (!div) return '<option value="">Choose A Division First</option>';
+  const used = new Set(S.proj.lines.map(l => l.subtask_code).filter(Boolean));
+  const subs = S.subs.filter(s => s.division_code === div && !used.has(s.code));
+  return '<option value="__div">Division Level (No Sub-Task)</option>' +
+    subs.map(s => `<option value="${esc(s.code)}">${esc(s.name)}</option>`).join('') +
+    '<option value="__custom">Custom Line…</option>';
+}
+function budDraftRow(){
+  const unit = unitSelect().replace('name="unit"', 'data-b="unit" aria-label="Unit"');
+  return `<tbody class="bud-entry"><tr>
+    <td><select data-b="div" aria-label="Division"><option value="">Choose A Division</option>${divOptions('')}</select></td>
+    <td><select data-b="sub" aria-label="Sub-task">${budSubOptions('')}</select><input data-b="custom" placeholder="Name the custom line" hidden aria-label="Custom line name"></td>
+    <td class="g-start">${unit}</td>
+    <td class="r"><input type="text" class="money r" data-b="qty" value="1" inputmode="decimal" aria-label="Sq.Ft. or qty"></td>
+    <td class="r"><input type="text" class="money r" data-b="rate" value="0" inputmode="decimal" aria-label="Rate"></td>
+    <td class="g-start"><input type="date" data-b="start" aria-label="Start date"></td>
+    <td><input type="date" data-b="end" aria-label="End date"></td>
+    <td class="r g-start" data-b="budget">${money(0)}</td>
+    <td class="r"><input type="text" class="money r" data-b="contract" placeholder="Contract" inputmode="decimal" aria-label="Signed contract"></td><td class="g-start"></td><td></td>
+    <td class="ctr"><button class="btn primary sm" data-act="save-bud">Save</button></td>
+    <td class="ctr g-start"><input type="checkbox" data-b="bank" checked aria-label="Bank funded"></td>
+  </tr></tbody>`;
+}
+function budChange(t){
+  const body = t.closest('.bud-entry');
+  if (t.dataset.b === 'div') fillSelect(body.querySelector('[data-b=sub]'), budSubOptions(t.value), '__div');
+  if (t.dataset.b === 'sub'){
+    const c = body.querySelector('[data-b=custom]');
+    c.hidden = t.value !== '__custom';
+    if (!c.hidden) c.focus();
+  }
+}
+function budInput(el){
+  const body = el.closest('.bud-entry');
+  if (el.classList.contains('money')) el.value = formatMoneyText(el.value);
+  body.querySelector('[data-b=budget]').textContent = money(num(body.querySelector('[data-b=qty]').value) * num(body.querySelector('[data-b=rate]').value));
+}
+async function saveBudDraft(P, body){
+  const q = k => body.querySelector(`[data-b="${k}"]`);
+  const div = q('div').value;
+  if (!div) throw new Error('Choose the division for this line.');
+  const sub = q('sub').value;
+  if (!sub) throw new Error('Choose a sub-task, or Division Level if you do not have a breakdown.');
+  const custom = sub === '__custom' ? q('custom').value.trim() : '';
+  if (sub === '__custom' && !custom) throw new Error('Name the custom line.');
+  const start = q('start').value, end = q('end').value;
+  if (start || end){
+    if (!start || !end) throw new Error('Enter both the start and end date, or clear both.');
+    if (end < start) throw new Error('End date cannot be before the start date.');
+  }
+  const qty = num(q('qty').value), rate = num(q('rate').value);
+  const divLevel = sub === '__div';
+  const label = sub === '__custom' ? custom : divLevel ? `${S.divMap[div]?.name || 'Division'} Budget` : '';
+  const line = check(await sb.from('project_lines').insert({
+    project_id: P.project.id, division_code: div, subtask_code: sub === '__custom' || divLevel ? null : sub, label,
+    unit: q('unit').value.trim(), notes: '', qty, rate, budget: qty * rate, contract_amount: num(q('contract').value), bank_funded: q('bank').checked
+  }).select().single());
+  await syncLineTask(P, line.id, line, {start_date: {value: start}, end_date: {value: end}, percent_complete: {value: '0'}});
+  toast(divLevel ? 'Division budget added. Break it into sub-tasks later if you need to.' : 'Budget line added. Tap the line to set a revision or notes.');
+  await render();
+  document.querySelector('.bud-entry [data-b=div]')?.focus();
+}
+
+// ---------- Payments ----------
+// ---------- Transactions (payments) ----------
+function txRows(P){
+  const rc = {};
+  P.receipts.forEach(r => { rc[r.payment_id] = (rc[r.payment_id] || 0) + 1; });
+  return P.pays.map(p => {
+    const line = P.lines.find(l => l.id === p.budget_line_id);
+    return {p, line,
+      amt: num(p.amount),
+      div: line ? line.division_code : '',
+      task: line ? lineName(line) : '',
+      vendor: p.vendors?.name || '',
+      method: p.method || '', ref: p.reference || '',
+      notes: p.notes || '',
+      files: rc[p.id] || 0};
+  });
+}
+function txFiltered(P){
+  const q = (S.txQ || '').trim().toLowerCase();
+  const div = S.txFilterDiv || '';
+  const ven = S.txFilterVendor || '';
+  return txRows(P).filter(r => {
+    if (div && r.div !== div) return false;
+    if (ven && (ven === '__none' ? !!r.p.vendor_id : r.p.vendor_id !== ven)) return false;
+    return !q || [r.p.pay_date, r.amt, divName(r.div), r.task, r.vendor, r.method, r.ref, r.notes].join(' ').toLowerCase().includes(q);
+  });
+}
+function txSorted(P){
+  const rows = txFiltered(P);
+  const by = {
+    date_desc: (a, b) => (b.p.pay_date || '').localeCompare(a.p.pay_date || ''),
+    date_asc: (a, b) => (a.p.pay_date || '').localeCompare(b.p.pay_date || ''),
+    amount_desc: (a, b) => b.amt - a.amt,
+    amount_asc: (a, b) => a.amt - b.amt,
+    division: (a, b) => (a.div || '').localeCompare(b.div || '') || (a.p.pay_date || '').localeCompare(b.p.pay_date || ''),
+    task: (a, b) => a.task.localeCompare(b.task),
+    vendor: (a, b) => a.vendor.localeCompare(b.vendor)
+  };
+  return rows.sort(by[S.txSort || 'date_desc']);
+}
+function txFoot(P){
+  const rows = txSorted(P);
+  const total = rows.reduce((a, r) => a + r.amt, 0);
+  const foot = $('#txFoot');
+  if (foot) foot.innerHTML = rows.length ? `<tr><td colspan="2">Total</td><td class="r num">${money(total)}</td><td colspan="8" class="small muted">${rows.length} of ${P.pays.length} shown</td></tr>` : '';
+}
+const ICON_CLIP = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/></svg>`;
+const ICON_TRASH = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></svg>`;
+const ICON_NOTE = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 4h16v12l-4 4H4z"/><path d="M8 9h8M8 13h5"/></svg>`;
+function txRowHtml(r, no){
+  const methods = PAY_METHODS.includes(r.method) ? PAY_METHODS : [r.method, ...PAY_METHODS];
+  return `<tr data-id="${r.p.id}" class="tx-edit ${r.line ? '' : 'tx-unc'}">
+    <td class="ctr tx-no">${no}</td>
+    <td><input type="date" data-f="date" value="${r.p.pay_date || ''}" aria-label="Date"></td>
+    <td><input type="text" class="money r" data-f="amount" value="${fmtInput(r.amt)}" aria-label="Amount"></td>
+    <td><select data-f="div" aria-label="Expense classification (division)"><option value="">Choose A Division</option>${divOptions(r.div)}</select></td>
+    <td><select data-f="task" aria-label="Task">${taskOptions(r.div, r.p.budget_line_id || '')}</select></td>
+    <td><select data-f="vendor" aria-label="Paid to">${vendorOptions(r.p.vendor_id || '')}</select></td>
+    <td><select data-f="method" aria-label="Method">${methods.map(m => `<option ${m === r.method ? 'selected' : ''}>${esc(m)}</option>`).join('')}</select></td>
+    <td><input data-f="ref" value="${esc(r.ref)}" aria-label="Check number"></td>
+    <td class="ctr"><button class="icon-btn ${r.notes ? 'has' : ''}" data-act="edit-notes" data-id="${r.p.id}" title="${r.notes ? 'Edit notes' : 'Add notes'}" aria-label="${r.notes ? 'Edit notes' : 'Add notes'}">${ICON_NOTE}</button></td>
+    <td class="ctr tx-icons">
+      <button class="icon-btn ${r.files ? 'has' : ''}" data-act="attach-receipt" data-id="${r.p.id}" title="Attach files" aria-label="Attach files">${ICON_CLIP}</button>
+      ${r.files ? `<button class="link-btn" data-act="open-pay" data-id="${r.p.id}">${r.files}</button>` : ''}
+    </td>
+    <td class="ctr"><button class="icon-btn" data-act="delete-payment" data-id="${r.p.id}" title="Delete transaction" aria-label="Delete transaction">${ICON_TRASH}</button></td>
+  </tr>`;
+}
+function txFill(P){
+  const rows = txSorted(P);
+  const empty = P.pays.length ? 'No transactions match these filters.' : 'No transactions yet. Add one above.';
+  const desk = $('#txRows'), cards = $('#txCards');
+  if (!desk) return;
+  desk.innerHTML = rows.length ? rows.map((r, i) => txRowHtml(r, i + 1)).join('') : `<tr><td colspan="11" class="small muted" style="text-align:center;padding:20px">${empty}</td></tr>`;
+  cards.innerHTML = rows.length ? rows.map(r => `
+    <button class="row" data-act="open-pay" data-id="${r.p.id}">
+      <div><div class="t">${esc(r.vendor || 'No vendor')}</div>
+        <div class="s">${fmtDate(r.p.pay_date)} · ${r.line ? esc(divName(r.div) + ' · ' + r.task) : '<span class="badge b-warn">Unclassified</span>'}</div>
+        <div class="s">${esc(r.method)}${r.ref ? ' #' + esc(r.ref) : ''}${r.notes ? ' · Notes' : ''}${r.files ? ' · ' + r.files + (r.files > 1 ? ' files' : ' file') : ''}</div></div>
+      <div class="amt">${money(r.amt)}</div>
+    </button>`).join('') : `<div class="empty">${empty}</div>`;
+  txFoot(P);
+}
+
+function exportTxCsv(){
+  const P = S.proj;
+  const rows = [['Date', 'Amount', 'Division', 'Task', 'Paid To', 'Method', 'Check #', 'Invoice #', 'Notes', 'Receipts']];
+  const shown = txSorted(P);
+  shown.forEach(r => rows.push([r.p.pay_date, r.amt, divName(r.div), r.task, r.vendor, r.method, r.ref, r.p.invoice_number || '', r.notes, r.files]));
+  rows.push(['Total', shown.reduce((a, r) => a + r.amt, 0)]);
+  const csv = rows.map(r => r.map(c => `"${String(c ?? '').replace(/"/g, '""')}"`).join(',')).join('\r\n');
+  const blob = new Blob(['﻿' + csv], {type: 'text/csv;charset=utf-8'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = (P.project.name + ' Transactions.csv').replace(/[\\/:*?"<>|]/g, '-');
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+async function deletePayment(id){
+  if (!confirm('Delete this transaction and its receipts? This cannot be undone.')) return;
+  const files = S.proj.receipts.filter(r => r.payment_id === id);
+  if (files.length) await sb.storage.from('receipts').remove(files.map(f => f.path));
+  check(await sb.from('payments').delete().eq('id', id));
+  toast('Transaction deleted.');
+  await render();
+}
+
+function renderPayments(P){
+  const total = P.pays.reduce((a, p) => a + num(p.amount), 0);
+  $('#main').innerHTML = `
+    <div class="page-h">
+      <h2>Transactions</h2>
+      <button class="btn primary sm tx-add-btn" data-act="new-payment">+ Add Transaction</button>
+    </div>
+    <div class="small muted" style="margin:-4px 0 12px">${P.pays.length} ${P.pays.length === 1 ? 'transaction' : 'transactions'} · ${money(total)} total</div>
+    ${txDatalists(P)}
+    <div class="tx-tools">
+      <input type="search" id="txQ" class="tx-q" placeholder="Search transactions" value="${esc(S.txQ || '')}" aria-label="Search transactions">
+      <select id="txDivSel" aria-label="Filter by division">
+        <option value="">All Divisions</option>
+        ${S.divs.map(d => `<option value="${esc(d.code)}" ${S.txFilterDiv === d.code ? 'selected' : ''}>${esc(divName(d.code))}</option>`).join('')}
+      </select>
+      <select id="txVendorSel" aria-label="Filter by contractor">
+        <option value="">All Contractors</option>
+        <option value="__none" ${S.txFilterVendor === '__none' ? 'selected' : ''}>No Contractor</option>
+        ${S.vendors.map(v => `<option value="${v.id}" ${S.txFilterVendor === v.id ? 'selected' : ''}>${esc(v.name)}</option>`).join('')}
+      </select>
+      <select id="txSortSel" aria-label="Sort transactions">
+        ${[['date_desc', 'Date: Newest First'], ['date_asc', 'Date: Oldest First'], ['amount_desc', 'Amount: High to Low'], ['amount_asc', 'Amount: Low to High'], ['division', 'Division'], ['task', 'Task'], ['vendor', 'Paid To']]
+          .map(([v, l]) => `<option value="${v}" ${(S.txSort || 'date_desc') === v ? 'selected' : ''}>${l}</option>`).join('')}
+      </select>
+      <button class="btn sm" data-act="export-tx">Export Excel (CSV)</button>
+    </div>
+    <div class="card tx-wrap" id="txTableWrap" style="padding:0;overflow-x:auto">
+      <table class="sheet-tbl tx-tbl">
+        <thead>
+          <tr><th class="ctr">#</th><th>Date</th><th class="r">Amount</th><th>Expense Classification</th><th>Task</th><th>Paid To</th><th>Method</th><th>Check #</th><th class="ctr">Notes</th><th class="ctr">Receipts</th><th class="ctr"></th></tr>
+        </thead>
+        <tbody id="txDraftBody">${draftRow()}</tbody>
+        <tbody id="txRows"></tbody>
+        <tfoot id="txFoot"></tfoot>
+      </table>
+    </div>
+    <div class="tx-cards" id="txCards"></div>`;
+  txFill(P);
+}
+
+// ---------- Contractors (assigned to this project) ----------
+function renderContractors(P){
+  const assigned = S.vendors.filter(v => P.assignedIds.has(v.id));
+  const rows = assigned.map(v => {
+    const ins = P.insMap[v.id + '|' + P.project.id];
+    const st = coiStatus(ins);
+    const paid = P.pays.filter(p => p.vendor_id === v.id).reduce((a, p) => a + num(p.amount), 0);
+    return {v, st, ins, paid};
+  });
+  const needing = rows.filter(r => r.st === 'missing' || r.st === 'expired');
+
+  let html = `
+    <div class="page-h">
+      <h2>Contractors On This Project</h2>
+      <button class="btn primary sm" data-act="assign">+ Assign Contractor</button>
+    </div>`;
+
+  if (needing.length){
+    html += `<div class="notice bad"><strong>${needing.length} certificate${needing.length > 1 ? 's' : ''} of insurance missing.</strong>
+      <div class="small" style="margin-top:4px">This reminder shows every day until you add the certificate or dismiss it with a reason.</div></div>`;
+  }
+
+  if (!rows.length){
+    html += `<div class="empty">No contractors assigned yet. Assigning one asks you for their certificate of insurance.</div>`;
+  }
+
+  rows.forEach(r => {
+    const open = r.st === 'missing' || r.st === 'expired' || r.st === 'soon';
+    html += `
+      <div class="card">
+        <div class="card-h"><strong>${esc(r.v.name)}</strong><span class="num" style="font-weight:700">${money(r.paid)} paid</span></div>
+        <div class="small muted">${esc([r.v.trade, r.v.company].filter(Boolean).join(' · ') || 'No trade listed')}</div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          ${coiBadge(r.st)}
+          <span class="badge ${r.v.w9_path ? 'b-ok' : 'b-warn'}">${r.v.w9_path ? 'W-9 on file' : 'W-9 missing'}</span>
+        </div>
+        ${r.ins && r.ins.dismissed_reason ? `<div class="small muted">Dismissed: ${esc(r.ins.dismissed_reason)}${r.ins.dismissed_by ? ' · ' + esc(r.ins.dismissed_by) : ''}</div>` : ''}
+        ${r.ins && r.ins.file_path && !r.ins.dismissed_reason ? `<div class="small muted">${esc(r.ins.insurer || 'Insurer not listed')}${r.ins.expires_on ? ' · expires ' + fmtDate(r.ins.expires_on) : ''}${r.ins.holder_listed ? ' · bank listed as holder' : ''}</div>` : ''}
+        <div class="btn-row">
+          ${open
+            ? `<button class="btn primary" data-act="add-coi" data-id="${r.v.id}">Add Certificate</button>
+               <button class="btn" data-act="dismiss-coi" data-id="${r.v.id}">Dismiss With Reason</button>`
+            : `<button class="btn" data-act="add-coi" data-id="${r.v.id}">Update Certificate</button>`}
+        </div>
+      </div>`;
+  });
+
+  $('#main').innerHTML = html;
+}
+
+// ---------- Vendors (global) ----------
+async function renderVendors(){
+  const [v, p] = await Promise.all([
+    sb.from('vendors').select('*').order('name'),
+    sb.from('payments').select('vendor_id, amount, pay_date')
   ]);
-  const bad = [p, c, t, r].find(x => x.error);
-  if (bad){ fail(bad.error); return; }
-  state.project = p.data || {};
-  state.cats = c.data;
-  state.tasks = t.data;
-  state.receipts = r.data;
-  renderAll();
+  S.vendors = check(v);
+  const pays = check(p);
+  const year = String(S.year);
+  const yearTotal = {}, allTotal = {};
+  pays.forEach(x => {
+    if (!x.vendor_id) return;
+    const a = num(x.amount);
+    allTotal[x.vendor_id] = (allTotal[x.vendor_id] || 0) + a;
+    if (String(x.pay_date).startsWith(year)) yearTotal[x.vendor_id] = (yearTotal[x.vendor_id] || 0) + a;
+  });
+  const now = new Date().getFullYear();
+  const yearOpts = [now, now - 1, now - 2].map(y => `<option value="${y}" ${y === S.year ? 'selected' : ''}>${y}</option>`).join('');
+
+  let html = `
+    <div class="page-h">
+      <h2>Contractors</h2>
+      <button class="btn primary sm" data-act="new-vendor">+ Add Contractor</button>
+    </div>
+    <div class="card" style="flex-direction:row;align-items:center;justify-content:space-between;gap:10px;padding:12px 16px">
+      <span class="small muted">1099 Year</span>
+      <select id="yearSel" style="width:auto;padding:8px 10px">${yearOpts}</select>
+    </div>`;
+
+  if (!S.vendors.length){
+    html += `<div class="empty">No contractors yet. Add one here, or assign them to a project.</div>`;
+  } else {
+    html += `<div class="card" style="padding:4px 16px"><div class="rows">`;
+    S.vendors.forEach(x => {
+      const t1099 = x.is_corporation ? 'Corporation, no 1099' : money(yearTotal[x.id] || 0) + ' for 1099';
+      html += `
+        <button class="row" data-act="open-vendor" data-id="${x.id}">
+          <div><div class="t">${esc(x.name)}</div>
+            <div class="s">${esc([x.trade, x.company].filter(Boolean).join(' · ') || 'No trade listed')}</div>
+            <div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap">
+              <span class="badge ${x.w9_path ? 'b-ok' : 'b-warn'}">${x.w9_path ? 'W-9 on file' : 'W-9 missing'}</span>
+            </div></div>
+          <div style="text-align:right"><div class="amt">${money(allTotal[x.id] || 0)}</div><div class="s">${t1099}</div></div>
+        </button>`;
+    });
+    html += `</div></div>`;
+  }
+  html += `<div class="small muted" style="text-align:center">1099 totals are payments in the year selected, excluding corporations.</div>`;
+
+  $('#main').innerHTML = html;
+  setTopbar('SN Square Group', 'Contractors', `${S.vendors.length} on file`, '');
 }
 
-function renderAll(){ renderProject(); renderTiles(); renderCats(); renderTasks(); fillLists(); }
+// ---------- Library view ----------
+async function renderLibrary(){
+  await loadLibrary();
+  const subsByDiv = {};
+  S.subs.forEach(s => { (subsByDiv[s.division_code] ||= []).push(s); });
+  const totalSubs = S.subs.length;
 
-function renderProject(){
-  const p = state.project;
-  $('#pname').textContent = p ? (p.name || 'Untitled project') : 'Loading…';
-  $('#client').textContent = p?.client || '';
-  const range = p && (p.start_date || p.end_date) ? `${fmtDate(toDate(p.start_date))} – ${fmtDate(toDate(p.end_date))}` : '';
-  const bits = p ? [p.manager ? `Project manager: ${p.manager}` : '', range].filter(Boolean) : [];
-  $('#pmeta').textContent = p ? (bits.join('  ·  ') || 'Add project details to get started.') : '';
+  let html = `
+    <div class="page-h">
+      <h2>Library</h2>
+      <button class="btn primary sm" data-act="new-division">+ Division</button>
+    </div>
+    <div class="small muted">${S.divs.length} divisions · ${totalSubs} sub-tasks. Shared by every project.</div>`;
+
+  S.divs.forEach(d => {
+    const subs = subsByDiv[d.code] || [];
+    html += `
+      <details>
+        <summary><span>${esc(d.code)} ${esc(d.name)} <span class="muted small" style="font-weight:500">· ${subs.length}</span></span></summary>
+        <div style="margin-top:6px">
+          ${subs.map(s => `<div class="sub-li"><span>${esc(s.code)} ${esc(s.name)}</span></div>`).join('') || '<div class="small muted">No sub-tasks yet.</div>'}
+        </div>
+        <div style="margin-top:10px"><button class="btn sm" data-act="new-subtask" data-code="${esc(d.code)}">+ Sub-Task</button></div>
+      </details>`;
+  });
+
+  $('#main').innerHTML = html;
+  setTopbar('SN Square Group', 'Library', 'Divisions and sub-tasks', '');
 }
 
-function renderTiles(){
-  const cats = state.cats || [], ts = tasksD();
-  const loading = state.cats === null || state.tasks === null;
-  const approved = sum(cats, 'budget'), actual = sum(ts, 'actual');
-  const planned = sum(ts, 'planned'), paid = sum(ts, 'paid'), due = sum(ts, 'due');
-  const remaining = approved - actual;
-  const used = approved ? Math.round(actual / approved * 100) : 0;
-  const count = s => ts.filter(t => t.status === s).length;
-  const tiles = [
-    ['Approved budget', money(approved), `${cats.length} categor${cats.length === 1 ? 'y' : 'ies'}`, false],
-    ['Actual cost', money(actual), `Planned ${money(planned)}`, false],
-    ['Remaining budget', money(remaining), approved ? `${used}% used` : 'Set category budgets', remaining < 0],
-    ['Paid', money(paid), `Due ${money(due)}`, false],
-    ['Tasks', String(ts.length), `${count('Complete')} complete · ${count('Delayed')} delayed`, false]
-  ];
-  $('#tiles').innerHTML = tiles.map(([l, v, s, neg]) =>
-    `<div class="tile"><div class="l">${l}</div><div class="v${neg ? ' neg' : ''}">${loading ? '…' : esc(v)}</div><div class="s">${esc(s)}</div></div>`).join('');
+// ---------- Sheets (forms) ----------
+function sheet({title, html, submit = 'Save', onSubmit, onOpen, danger, keepPage = false, onDone, onCancel}){
+  const d = document.createElement('dialog');
+  d.className = 'sheet';
+  d.innerHTML = `<form novalidate>
+    <div class="sheet-h"><h2>${esc(title)}</h2><button type="button" class="x" data-close aria-label="Close">×</button></div>
+    ${html}
+    <p class="err" hidden></p>
+    <div class="actions">
+      ${danger ? `<button type="button" class="btn danger" data-danger>${esc(danger.label)}</button><span class="spacer"></span>` : '<span class="spacer"></span>'}
+      <button type="button" class="btn" data-close>Cancel</button>
+      <button type="submit" class="btn primary">${esc(submit)}</button>
+    </div>
+  </form>`;
+  document.body.append(d);
+  let finished = false;
+  d.addEventListener('close', () => { d.remove(); if (!finished && onCancel) onCancel(); });
+  const form = d.querySelector('form');
+  d.querySelectorAll('input.money').forEach(el => el.addEventListener('input', () => { el.value = formatMoneyText(el.value); }));
+  const err = d.querySelector('.err');
+  const showErr = e => { err.textContent = msg(e); err.hidden = false; };
+  d.querySelectorAll('[data-close]').forEach(b => b.addEventListener('click', () => d.close()));
+  if (danger){
+    d.querySelector('[data-danger]').addEventListener('click', async () => {
+      if (!confirm(danger.confirm || 'Delete this? This cannot be undone.')) return;
+      try { await danger.run(); d.close(); await render(); } catch (e) { showErr(e); }
+    });
+  }
+  form.addEventListener('submit', async e => {
+    e.preventDefault();
+    err.hidden = true;
+    const btn = form.querySelector('button[type=submit]');
+    btn.disabled = true;
+    try {
+      await onSubmit(form);
+      finished = true;
+      d.close();
+      if (!keepPage) await render();
+      else if (onDone) { try { await onDone(); } catch (ex) { toast(msg(ex), true); } }
+    }
+    catch (ex) { showErr(ex); }
+    finally { btn.disabled = false; }
+  });
+  onOpen && onOpen(form, d);
+  d.showModal();
+  return d;
 }
 
-function catRow(name, budget, id, ts){
-  const rs = ts.filter(t => t.category === name);
-  const actual = sum(rs, 'actual'), paid = sum(rs, 'paid'), b = num(budget);
-  const rem = b - actual, pct = b ? Math.min(actual / b * 100, 100) : 0, over = b && actual > b;
-  const budgetCell = id
-    ? `<input class="amt" type="number" min="0" step="any" value="${b}" data-cat-budget="${esc(id)}" aria-label="Approved budget for ${esc(name)}">`
-    : `<span class="muted">No budget set</span>`;
-  return `<tr>
-    <td>${esc(name)}</td>
-    <td class="num">${budgetCell}</td>
-    <td class="num">${money(actual)}</td>
-    <td class="num">${money(paid)}</td>
-    <td class="num${rem < 0 ? ' neg' : ''}">${b ? money(rem) : '—'}</td>
-    <td style="min-width:120px">${b ? `<div class="bar${over ? ' over' : ''}"><i style="width:${pct}%"></i></div>` : ''}</td>
-    <td class="acts">${id ? `<button class="btn-link danger" data-act="del-cat" data-id="${esc(id)}">Delete</button>` : ''}</td>
+function divOptions(selected = ''){
+  return S.divs.map(d => `<option value="${esc(d.code)}" ${d.code === selected ? 'selected' : ''}>${esc(d.code + ' ' + d.name)}</option>`).join('');
+}
+
+// Project details
+function projectSheet(pr){
+  const editing = !!pr;
+  sheet({
+    title: editing ? 'Project Details' : 'New Project',
+    submit: 'Save',
+    html: `<div class="grid">
+      <label class="full">Project Name<input name="name" required value="${esc(pr?.name)}"></label>
+      <label class="full">Address<input name="address" value="${esc(pr?.address)}"></label>
+      <label>Status<select name="status">${PROJECT_STATUS.map(s => `<option ${s === (pr?.status || 'Planning') ? 'selected' : ''}>${s}</option>`).join('')}</select></label>
+      <label>General Contractor<input name="general_contractor" value="${esc(pr?.general_contractor)}"></label>
+      <label>Lender<input name="lender" value="${esc(pr?.lender)}"></label>
+      <label>Loan Amount ($)<input type="text" class="money" name="loan_amount" inputmode="decimal" min="0" step="any" value="${esc(fmtInput(pr?.loan_amount))}"></label>
+      <label>Start Date<input type="date" name="start_date" value="${esc(pr?.start_date || '')}"></label>
+      <label>End Date<input type="date" name="end_date" value="${esc(pr?.end_date || '')}"></label>
+    </div>`,
+    onSubmit: async form => {
+      const v = form.elements;
+      if (!v.name.value.trim()) throw new Error('Enter the project name.');
+      const row = {
+        name: v.name.value.trim(), address: v.address.value.trim(), status: v.status.value,
+        general_contractor: v.general_contractor.value.trim(), lender: v.lender.value.trim(),
+        loan_amount: num(v.loan_amount.value), start_date: v.start_date.value || null, end_date: v.end_date.value || null
+      };
+      if (editing){
+        check(await sb.from('projects').update(row).eq('id', pr.id));
+      } else {
+        const created = check(await sb.from('projects').insert(row).select().single());
+        location.hash = `#/project/${created.id}/budget`;
+      }
+    }
+  });
+}
+
+// Budget line (add or edit)
+function calcBox(qty, rate){
+  return `<div class="calc"><span class="small muted">Budget = Sq.Ft. / Qty × Rate</span><strong class="num" data-calc>${money(num(qty) * num(rate))}</strong></div>`;
+}
+function bindCalc(form){
+  const v = form.elements;
+  const out = form.querySelector('[data-calc]');
+  const upd = () => { out.textContent = money(num(v.qty.value) * num(v.rate.value)); };
+  v.qty.addEventListener('input', upd);
+  v.rate.addEventListener('input', upd);
+}
+const UNIT_HINTS = ['SF', 'EA', 'HR'];
+const unitSelect = (current = '') => {
+  const cur = String(current || '').trim();
+  const opts = UNIT_HINTS;
+  return `<select name="unit"><option value="">—</option>${opts.map(u => `<option value="${esc(u)}" ${u === cur ? 'selected' : ''}>${esc(u)}</option>`).join('')}</select>`;
+};
+
+function lineSheet(line){
+  const P = S.proj;
+  if (line){
+    const paidHere = P.pays.filter(p => p.budget_line_id === line.id).reduce((a, p) => a + num(p.amount), 0);
+    const custom = !line.subtask_code;
+    const linked = taskForLine(P, line.id);
+    sheet({
+      title: lineName(line),
+      html: `<div class="small muted">${esc(divName(line.division_code))}${line.subtask_code ? ' · ' + esc(line.subtask_code) : ''}</div>
+        <div class="grid">
+          ${custom ? `<label class="full">Line Name<input name="label" value="${esc(line.label)}"></label>` : ''}
+          <label>Unit${unitSelect(line.unit)}</label>
+          ${dateFields(linked)}
+          <label>Sq.Ft. / Qty<input type="text" class="money" name="qty" inputmode="decimal" value="${esc(fmtInput(line.qty))}"></label>
+          <label>Rate ($)<input type="text" class="money" name="rate" inputmode="decimal" value="${esc(fmtInput(line.rate))}"></label>
+          <label class="check"><input type="checkbox" name="bank_funded" ${line.bank_funded ? 'checked' : ''}> Bank Funds This Line</label>
+          <label class="full">Notes<input name="notes" value="${esc(line.notes)}" placeholder="Scope, vendor, or reference"></label>
+          <label class="full">Signed Contract ($)<input type="text" class="money" name="contract_amount" value="${esc(fmtInput(line.contract_amount))}" placeholder="Leave blank until signed"></label>
+          <label class="full">Revision ($)<input type="text" class="money" name="revision" inputmode="decimal" value="${esc(fmtInput(line.revision))}"></label>
+          <label class="full">Reason For Revision<input name="revision_reason" value="${esc(line.revision_reason)}" placeholder="e.g. Change Order 2"></label>
+        </div>
+        ${calcBox(line.qty, line.rate)}
+        <div class="small muted">Paid so far: ${money(paidHere)}. ${paidHere ? 'Lines with payments cannot be deleted.' : ''}</div>`,
+      danger: paidHere ? null : {
+        label: 'Delete Line',
+        run: async () => {
+          const t = taskForLine(P, line.id);
+          if (t) check(await sb.from('schedule_tasks').delete().eq('id', t.id));
+          check(await sb.from('project_lines').delete().eq('id', line.id));
+        }
+      },
+      onOpen: form => bindCalc(form),
+      onSubmit: async form => {
+        const v = form.elements;
+        const rev = num(v.revision.value);
+        if (rev !== num(line.revision) && !v.revision_reason.value.trim()) throw new Error('Give a reason for the revision.');
+        checkLineDates(v);
+        const qty = num(v.qty.value), rate = num(v.rate.value);
+        const row = {
+          qty, rate, budget: qty * rate, unit: v.unit.value.trim(), notes: v.notes.value.trim(),
+          revision: rev, revision_reason: v.revision_reason.value.trim(), bank_funded: v.bank_funded.checked,
+          contract_amount: num(v.contract_amount.value)
+        };
+        if (custom){
+          const label = v.label.value.trim();
+          if (!label) throw new Error('Name the line.');
+          row.label = label;
+        }
+        check(await sb.from('project_lines').update(row).eq('id', line.id));
+        await syncLineTask(S.proj, line.id, {...line, ...row}, v);
+      }
+    });
+    return;
+  }
+
+  sheet({
+    title: 'Add Budget Line',
+    html: `<div class="grid">
+      <label class="full">Division<select name="division_code">${divOptions()}</select></label>
+      <label class="full">Sub-Task<select name="subtask_code"></select></label>
+      <label class="full" data-custom hidden>Line Name<input name="label" placeholder="e.g. Permit Fee, Unexpected"></label>
+      <label>Unit${unitSelect()}</label>
+      <label>Sq.Ft. / Qty<input type="text" class="money" name="qty" inputmode="decimal" value="1"></label>
+      <label>Rate ($)<input type="text" class="money" name="rate" inputmode="decimal" value="0"></label>
+      ${dateFields(null)}
+      <label class="check"><input type="checkbox" name="bank_funded" checked> Bank Funds This Line</label>
+      <label class="full">Notes<input name="notes" placeholder="Scope, vendor, or reference"></label>
+    </div>
+    ${calcBox(1, 0)}`,
+    onOpen: (form) => {
+      const v = form.elements;
+      const fillSubs = () => {
+        const code = v.division_code.value;
+        const subs = S.subs.filter(s => s.division_code === code);
+        v.subtask_code.innerHTML = `<option value="">Custom Line</option>` + subs.map(s => `<option value="${esc(s.code)}">${esc(s.code + ' ' + s.name)}</option>`).join('');
+        v.bank_funded.checked = !!S.divMap[code]?.bank_funded;
+        toggleCustom();
+      };
+      const toggleCustom = () => { form.querySelector('[data-custom]').hidden = !!v.subtask_code.value; };
+      v.division_code.addEventListener('change', fillSubs);
+      v.subtask_code.addEventListener('change', toggleCustom);
+      bindCalc(form);
+      fillSubs();
+    },
+    onSubmit: async form => {
+      const v = form.elements;
+      const sub = v.subtask_code.value || null;
+      const label = v.label.value.trim();
+      if (!sub && !label) throw new Error('Name the custom line, or pick a sub-task.');
+      if (sub && S.proj.lines.some(l => l.subtask_code === sub)) throw new Error('That sub-task is already on this budget.');
+      const qty = num(v.qty.value), rate = num(v.rate.value);
+      checkLineDates(v);
+      const created = check(await sb.from('project_lines').insert({
+        project_id: S.proj.project.id, division_code: v.division_code.value,
+        subtask_code: sub, label: sub ? '' : label, unit: v.unit.value.trim(), notes: v.notes.value.trim(),
+        qty, rate, budget: qty * rate, bank_funded: v.bank_funded.checked
+      }).select().single());
+      await syncLineTask(S.proj, created.id, created, v);
+    }
+  });
+}
+
+// Payment (classification required)
+// Shared by the entry row, the editable rows, and the phone form.
+async function resolveVendorId(P, name){
+  const vName = (name || '').trim();
+  if (!vName) return {vendorId: null, name: '', created: false};
+  const hit = S.vendors.find(v => v.name.toLowerCase() === vName.toLowerCase());
+  let vendorId = hit ? hit.id : null, created = false, shown = hit ? hit.name : vName;
+  if (!hit){
+    const nv = check(await sb.from('vendors').insert({name: vName}).select().single());
+    S.vendors.push(nv);
+    S.vendors.sort((a, b) => a.name.localeCompare(b.name));
+    vendorId = nv.id; created = true;
+  }
+  check(await sb.from('project_vendors').upsert({project_id: P.project.id, vendor_id: vendorId}, {onConflict: 'project_id,vendor_id', ignoreDuplicates: true}));
+  return {vendorId, name: shown, created};
+}
+async function addLibraryLine(P, div, code){
+  const line = check(await sb.from('project_lines').insert({
+    project_id: P.project.id, division_code: div, subtask_code: code, label: '',
+    budget: 0, bank_funded: !!S.divMap[div]?.bank_funded
+  }).select().single());
+  P.lines.push(line);
+  return line;
+}
+async function resolveLineId(P, value, div){
+  if (!div) throw new Error('Choose the division for this transaction.');
+  const v = (value || '').trim();
+  const need = 'Choose the task for this transaction. Nothing is saved without one.';
+  if (!v) throw new Error(need);
+  const hit = P.lines.find(l => l.id === v);
+  if (hit){
+    if (hit.division_code !== div) throw new Error(need);
+    return {lineId: hit.id, created: false, label: lineName(hit), division_code: div};
+  }
+  if (v.startsWith('lib:')){
+    const code = v.slice(4), sub = S.subMap[code];
+    if (!sub || sub.division_code !== div) throw new Error(need);
+    const existing = P.lines.find(l => l.subtask_code === code && l.division_code === div);
+    if (existing) return {lineId: existing.id, created: false, label: sub.name, division_code: div};
+    const line = await addLibraryLine(P, div, code);
+    return {lineId: line.id, created: true, label: sub.name, division_code: div};
+  }
+  // Typed name (phone form): use a matching library sub-item or project line, otherwise add a custom line.
+  const sub = S.subs.find(s => s.division_code === div && s.name.toLowerCase() === v.toLowerCase());
+  if (sub) return resolveLineId(P, 'lib:' + sub.code, div);
+  const named = P.lines.find(l => l.division_code === div && lineName(l).toLowerCase() === v.toLowerCase());
+  if (named) return {lineId: named.id, created: false, label: lineName(named), division_code: div};
+  const line = check(await sb.from('project_lines').insert({
+    project_id: P.project.id, division_code: div, subtask_code: null, label: v,
+    budget: 0, bank_funded: !!S.divMap[div]?.bank_funded
+  }).select().single());
+  P.lines.push(line);
+  return {lineId: line.id, created: true, label: v, division_code: div};
+}
+function txNotes(v, l){
+  const notes = [];
+  if (v && v.created) notes.push(`Added ${v.name} to the Contractor Directory`);
+  if (l && l.created) notes.push(`Added "${l.label}" as a task under ${divName(l.division_code || '')}. Set its budget on the Budget tab`);
+  return notes.length ? notes.join('. ') + '.' : '';
+}
+
+async function savePaymentRecord(P, d){
+  if (!d.date) throw new Error('Enter the payment date.');
+  if (!(d.amount > 0)) throw new Error('Enter the amount.');
+  const l = await resolveLineId(P, d.lineId || d.task, d.div);
+  const v = await vendorFor(P, d.vendorId || null, d.vendorName);
+  const pay = check(await sb.from('payments').insert({
+    project_id: P.project.id, vendor_id: v.vendorId, budget_line_id: l.lineId,
+    pay_date: d.date, amount: d.amount, method: d.method,
+    reference: (d.reference || '').trim(), invoice_number: (d.invoice || '').trim()
+  }).select().single());
+  if (d.files && d.files.length) await attachFiles(`payments/${pay.id}`, pay.id, d.files);
+  S.txDate = ''; S.txMethod = d.method; // date goes back to today; method stays; division, task, contractor, amount and check # clear
+  return txNotes(v, l) || 'Transaction saved.';
+}
+
+// Saves one existing row when a cell is changed (Excel-style).
+async function saveRow(tr){
+  const P = S.proj;
+  const pay = P.pays.find(p => p.id === tr.dataset.id);
+  if (!pay) return;
+  const q = f => tr.querySelector(`[data-f="${f}"]`);
+  const date = q('date').value, amount = num(q('amount').value);
+  if (!date) throw new Error('Enter the payment date.');
+  if (!(amount > 0)) throw new Error('Enter the amount.');
+  const div = q('div').value;
+  const l = await resolveLineId(P, q('task').value, div);
+  const v = await vendorFor(P, q('vendor').value || null, '');
+  const row = {pay_date: date, amount, method: q('method').value, reference: q('ref').value.trim(),
+    vendor_id: v.vendorId, budget_line_id: l.lineId};
+  check(await sb.from('payments').update(row).eq('id', pay.id));
+  Object.assign(pay, row);
+  pay.vendors = v.vendorId ? {name: v.name} : null;
+  tr.classList.remove('tx-unc');
+  fillSelect(q('task'), taskOptions(div, l.lineId), l.lineId);
+  fillSelect(q('vendor'), vendorOptions(v.vendorId || ''), v.vendorId || '');
+  if (v.created || l.created) refreshTxSelects(tr);
+  txFoot(P);
+  const note = txNotes(v, l);
+  if (note) toast(note);
+}
+
+// Dropdown options. Task lists only the tasks in the chosen division.
+function taskOptions(div, selectedId = ''){
+  if (!div) return '<option value="">Choose Division First</option>';
+  const here = S.proj.lines.filter(l => l.division_code === div);
+  const byCode = new Map(here.filter(l => l.subtask_code).map(l => [l.subtask_code, l]));
+  const items = S.subs.filter(s => s.division_code === div).map(s => ({
+    value: byCode.has(s.code) ? byCode.get(s.code).id : 'lib:' + s.code, label: s.name
+  }));
+  here.filter(l => !l.subtask_code).forEach(l => items.push({value: l.id, label: lineName(l)}));
+  items.sort((a, b) => a.label.localeCompare(b.label));
+  return '<option value="">Choose A Task</option>' +
+    items.map(i => `<option value="${esc(i.value)}" ${i.value === selectedId ? 'selected' : ''}>${esc(i.label)}</option>`).join('') +
+    '<option value="__new">+ New Task…</option>';
+}
+function vendorOptions(selectedId = ''){
+  return '<option value="">No Contractor</option>' +
+    S.vendors.map(v => `<option value="${v.id}" ${v.id === selectedId ? 'selected' : ''}>${esc(v.name)}</option>`).join('') +
+    '<option value="__new">+ New Contractor…</option>';
+}
+// Replaces a select's options and keeps its current value when it still exists.
+function fillSelect(sel, html, value){
+  sel.innerHTML = html;
+  sel.value = value;
+}
+// Rebuilds the contractor and task dropdowns in the other rows and the entry row.
+function refreshTxSelects(except){
+  document.querySelectorAll('#txRows tr').forEach(tr => {
+    if (tr === except) return;
+    const v = tr.querySelector('[data-f=vendor]'), t = tr.querySelector('[data-f=task]');
+    if (v) fillSelect(v, vendorOptions(), v.value);
+    if (t) fillSelect(t, taskOptions(tr.querySelector('[data-f=div]').value), t.value);
+  });
+  refreshDraftSelects();
+}
+function refreshDraftSelects(){
+  const body = $('#txDraftBody');
+  if (!body) return;
+  const v = body.querySelector('[data-d=vendor]'), t = body.querySelector('[data-d=task]');
+  if (v) fillSelect(v, vendorOptions(), v.value);
+  if (t) fillSelect(t, taskOptions(body.querySelector('[data-d=div]').value), t.value);
+}
+// Contractor for a payment: an existing one by id, or a typed name (added to the directory if new).
+async function vendorFor(P, vendorId, name){
+  if (vendorId){
+    const hit = S.vendors.find(v => v.id === vendorId);
+    check(await sb.from('project_vendors').upsert({project_id: P.project.id, vendor_id: vendorId}, {onConflict: 'project_id,vendor_id', ignoreDuplicates: true}));
+    return {vendorId, name: hit?.name || '', created: false};
+  }
+  return resolveVendorId(P, name);
+}
+
+function txDatalists(P){
+  const names = [...new Set(P.lines.map(l => lineName(l)))];
+  return `<datalist id="txLines">${names.map(n => `<option value="${esc(n)}">`).join('')}</datalist>
+    <datalist id="txVendors">${S.vendors.map(v => `<option value="${esc(v.name)}">`).join('')}</datalist>`;
+}
+
+function draftRow(){
+  const preTask = S.txPreTask || '';
+  S.txPreTask = '';
+  const methodOpts = PAY_METHODS.map(m => `<option ${m === (S.txMethod || 'Check') ? 'selected' : ''}>${m}</option>`).join('');
+  const div = S.txDiv || '';
+  return `<tr class="tx-draft">
+    <td class="ctr tx-no">New</td>
+    <td><input type="date" data-d="date" value="${S.txDate || todayISO()}" aria-label="Date"></td>
+    <td><input type="text" class="money" data-d="amount" inputmode="decimal" placeholder="0.00" aria-label="Amount"></td>
+    <td><select data-d="div" aria-label="Expense classification (division)"><option value="">Choose A Division</option>${divOptions(div)}</select></td>
+    <td><select data-d="task" aria-label="Task">${taskOptions(div, preTask)}</select></td>
+    <td><select data-d="vendor" aria-label="Paid to">${vendorOptions()}</select></td>
+    <td><select data-d="method" aria-label="Method">${methodOpts}</select></td>
+    <td><input data-d="ref" placeholder="Check or ref #" aria-label="Check number"></td>
+    <td class="ctr"></td>
+    <td class="ctr"></td>
+    <td class="ctr"><button class="btn primary sm" data-act="save-draft">Save</button></td>
   </tr>`;
 }
 
-function renderCats(){
-  const el = $('#catTable');
-  if (state.cats === null){ el.innerHTML = `<tbody><tr><td class="empty">Loading…</td></tr></tbody>`; return; }
-  const cats = state.cats, ts = tasksD();
-  const known = new Set(cats.map(c => c.name));
-  const extra = [...new Set(ts.map(t => t.category).filter(n => n && !known.has(n)))];
-  if (!cats.length && !extra.length){
-    el.innerHTML = `<tbody><tr><td class="empty">No categories yet. Add one, such as Labor or Materials, and give it a budget.</td></tr></tbody>`;
-    return;
-  }
-  el.innerHTML = `<thead><tr><th>Category</th><th class="num">Approved</th><th class="num">Actual</th><th class="num">Paid</th>
-    <th class="num">Remaining</th><th>Used</th><th></th></tr></thead>
-    <tbody>${cats.map(c => catRow(c.name, c.budget, c.id, ts)).join('')}${extra.map(n => catRow(n, null, null, ts)).join('')}</tbody>`;
-}
 
-function taskRow(t){
-  const qty = t.qty ? `<div class="muted small">${esc(t.qty)} ${esc(t.unit || '')} × ${money(t.unit_cost)}</div>` : '';
-  return `<tr>
-    <td><strong>${esc(t.name)}</strong>${qty}</td>
-    <td>${esc(t.phase)}</td><td>${esc(t.category)}</td><td>${esc(t.assigned_to)}</td>
-    <td>${fmtDate(t.startD)}</td><td>${fmtDate(t.endD)}</td>
-    <td style="min-width:110px"><div class="bar${t.progress >= 100 ? ' done' : ''}"><i style="width:${t.progress}%"></i></div><div class="small muted">${t.progress}%</div></td>
-    <td class="num">${money(t.planned)}</td><td class="num">${money(t.actual)}</td><td class="num">${money(t.due)}</td>
-    <td><span class="badge" data-status="${esc(t.status)}">${esc(t.status || '—')}</span></td>
-    <td class="acts">
-      <button class="btn-link" data-act="edit-task" data-id="${esc(t.id)}">Edit</button>
-      <button class="btn-link danger" data-act="del-task" data-id="${esc(t.id)}">Delete</button>
-    </td></tr>`;
-}
-
-function renderTasks(){
-  const el = $('#taskTable');
-  if (state.tasks === null){ el.innerHTML = `<tbody><tr><td class="empty">Loading…</td></tr></tbody>`; return; }
-  const ts = tasksD();
-  if (!ts.length){ el.innerHTML = `<tbody><tr><td class="empty">No tasks yet. Add one to track its schedule, cost and payments.</td></tr></tbody>`; return; }
-  el.innerHTML = `<thead><tr><th>Task</th><th>Phase</th><th>Category</th><th>Assigned</th><th>Start</th><th>End</th><th>Progress</th>
-    <th class="num">Planned</th><th class="num">Actual</th><th class="num">Due</th><th>Status</th><th></th></tr></thead>
-    <tbody>${ts.map(taskRow).join('')}</tbody>`;
-}
-
-function fillLists(){
-  const uniq = a => [...new Set(a.filter(Boolean))].sort();
-  const opts = a => uniq(a).map(v => `<option value="${esc(v)}"></option>`).join('');
-  $('#catList').innerHTML = opts((state.cats || []).map(c => c.name));
-  $('#phaseList').innerHTML = opts((state.tasks || []).map(t => t.phase));
-  $('#whoList').innerHTML = opts((state.tasks || []).map(t => t.assigned_to));
-}
-
-// ---------- Receipts ----------
-function renderReceipts(taskId){
-  const list = $('#receiptList');
-  const rs = state.receipts.filter(r => r.task_id === taskId);
-  $('#receiptHint').hidden = !!taskId;
-  $('#attachBtn').hidden = !taskId;
-  list.innerHTML = rs.map(r => `<li><span>${esc(r.filename)}</span>
-    <span class="inline"><button type="button" class="btn-link" data-act="open-receipt" data-id="${esc(r.id)}">Open</button>
-    <button type="button" class="btn-link danger" data-act="del-receipt" data-id="${esc(r.id)}">Delete</button></span></li>`).join('');
-}
-
-async function uploadReceipts(taskId, files){
-  for (const file of files){
-    const safe = file.name.replace(/[^\w.-]+/g, '_');
-    const path = `${taskId}/${crypto.randomUUID()}-${safe}`;
-    const up = await sb.storage.from('receipts').upload(path, file, {contentType: file.type || undefined});
-    if (up.error){ fail(up.error); return; }
-    const ins = await sb.from('receipts').insert({task_id: taskId, path, filename: file.name});
-    if (ins.error){ fail(ins.error); return; }
-  }
-  await loadAll();
-  renderReceipts(taskId);
-}
-
-// ---------- Dialogs ----------
-function openTask(id){
-  const f = $('#taskForm');
-  const t = id ? (state.tasks || []).find(x => x.id === id) : null;
-  $('#taskTitle').textContent = t ? 'Edit task' : 'Add task';
-  f.dataset.id = t ? t.id : '';
-  $('#taskErr').hidden = true;
-  for (const el of f.elements){
-    if (!el.name) continue;
-    el.value = t ? (t[el.name] ?? '') : (el.name === 'status' ? 'Ongoing' : '');
-  }
-  renderReceipts(t ? t.id : null);
-  $('#taskDlg').showModal();
-}
-
-function openQuick(){
-  const f = $('#quickForm');
-  f.reset();
-  f.elements.start_date.value = isoOf(new Date());
-  f.elements.status.value = 'Ongoing';
-  $('#quickErr').hidden = true;
-  $('#quickDlg').showModal();
-  f.elements.name.focus();
-}
-
-function openProject(){
-  const f = $('#projForm'), p = state.project || {};
-  for (const el of f.elements){ if (el.name) el.value = p[el.name] ?? ''; }
-  $('#projErr').hidden = true;
-  $('#projDlg').showModal();
-}
-
-// ---------- Events ----------
-document.addEventListener('click', async e => {
-  if (e.target.closest('[data-close]')){ e.target.closest('dialog').close(); return; }
-  const btn = e.target.closest('[data-act]');
-  if (!btn) return;
-  const act = btn.dataset.act, id = btn.dataset.id;
-  if (act === 'add-task') return openTask('');
-  if (act === 'edit-task') return openTask(id);
-  if (act === 'quick-add') return openQuick();
-  if (act === 'edit-project') return openProject();
-  if (act === 'sign-out'){ await sb.auth.signOut(); return; }
-  if (act === 'open-receipt'){
-    const r = state.receipts.find(x => x.id === id);
-    const s = await sb.storage.from('receipts').createSignedUrl(r.path, 3600);
-    if (s.error){ fail(s.error); return; }
-    window.open(s.data.signedUrl, '_blank', 'noopener');
-    return;
-  }
-  if (act === 'del-receipt'){
-    const r = state.receipts.find(x => x.id === id);
-    if (!btn.dataset.armed){ armDelete(btn); return; }
-    await sb.storage.from('receipts').remove([r.path]);
-    const del = await sb.from('receipts').delete().eq('id', id);
-    if (del.error){ fail(del.error); return; }
-    await loadAll();
-    renderReceipts($('#taskForm').dataset.id || null);
-    return;
-  }
-  if (act === 'del-task' || act === 'del-cat'){
-    // No confirm() dialogs in this app either, so the button arms itself first.
-    if (!btn.dataset.armed){ armDelete(btn); return; }
-    const table = act === 'del-task' ? 'tasks' : 'categories';
-    const del = await sb.from(table).delete().eq('id', id);
-    if (del.error){ fail(del.error); return; }
-    await loadAll();
-  }
-});
-
-function armDelete(btn){
-  btn.dataset.armed = '1'; btn.textContent = 'Confirm';
-  setTimeout(() => { btn.dataset.armed = ''; btn.textContent = 'Delete'; }, 4000);
-}
-
-document.addEventListener('change', async e => {
-  const inp = e.target.closest('[data-cat-budget]');
-  if (!inp) return;
-  const up = await sb.from('categories').update({budget: num(inp.value)}).eq('id', inp.dataset.catBudget);
-  if (up.error){ fail(up.error); return; }
-  await loadAll();
-});
-
-$('#attachBtn').addEventListener('click', () => $('#receiptInput').click());
-$('#receiptInput').addEventListener('change', async e => {
-  const taskId = $('#taskForm').dataset.id;
-  if (!taskId || !e.target.files.length) return;
-  await uploadReceipts(taskId, [...e.target.files]);
-  e.target.value = '';
-});
-
-$('#taskForm').addEventListener('submit', async e => {
-  e.preventDefault();
-  const f = e.currentTarget, v = Object.fromEntries(new FormData(f));
-  if (!v.name.trim()){ $('#taskErr').textContent = 'Enter a task name.'; $('#taskErr').hidden = false; return; }
-  const data = {
-    name: v.name.trim(), phase: v.phase.trim(), category: v.category.trim(), assigned_to: v.assigned_to.trim(),
-    status: v.status, start_date: dateOrNull(v.start_date), duration_days: num(v.duration_days), delay_days: num(v.delay_days),
-    progress: clamp(num(v.progress), 0, 100), qty: num(v.qty), unit: v.unit.trim(), unit_cost: num(v.unit_cost),
-    actual: num(v.actual), paid: num(v.paid)
+async function saveDraft(){
+  const body = $('#txDraftBody');
+  const q = k => body.querySelector(`[data-d="${k}"]`);
+  const vendorVal = q('vendor').value;
+  const d = {
+    date: q('date').value, amount: num(q('amount').value),
+    lineId: q('task').value, div: q('div').value,
+    method: q('method').value, reference: q('ref').value,
+    vendorId: vendorVal || null
   };
-  const res = f.dataset.id
-    ? await sb.from('tasks').update(data).eq('id', f.dataset.id)
-    : await sb.from('tasks').insert(data);
-  if (res.error){ $('#taskErr').textContent = res.error.message; $('#taskErr').hidden = false; return; }
-  $('#taskDlg').close();
-  await loadAll();
-});
-
-$('#quickForm').addEventListener('submit', async e => {
-  e.preventDefault();
-  const v = Object.fromEntries(new FormData(e.currentTarget));
-  if (!v.name.trim()){ $('#quickErr').textContent = 'Enter a task name.'; $('#quickErr').hidden = false; return; }
-  const res = await sb.from('tasks').insert({
-    name: v.name.trim(), category: v.category.trim(), status: v.status,
-    start_date: dateOrNull(v.start_date), actual: num(v.actual), paid: num(v.paid)
-  });
-  if (res.error){ $('#quickErr').textContent = res.error.message; $('#quickErr').hidden = false; return; }
-  $('#quickDlg').close();
-  await loadAll();
-});
-
-$('#projForm').addEventListener('submit', async e => {
-  e.preventDefault();
-  const v = Object.fromEntries(new FormData(e.currentTarget));
-  if (!v.name.trim()){ $('#projErr').textContent = 'Enter a project name.'; $('#projErr').hidden = false; return; }
-  $('#projErr').hidden = true;
   try {
-    const res = await sb.from('project').upsert({
-      id: 1, name: v.name.trim(), client: v.client.trim(), manager: v.manager.trim(),
-      start_date: dateOrNull(v.start_date), end_date: dateOrNull(v.end_date)
+    const out = await savePaymentRecord(S.proj, d);
+    toast(out);
+    await render();
+    document.querySelector('#txDraftBody [data-d=amount]')?.focus();
+  } catch (e) { toast(msg(e), true); }
+}
+
+function notesSheet(p){
+  sheet({
+    title: 'Notes',
+    submit: 'Save Notes',
+    html: `<label class="full">Notes<textarea name="notes" rows="5" placeholder="Anything about this transaction">${esc(p.notes || '')}</textarea></label>`,
+    onSubmit: async form => {
+      const notes = form.elements.notes.value.trim();
+      check(await sb.from('payments').update({notes}).eq('id', p.id));
+      p.notes = notes;
+    }
+  });
+}
+
+function paymentSheet(){
+  const P = S.proj;
+  sheet({
+    title: 'Add Transaction',
+    submit: 'Save Transaction',
+    html: `${txDatalists(P)}<div class="grid">
+      <label>Date<input type="date" name="pay_date" value="${S.txDate || todayISO()}"></label>
+      <label>Amount ($)<input type="text" class="money" name="amount" inputmode="decimal"></label>
+      <label class="full">Expense Classification<select name="div"><option value="">Choose A Division</option>${divOptions(S.txDiv || '')}</select></label>
+      <label class="full">Task<input name="task" list="txLines" autocomplete="off" placeholder="Task (budget line)"></label>
+      <label class="full">Paid To<input name="vendor" list="txVendors" autocomplete="off" placeholder="Contractor"></label>
+      <label>Method<select name="method">${PAY_METHODS.map(m => `<option ${m === (S.txMethod || 'Check') ? 'selected' : ''}>${m}</option>`).join('')}</select></label>
+      <label>Check Or Reference #<input name="reference"></label>
+      <label>Invoice #<input name="invoice_number"></label>
+      <label class="full">Receipts And Invoices<input type="file" name="files" multiple accept="image/*,application/pdf"></label>
+    </div>`,
+    onSubmit: async form => {
+      const v = form.elements;
+      toast(await savePaymentRecord(S.proj, {
+        date: v.pay_date.value, amount: num(v.amount.value), vendorName: v.vendor.value,
+        task: v.task.value, div: v.div.value, method: v.method.value,
+        reference: v.reference.value, invoice: v.invoice_number.value, files: v.files.files
+      }));
+    }
+  });
+}
+
+function lineOptions(lines, selected){
+  const byDiv = {};
+  lines.forEach(l => { (byDiv[l.division_code] ||= []).push(l); });
+  return Object.keys(byDiv).sort().map(code =>
+    `<optgroup label="${esc(divName(code))}">` +
+    byDiv[code].map(l => `<option value="${l.id}" ${l.id === selected ? 'selected' : ''}>${esc(lineName(l))}</option>`).join('') +
+    `</optgroup>`).join('');
+}
+
+async function attachFiles(folder, paymentId, files){
+  for (const f of Array.from(files || [])){
+    const path = await uploadFile(folder, f);
+    check(await sb.from('payment_receipts').insert({payment_id: paymentId, path, filename: f.name}));
+  }
+}
+
+async function uploadFile(folder, file){
+  const safe = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+  const path = `${folder}/${Date.now()}-${safe}`;
+  const res = await sb.storage.from('receipts').upload(path, file, {contentType: file.type || undefined});
+  if (res.error) throw res.error;
+  return path;
+}
+
+async function openFile(path){
+  const res = await sb.storage.from('receipts').createSignedUrl(path, 600);
+  if (res.error) throw res.error;
+  const a = document.createElement('a');
+  a.href = res.data.signedUrl;
+  a.target = '_blank';
+  a.rel = 'noopener';
+  a.click();
+}
+
+// Payment detail, attach receipts, delete
+function paymentDetail(p){
+  const P = S.proj;
+  const line = P.lines.find(l => l.id === p.budget_line_id);
+  const files = P.receipts.filter(r => r.payment_id === p.id);
+  sheet({
+    title: p.vendors?.name || 'Payment',
+    submit: 'Attach Files',
+    html: `<dl class="kv">
+        <dt>Date</dt><dd>${fmtDate(p.pay_date)}</dd>
+        <dt>Amount</dt><dd>${money(p.amount)}</dd>
+        <dt>Budget Line</dt><dd>${esc(line ? divName(line.division_code) + ' · ' + lineName(line) : 'Unclassified')}</dd>
+        <dt>Method</dt><dd>${esc(p.method)}${p.reference ? ' #' + esc(p.reference) : ''}</dd>
+        <dt>Invoice</dt><dd>${esc(p.invoice_number || '—')}</dd>
+        <dt>Status</dt><dd>${esc(p.status)}</dd>
+      </dl>
+      <div>
+        <div class="small muted" style="font-weight:600;text-transform:uppercase;letter-spacing:.6px">Receipts</div>
+        ${files.map(f => `<div class="file-li"><span>${esc(f.filename || f.path)}</span>
+            <span style="display:flex;gap:6px"><button type="button" class="btn sm" data-act="open-file" data-path="${esc(f.path)}">Open</button>
+            <button type="button" class="btn sm danger" data-act="del-receipt" data-id="${f.id}" data-path="${esc(f.path)}">Remove</button></span></div>`).join('') || '<div class="small muted">No receipts attached.</div>'}
+      </div>
+      <label>Add Receipts Or Invoices<input type="file" name="files" multiple accept="image/*,application/pdf"></label>`,
+    danger: {
+      label: 'Delete Payment',
+      confirm: 'Delete this payment and its receipts?',
+      run: async () => {
+        const paths = files.map(f => f.path);
+        if (paths.length) await sb.storage.from('receipts').remove(paths);
+        check(await sb.from('payments').delete().eq('id', p.id));
+      }
+    },
+    onSubmit: async form => {
+      const files = form.elements.files.files;
+      if (!files.length) throw new Error('Choose a file first.');
+      await attachFiles(`payments/${p.id}`, p.id, files);
+    }
+  });
+}
+
+// Contractors: assign to project
+function assignSheet(){
+  const P = S.proj;
+  const free = S.vendors.filter(v => !P.assignedIds.has(v.id));
+  sheet({
+    title: 'Assign Contractor',
+    submit: 'Assign',
+    html: `<label>Contractor<select name="vendor_id">
+        ${free.map(v => `<option value="${v.id}">${esc(v.name)}${v.trade ? ' · ' + esc(v.trade) : ''}</option>`).join('')}
+        <option value="__new">+ New Contractor</option></select></label>
+      <div class="grid" data-newbox hidden>
+        <label class="full">Name<input name="new_name" autocomplete="off"></label>
+        <label>Trade<input name="new_trade" autocomplete="off" placeholder="Framing, electrical"></label>
+        <label>Company<input name="new_company" autocomplete="off"></label>
+        <label>Phone<input name="new_phone" type="tel" autocomplete="off"></label>
+        <label>Email<input name="new_email" type="email" autocomplete="off"></label>
+      </div>
+      <div class="small muted">Once assigned, a certificate of insurance is required for this project.</div>`,
+    onOpen: (form) => {
+      const sel = form.elements.vendor_id;
+      const box = form.querySelector('[data-newbox]');
+      const toggle = () => { box.hidden = sel.value !== '__new'; };
+      sel.addEventListener('change', toggle);
+      if (!free.length) sel.value = '__new';
+      toggle();
+    },
+    onSubmit: async form => {
+      const v = form.elements;
+      let vendorId = v.vendor_id.value;
+      if (vendorId === '__new'){
+        const name = v.new_name.value.trim();
+        if (!name) throw new Error('Enter the contractor name.');
+        const row = check(await sb.from('vendors').insert({
+          name, trade: v.new_trade.value.trim(), company: v.new_company.value.trim(),
+          phone: v.new_phone.value.trim(), email: v.new_email.value.trim()
+        }).select().single());
+        vendorId = row.id;
+      }
+      if (!vendorId) throw new Error('Choose a contractor.');
+      check(await sb.from('project_vendors').upsert(
+        {project_id: P.project.id, vendor_id: vendorId},
+        {onConflict: 'project_id,vendor_id', ignoreDuplicates: true}
+      ));
+    }
+  });
+}
+
+// Certificate of insurance: add
+function coiSheet(vendorId){
+  const P = S.proj;
+  const vendor = S.vendors.find(v => v.id === vendorId);
+  const cur = P.insMap[vendorId + '|' + P.project.id];
+  sheet({
+    title: `Certificate Of Insurance · ${vendor?.name || ''}`,
+    submit: 'Save Certificate',
+    html: `<div class="grid">
+        <label>Insurer<input name="insurer" value="${esc(cur?.insurer)}"></label>
+        <label>Policy Number<input name="policy_number" value="${esc(cur?.policy_number)}"></label>
+        <label>Expires<input type="date" name="expires_on" value="${esc(cur?.expires_on || '')}"></label>
+        <label class="check"><input type="checkbox" name="holder_listed" ${cur?.holder_listed ? 'checked' : ''}> Bank Named As Certificate Holder</label>
+        <label class="full">Certificate File<input type="file" name="file" accept="image/*,application/pdf"></label>
+      </div>
+      <div class="small muted">A certificate file is required to mark insurance as on file.</div>`,
+    onSubmit: async form => {
+      const v = form.elements;
+      const f = v.file.files[0];
+      if (!f) throw new Error('Attach the certificate file.');
+      const path = await uploadFile(`insurance/${vendorId}/${P.project.id}`, f);
+      check(await sb.from('vendor_insurance').insert({
+        vendor_id: vendorId, project_id: P.project.id,
+        insurer: v.insurer.value.trim(), policy_number: v.policy_number.value.trim(),
+        expires_on: v.expires_on.value || null, holder_listed: v.holder_listed.checked, file_path: path
+      }));
+    }
+  });
+}
+
+// Certificate of insurance: dismiss with a reason
+function dismissSheet(vendorId){
+  const P = S.proj;
+  const vendor = S.vendors.find(v => v.id === vendorId);
+  sheet({
+    title: `Dismiss Reminder · ${vendor?.name || ''}`,
+    submit: 'Dismiss Reminder',
+    html: `<label>Reason<select name="reason">${DISMISS_REASONS.map(r => `<option>${esc(r)}</option>`).join('')}</select></label>
+      <label>Note (Optional)<input name="note" autocomplete="off"></label>
+      <div class="small muted">The reminder stops for this contractor on this project. You can add the certificate later.</div>`,
+    onSubmit: async form => {
+      const v = form.elements;
+      const reason = v.reason.value;
+      const note = v.note.value.trim();
+      if (reason.startsWith('Other') && !note) throw new Error('Add a note explaining the reason.');
+      check(await sb.from('vendor_insurance').insert({
+        vendor_id: vendorId, project_id: P.project.id,
+        dismissed_reason: note ? `${reason}: ${note}` : reason,
+        dismissed_by: session?.user?.email || 'unknown',
+        dismissed_at: new Date().toISOString()
+      }));
+    }
+  });
+}
+
+// Contractor (global): create or edit, W-9, and ledger
+async function vendorSheet(v, onCreated, onCancel){
+  const editing = !!v;
+  let created = null;
+  let ledger = [];
+  if (editing){
+    ledger = check(await sb.from('payments').select('*, projects(name)').eq('vendor_id', v.id).order('pay_date', {ascending:false}));
+  }
+  const total = ledger.reduce((a, p) => a + num(p.amount), 0);
+  const yearTotal = ledger.filter(p => String(p.pay_date).startsWith(String(S.year))).reduce((a, p) => a + num(p.amount), 0);
+  const ledgerHtml = editing ? `
+    <div>
+      <div class="small muted" style="font-weight:600;text-transform:uppercase;letter-spacing:.6px">Payment Ledger · ${money(total)} total · ${money(yearTotal)} in ${S.year}</div>
+      ${ledger.map(p => `<div class="file-li"><span>${fmtDate(p.pay_date)} · ${esc(p.projects?.name || 'Project')}</span><span class="num">${money(p.amount)}</span></div>`).join('') || '<div class="small muted">No payments yet.</div>'}
+    </div>` : '';
+
+  sheet({
+    title: editing ? v.name : 'New Contractor',
+    submit: 'Save',
+    keepPage: !!onCreated, onCancel, onDone: onCreated ? () => onCreated(created) : null,
+    html: `<div class="grid">
+        <label>Name<input name="name" required value="${esc(v?.name)}"></label>
+        <label>Trade<input name="trade" value="${esc(v?.trade)}" placeholder="Framing, electrical"></label>
+        <label>Company<input name="company" value="${esc(v?.company)}"></label>
+        <label>Phone<input name="phone" type="tel" value="${esc(v?.phone)}"></label>
+        <label class="full">Email<input name="email" type="email" value="${esc(v?.email)}"></label>
+        <label class="check full"><input type="checkbox" name="is_corporation" ${v?.is_corporation ? 'checked' : ''}> Corporation (No 1099 Needed)</label>
+        <label class="full">W-9 ${v?.w9_path ? '(On File, Upload To Replace)' : '(Missing)'}<input type="file" name="w9" accept="image/*,application/pdf"></label>
+      </div>
+      ${ledgerHtml}`,
+    danger: editing ? {
+      label: 'Delete Contractor',
+      confirm: 'Delete this contractor? Payments to them stay, but lose the link.',
+      run: async () => {
+        if (v.w9_path) await sb.storage.from('receipts').remove([v.w9_path]);
+        check(await sb.from('vendors').delete().eq('id', v.id));
+      }
+    } : null,
+    onSubmit: async form => {
+      const f = form.elements;
+      if (!f.name.value.trim()) throw new Error('Enter the contractor name.');
+      const row = {
+        name: f.name.value.trim(), trade: f.trade.value.trim(), company: f.company.value.trim(),
+        phone: f.phone.value.trim(), email: f.email.value.trim(), is_corporation: f.is_corporation.checked
+      };
+      let id = v?.id;
+      if (editing){
+        check(await sb.from('vendors').update(row).eq('id', id));
+      } else {
+        const nv = check(await sb.from('vendors').insert(row).select().single());
+        id = nv.id;
+        created = nv;
+        S.vendors.push(nv);
+        S.vendors.sort((a, b) => a.name.localeCompare(b.name));
+      }
+      const w9 = f.w9.files[0];
+      if (w9){
+        const path = await uploadFile(`w9/${id}`, w9);
+        check(await sb.from('vendors').update({w9_path: path}).eq('id', id));
+      }
+    }
+  });
+}
+
+function divisionSheet(){
+  sheet({
+    title: 'New Division',
+    html: `<div class="grid">
+        <label>Code<input name="code" placeholder="210-000" required></label>
+        <label>Name<input name="name" placeholder="Garage" required></label>
+        <label class="check full"><input type="checkbox" name="bank_funded" checked> Bank Funds This Division</label>
+      </div>
+      <div class="small muted">Codes use the form NNN-000, for example 210-000.</div>`,
+    onSubmit: async form => {
+      const v = form.elements;
+      const code = v.code.value.trim();
+      if (!/^\d{3}-000$/.test(code)) throw new Error('Use a code like 210-000.');
+      if (!v.name.value.trim()) throw new Error('Enter a division name.');
+      if (S.divMap[code]) throw new Error('That division already exists.');
+      check(await sb.from('library_divisions').insert({code, name: v.name.value.trim(), bank_funded: v.bank_funded.checked, sort_order: 0}));
+    }
+  });
+}
+
+function subtaskSheet(divCode, onCreated, onCancel){
+  const nextCode = () => {
+    const subs = S.subs.filter(s => s.division_code === divCode);
+    const n = Math.max(0, ...subs.map(s => Number(s.code.slice(4)))) + 10;
+    return `${divCode.slice(0, 3)}-${String(n).padStart(3, '0')}`;
+  };
+  let created = null;
+  sheet({
+    title: `New Sub-Task · ${divName(divCode)}`,
+    html: `<label>Name<input name="name" required placeholder="e.g. Pool heater"></label>
+      <div class="small muted">Saved to the Library under ${esc(divName(divCode))}. Code will be ${nextCode()}.</div>`,
+    keepPage: !!onCreated, onCancel, onDone: onCreated ? () => onCreated(created) : null,
+    onSubmit: async form => {
+      const name = form.elements.name.value.trim();
+      if (!name) throw new Error('Enter a name.');
+      created = check(await sb.from('library_subtasks').insert({code: nextCode(), division_code: divCode, name, sort_order: 0}).select().single());
+      S.subs.push(created);
+      S.subs.sort((a, b) => a.code.localeCompare(b.code));
+      S.subMap[created.code] = created;
+    }
+  });
+}
+
+// ---------- Actions (delegated) ----------
+const actions = {
+  'sign-out': () => sb.auth.signOut(),
+  'new-project': () => projectSheet(null),
+  'edit-project': () => projectSheet(S.proj.project),
+  'add-line': () => {
+    if (window.matchMedia('(max-width:640px)').matches) return lineSheet(null);
+    const el = document.querySelector('.bud-entry [data-b=div]');
+    el?.scrollIntoView({block: 'center'});
+    el?.focus();
+  },
+  'save-bud': t => saveBudDraft(S.proj, t.closest('.bud-entry')),
+  'pay-line': (t, id) => {
+    const l = S.proj.lines.find(x => x.id === id);
+    if (!l) return;
+    S.txDiv = l.division_code;
+    S.txPreTask = l.id;
+    location.hash = `#/project/${S.proj.project.id}/payments`;
+  },
+  'delete-line': async (t, id) => {
+    const P = S.proj;
+    const l = P.lines.find(x => x.id === id);
+    if (!l) return;
+    if (P.pays.some(p => p.budget_line_id === id)) throw new Error('This line has payments, so it cannot be deleted. Remove its transactions first.');
+    if (!confirm(`Delete "${lineName(l)}" from the budget? This cannot be undone.`)) return;
+    const task = taskForLine(P, id);
+    if (task) check(await sb.from('schedule_tasks').delete().eq('id', task.id));
+    check(await sb.from('project_lines').delete().eq('id', id));
+    toast('Budget line deleted.');
+    await render();
+  },
+  'toggle-div': t => {
+    const code = t.dataset.code;
+    const set = S.collapsedDivs || (S.collapsedDivs = new Set());
+    const hide = !set.has(code);
+    hide ? set.add(code) : set.delete(code);
+    document.querySelectorAll('.bud-tbl tr.item').forEach(r => { if (r.dataset.div === code) r.hidden = hide; });
+    t.querySelector('.caret').textContent = hide ? '▸' : '▾';
+  },
+  'edit-line': (t, id) => lineSheet(S.proj.lines.find(l => l.id === id)),
+  'new-payment': () => {
+    if (window.matchMedia('(max-width:640px)').matches) return paymentSheet();
+    const el = document.querySelector('#txDraftBody [data-d=amount]');
+    el.scrollIntoView({block: 'center'});
+    el.focus();
+  },
+  'save-draft': () => saveDraft(),
+  'edit-notes': (t, id) => notesSheet(S.proj.pays.find(p => p.id === id)),
+  'delete-payment': (t, id) => deletePayment(id),
+  'export-tx': () => exportTxCsv(),
+  'attach-receipt': (t, id) => {
+    const inp = document.createElement('input');
+    inp.type = 'file'; inp.multiple = true; inp.accept = 'image/*,application/pdf';
+    inp.addEventListener('change', async () => {
+      if (!inp.files.length) return;
+      try {
+        await attachFiles(`payments/${id}`, id, inp.files);
+        toast(`Attached ${inp.files.length} file${inp.files.length > 1 ? 's' : ''}.`);
+        await render();
+      } catch (e) { toast(msg(e), true); }
     });
-    if (res.error){ $('#projErr').textContent = res.error.message; $('#projErr').hidden = false; return; }
-    $('#projDlg').close();
-    await loadAll();
-  } catch (err) {
-    $('#projErr').textContent = 'Save failed: ' + (err?.message || err);
-    $('#projErr').hidden = false;
+    inp.click();
+  },
+  'new-task': () => taskSheet(null, S.proj),
+  'edit-task': (t, id) => taskSheet(S.proj.tasks.find(x => x.id === id), S.proj),
+  'open-pay': (t, id) => paymentDetail(S.proj.pays.find(p => p.id === id)),
+  'open-file': (t) => openFile(t.dataset.path).catch(e => toast(msg(e), true)),
+  'del-receipt': async (t, id) => {
+    if (!confirm('Remove this receipt?')) return;
+    await sb.storage.from('receipts').remove([t.dataset.path]);
+    check(await sb.from('payment_receipts').delete().eq('id', id));
+    t.closest('dialog')?.close();
+    await render();
+  },
+  'assign': () => assignSheet(),
+  'add-coi': (t, id) => coiSheet(id),
+  'dismiss-coi': (t, id) => dismissSheet(id),
+  'new-vendor': () => vendorSheet(null),
+  'open-vendor': (t, id) => vendorSheet(S.vendors.find(v => v.id === id)),
+  'new-division': () => divisionSheet(),
+  'new-subtask': (t) => subtaskSheet(t.dataset.code),
+  'export-csv': () => exportBudgetCsv()
+};
+
+document.addEventListener('click', async e => {
+  // Calculated cells (Owed, Variance) do nothing when clicked.
+  if (e.target.closest && e.target.closest('[data-noact]')) return;
+  const t = e.target.closest('[data-act]');
+  if (!t) return;
+  const fn = actions[t.dataset.act];
+  if (!fn) return;
+  try { await fn(t, t.dataset.id); }
+  catch (ex) { toast(msg(ex), true); }
+});
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && e.target.closest && e.target.closest('.bud-entry')){ e.preventDefault(); saveBudDraft(S.proj, e.target.closest('.bud-entry')).catch(err => toast(msg(err), true)); return; }
+  if (!e.target.closest || !e.target.closest('#txDraftBody')) return;
+  if (e.key === 'Enter'){ e.preventDefault(); saveDraft(); }
+  if (e.key === 'Escape'){ e.target.value = ''; }
+});
+
+// Remembers the value before a pick so a cancelled "+ New" can restore it.
+document.addEventListener('focusin', e => {
+  const t = e.target;
+  if (t.tagName === 'SELECT' && t.closest && t.closest('#txRows, #txDraftBody')) t.dataset.prev = t.value;
+});
+const revertPick = sel => { sel.value = sel.dataset.prev || ''; };
+
+function openNewTask(row, sel, isDraft){
+  const div = row.querySelector(`[data-${isDraft ? 'd' : 'f'}="div"]`).value;
+  if (!div){ revertPick(sel); toast('Choose the division first, then add the task.', true); return; }
+  subtaskSheet(div, async sub => {
+    const line = await addLibraryLine(S.proj, div, sub.code);
+    fillSelect(sel, taskOptions(div, line.id), line.id);
+    refreshTxSelects(isDraft ? null : row);
+    toast(`Added "${sub.name}" to ${divName(div)} in the Library. Set its budget on the Budget tab.`);
+    if (!isDraft) await saveRow(row);
+  }, () => revertPick(sel));
+}
+function openNewVendor(row, sel, isDraft){
+  vendorSheet(null, async v => {
+    fillSelect(sel, vendorOptions(v.id), v.id);
+    refreshTxSelects(isDraft ? null : row);
+    if (!isDraft) await saveRow(row);
+    else toast(`Added ${v.name} to the Contractor Directory.`);
+  }, () => revertPick(sel));
+}
+
+document.addEventListener('change', e => {
+  const t = e.target;
+  if (t.id === 'txDivSel' || t.id === 'txSortSel' || t.id === 'txVendorSel'){
+    if (t.id === 'txDivSel') S.txFilterDiv = t.value;
+    else if (t.id === 'txVendorSel') S.txFilterVendor = t.value;
+    else S.txSort = t.value;
+    if (S.proj) txFill(S.proj);
+    return;
+  }
+  if (t.id === 'showBank'){
+    S.showBank = t.checked;
+    document.querySelector('.bud-tbl')?.classList.toggle('no-bank', !t.checked);
+    return;
+  }
+  if (!S.proj || !t.closest) return;
+  if (t.closest('.bud-entry')){ budChange(t); return; }
+  const isDraft = !!t.closest('#txDraftBody');
+  const row = t.closest(isDraft ? '#txDraftBody tr' : '#txRows tr');
+  if (!row) return;
+  const attr = isDraft ? 'd' : 'f';
+  const key = t.dataset[attr];
+  if (!key) return;
+  const save = () => { if (!isDraft) saveRow(row).catch(err => toast(msg(err), true)); };
+
+  if (key === 'div'){
+    // A different division has its own task list: show it straight away.
+    const task = row.querySelector(`[data-${attr}="task"]`);
+    fillSelect(task, taskOptions(t.value), '');
+    task.dataset.prev = '';
+    if (!isDraft) row.classList.add('tx-unc');
+    task.focus();
+    try { task.showPicker(); } catch (_) { /* opens on click instead */ }
+    return;
+  }
+  if (key === 'task' && t.value === '__new'){ openNewTask(row, t, isDraft); return; }
+  if (key === 'vendor' && t.value === '__new'){ openNewVendor(row, t, isDraft); return; }
+  save();
+});
+
+document.addEventListener('input', e => {
+  if (e.target.closest && e.target.closest('#txRows') && e.target.classList.contains('money')){
+    e.target.value = formatMoneyText(e.target.value);
+  }
+  if (e.target.closest && e.target.closest('.bud-entry')) budInput(e.target);
+  if (e.target.closest && e.target.closest('#txDraftBody')){
+    if (e.target.classList.contains('money')) e.target.value = formatMoneyText(e.target.value);
+  }
+  if (e.target.id === 'txQ' && S.proj){
+    S.txQ = e.target.value;
+    txFill(S.proj);
+  }
+  if (e.target.id === 'budgetSearch' && S.proj){
+    S.budgetQuery = e.target.value;
+    const el = $('#budgetTable');
+    if (el) el.innerHTML = budgetBody(S.proj);
   }
 });
 
-$('#catForm').addEventListener('submit', async e => {
-  e.preventDefault();
-  const inp = $('#catName'), name = inp.value.trim();
-  if (!name) return;
-  const res = await sb.from('categories').insert({name, budget: 0});
-  if (res.error){ banner(res.error.code === '23505' ? 'That category already exists.' : res.error.message); return; }
-  inp.value = '';
-  await loadAll();
+document.addEventListener('change', e => {
+  if (e.target.id === 'lookSel'){
+    S.lookWin = e.target.value;
+    render();
+  }
+  if (e.target.id === 'yearSel'){
+    S.year = Number(e.target.value);
+    render();
+  }
 });
 
+// ---------- Line Dates (shared with Schedule) ----------
+const taskForLine = (P, lineId) => (P.tasks || []).find(t => t.budget_line_id === lineId);
+function checkLineDates(v){
+  const start = v.start_date.value, end = v.end_date.value;
+  if (!start && !end) return;
+  if (!start || !end) throw new Error('Enter both the start and end date, or clear both.');
+  if (end < start) throw new Error('End date cannot be before the start date.');
+  const pct = num(v.percent_complete.value);
+  if (pct < 0 || pct > 100) throw new Error('% complete must be between 0 and 100.');
+}
+// Keeps the schedule task for a budget line in step with the dates typed on the line.
+async function syncLineTask(P, lineId, line, v){
+  const start = v.start_date.value, end = v.end_date.value;
+  const existing = taskForLine(P, lineId);
+  if (!start && !end){
+    if (existing) check(await sb.from('schedule_tasks').delete().eq('id', existing.id));
+    return;
+  }
+  const row = {project_id: P.project.id, budget_line_id: lineId, name: lineName(line),
+    start_date: start, end_date: end, percent_complete: num(v.percent_complete.value)};
+  if (existing) check(await sb.from('schedule_tasks').update(row).eq('id', existing.id));
+  else check(await sb.from('schedule_tasks').insert(row));
+}
+const dateFields = t => `
+      <label>Start Date<input type="date" name="start_date" value="${t ? t.start_date : ''}"></label>
+      <label>End Date<input type="date" name="end_date" value="${t ? t.end_date : ''}"></label>
+      <label>% Complete<input type="number" name="percent_complete" min="0" max="100" step="1" value="${t ? num(t.percent_complete) : 0}"></label>`;
+
+// ---------- Schedule ----------
+const atNoon = d => new Date(d.getFullYear(), d.getMonth(), d.getDate(), 12);
+const addDays = (d, n) => { const x = new Date(d); x.setDate(x.getDate() + n); return x; };
+const toDate = s => new Date(s + 'T12:00:00');
+const rangeLabel = (a, b) => `${a.toLocaleDateString('en-US', {month:'short', day:'numeric'})} – ${b.toLocaleDateString('en-US', {month:'short', day:'numeric'})}`;
+
+function taskStatus(t, today){
+  if (num(t.percent_complete) >= 100) return 'Complete';
+  if (toDate(t.end_date) < today) return 'Late';
+  if (toDate(t.start_date) <= today) return 'In Progress';
+  return 'Not Started';
+}
+const STATUS_BADGE = {Complete:'b-ok', Late:'b-bad', 'In Progress':'b-info', 'Not Started':''};
+
+function ganttRows(P){
+  const rows = [];
+  const byDiv = {};
+  P.lines.forEach(l => { (byDiv[l.division_code] ||= []).push(l); });
+  const span = ts => ts.length ? {
+    start_date: ts.map(t => t.start_date).sort()[0],
+    end_date: ts.map(t => t.end_date).sort().slice(-1)[0],
+    percent_complete: ts.reduce((a, t) => a + num(t.percent_complete), 0) / ts.length
+  } : null;
+  Object.keys(byDiv).sort().forEach(code => {
+    const ls = byDiv[code];
+    rows.push({kind: 'div', label: `${code}  ${S.divMap[code]?.name || 'Unnamed Division'}`,
+      budget: ls.reduce((a, l) => a + budgetOf(l), 0),
+      task: span(ls.map(l => taskForLine(P, l.id)).filter(Boolean))});
+    ls.forEach(l => rows.push({kind: 'line', label: lineName(l), budget: budgetOf(l), line: l, task: taskForLine(P, l.id)}));
+  });
+  (P.tasks || []).filter(t => !t.budget_line_id).forEach(t => rows.push({kind: 'task', label: t.name, budget: null, task: t}));
+  return rows;
+}
+
+async function renderSchedule(P){
+  const tasks = P.tasks || [];
+  const today = atNoon(new Date());
+  const weekStart = addDays(today, -((today.getDay() + 6) % 7));
+  const y = today.getFullYear(), m = today.getMonth();
+  const windows = [
+    ['This Week', weekStart, addDays(weekStart, 6)],
+    ['Next Week', addDays(weekStart, 7), addDays(weekStart, 13)],
+    ['This Month', new Date(y, m, 1, 12), new Date(y, m + 1, 0, 12)],
+    ['Next Month', new Date(y, m + 1, 1, 12), new Date(y, m + 2, 0, 12)]
+  ];
+  const opts = {thisWeek: 0, nextWeek: 1, thisMonth: 2, nextMonth: 3};
+  const pick = S.lookWin in opts ? S.lookWin : 'thisWeek';
+  const [wLabel, wa, wb] = windows[opts[pick]];
+  const active = tasks.filter(t => toDate(t.start_date) <= wb && toDate(t.end_date) >= wa);
+  const look = `<div class="card look">
+    <div class="card-h">
+      <div><strong>Look-Ahead</strong> <span class="small muted">${rangeLabel(wa, wb)}</span></div>
+      <select id="lookSel" aria-label="Look-ahead window">${windows.map(([l], i) => {
+        const key = Object.keys(opts).find(k => opts[k] === i);
+        return `<option value="${key}" ${key === pick ? 'selected' : ''}>${l}</option>`;
+      }).join('')}</select>
+    </div>
+    <div class="small muted">${active.length} ${active.length === 1 ? 'Task' : 'Tasks'} Active</div>
+    ${active.map(t => `<div class="la-row"><span>${esc(t.name)}</span><span class="small muted num">${dateOr(t.start_date)} – ${dateOr(t.end_date)}</span></div>`).join('')}
+  </div>`;
+
+  const rows = ganttRows(P);
+  const dated = rows.filter(r => r.task);
+  const avg = tasks.length ? tasks.reduce((a, t) => a + num(t.percent_complete), 0) / tasks.length : 0;
+
+  let timeline;
+  if (!dated.length){
+    timeline = `<div class="empty">No dates yet. Add a start and end date to a budget line or a task to see it on the timeline.</div>`;
+  } else {
+    const DW = 16;
+    const rs = addDays(toDate(dated.map(r => r.task.start_date).sort()[0]), -3);
+    const re = addDays(toDate(dated.map(r => r.task.end_date).sort().slice(-1)[0]), 7);
+    const N = Math.round((re - rs) / 86400000) + 1;
+    const W = N * DW;
+    const offset = s => Math.round((toDate(s) - rs) / 86400000);
+    const todayOff = Math.round((today - rs) / 86400000);
+    const todayLine = todayOff >= 0 && todayOff < N ? `<div class="g-today" style="left:${todayOff * DW + DW / 2}px"></div>` : '';
+
+    let mHead = '', dHead = '';
+    for (let i = 0; i < N;){
+      const d = addDays(rs, i);
+      let len = 0;
+      while (i + len < N && addDays(rs, i + len).getMonth() === d.getMonth()) len++;
+      const seg = len * DW;
+      const mLabel = seg >= 90 ? d.toLocaleDateString('en-US', {month: 'short', year: 'numeric'})
+        : seg >= 30 ? d.toLocaleDateString('en-US', {month: 'short'}) : '';
+      mHead += `<div class="g-mon" style="width:${seg}px">${mLabel}</div>`;
+      i += len;
+    }
+    for (let k = 0; k < N; k++) dHead += `<div class="g-day" style="width:${DW}px">${addDays(rs, k).getDate()}</div>`;
+
+    const body = rows.map(r => {
+      const t = r.task;
+      const pct = t ? Math.min(100, Math.max(0, Math.round(num(t.percent_complete)))) : null;
+      const days = t ? Math.round((toDate(t.end_date) - toDate(t.start_date)) / 86400000) + 1 : '';
+      const act = r.kind === 'line' ? `data-act="edit-line" data-id="${r.line.id}"`
+        : r.kind === 'task' ? `data-act="edit-task" data-id="${r.task.id}"` : '';
+      const pad = r.kind === 'line' ? 22 : 0;
+      const bar = t ? `<div class="g-bar ${r.kind === 'div' ? 'g-sum' : ''}" style="left:${offset(t.start_date) * DW}px;width:${days * DW}px"><i style="width:${pct}%"></i></div>` : '';
+      return `<div class="g-row g-kind-${r.kind} ${act ? 'g-click' : ''}" ${act}>
+        <div class="g-left">
+          <div class="g-name" style="padding-left:${10 + pad}px">${esc(r.label)}</div>
+          <div class="g-bud num">${r.budget == null ? '' : money(r.budget)}</div>
+          <div class="g-st num">${t ? dateOr(t.start_date) : ''}</div>
+          <div class="g-days num">${days}</div>
+          <div class="g-pct">${t ? `<span class="g-mini"><i style="width:${pct}%"></i></span><span class="num">${pct}%</span>` : ''}</div>
+        </div>
+        <div class="g-right" style="width:${W}px">${todayLine}${bar}</div>
+      </div>`;
+    }).join('');
+
+    timeline = `<div class="g-wrap">
+      <div class="g-row g-head">
+        <div class="g-left"></div>
+        <div class="g-right g-hdr" style="width:${W}px">${mHead}</div>
+      </div>
+      <div class="g-row g-sub">
+        <div class="g-left"><div class="g-name" style="padding-left:10px">Budget Item</div><div class="g-bud">Budget</div><div class="g-st">Start</div><div class="g-days">Days</div><div class="g-pct">% Complete</div></div>
+        <div class="g-right g-hdr" style="width:${W}px">${dHead}</div>
+      </div>
+      ${body}
+    </div>`;
+  }
+
+  $('#main').innerHTML = `
+    ${P.tasksError ? `<div class="notice bad">Schedule is not set up yet. Run supabase/005_schedule.sql in Supabase. (${esc(P.tasksError)})</div>` : ''}
+    <div class="page-h">
+      <h2>Schedule</h2>
+      <button class="btn primary sm" data-act="new-task">+ Add Task</button>
+    </div>
+    ${look}
+    <div class="page-h">
+      <h3>Timeline</h3>
+      <span class="small muted">${tasks.length} ${tasks.length === 1 ? 'task' : 'tasks'} · ${avg.toFixed(0)}% average complete</span>
+    </div>
+    ${timeline}
+    <div class="small muted" style="text-align:center;margin-top:10px">Tap a line to set its dates. Dates here and on the budget are the same.</div>`;
+}
+
+function taskSheet(task, P){
+  const opts = `<option value="">None</option>` + P.lines.map(l =>
+    `<option value="${l.id}" ${task && task.budget_line_id === l.id ? 'selected' : ''}>${esc(lineName(l))}</option>`).join('');
+  sheet({
+    title: task ? task.name : 'Add Task',
+    html: `<div class="grid">
+      <label class="full">Task Name<input name="name" value="${esc(task ? task.name : '')}" placeholder="e.g. Framing, Roof Dry-In"></label>
+      <label>Start Date<input type="date" name="start_date" value="${task ? task.start_date : ''}"></label>
+      <label>End Date<input type="date" name="end_date" value="${task ? task.end_date : ''}"></label>
+      <label>% Complete<input type="number" name="percent_complete" min="0" max="100" step="1" value="${task ? num(task.percent_complete) : 0}"></label>
+      <label>Budget Line<select name="budget_line_id">${opts}</select></label>
+      <label class="full">Notes<input name="notes" value="${esc(task ? task.notes : '')}" placeholder="Crew, inspection, or reference"></label>
+    </div>`,
+    danger: task ? {label: 'Delete Task', run: async () => check(await sb.from('schedule_tasks').delete().eq('id', task.id))} : null,
+    onSubmit: async form => {
+      const v = form.elements;
+      const name = v.name.value.trim();
+      const start = v.start_date.value, end = v.end_date.value;
+      const pct = num(v.percent_complete.value);
+      if (!name) throw new Error('Name the task.');
+      if (!start) throw new Error('Enter the start date.');
+      if (!end) throw new Error('Enter the end date.');
+      if (end < start) throw new Error('End date cannot be before the start date.');
+      if (pct < 0 || pct > 100) throw new Error('% complete must be between 0 and 100.');
+      const bl = v.budget_line_id.value || null;
+      if (bl && P.tasks.some(t => t.budget_line_id === bl && (!task || t.id !== task.id)))
+        throw new Error('That budget line already has a schedule task. Change its dates on the budget line.');
+      const row = {project_id: P.project.id, name, start_date: start, end_date: end, percent_complete: pct,
+        budget_line_id: bl, notes: v.notes.value.trim()};
+      if (task) check(await sb.from('schedule_tasks').update(row).eq('id', task.id));
+      else check(await sb.from('schedule_tasks').insert(row));
+    }
+  });
+}
+
+// ---------- Routing ----------
+function route(){
+  const [a, b, c] = location.hash.replace(/^#\/?/, '').split('/');
+  if (a === 'project' && b) return {view: 'project', id: b, tab: c || 'budget'};
+  if (a === 'library') return {view: 'library'};
+  if (a === 'vendors') return {view: 'vendors'};
+  return {view: 'projects'};
+}
+
+function renderSide(r){
+  const link = (href, label, active, kind) => `<a class="${kind}" href="${href}" ${active ? 'aria-current="page"' : ''}>${esc(label)}</a>`;
+  let html = `<div class="side-brand"><div class="side-mark">SN</div><div><div class="side-name">SN Square</div><div class="side-sub">Project Tracker</div></div></div>`;
+  if (r.view === 'project' && S.proj){
+    const pr = S.proj.project;
+    const id = pr.id;
+    html += `<a href="#/projects" class="back-link">← All Projects</a>
+      <div class="side-proj">
+        <div class="side-sec" style="padding:0 0 6px">Current Project</div>
+        <div class="side-pname">${esc(pr.name)}</div>
+        <div class="side-sub">${esc(pr.address || pr.status)}</div>
+        <button class="side-btn" data-act="edit-project" style="margin-top:8px">Project Details</button>
+      </div>
+      <div class="side-group">
+        <div class="side-sec">Project</div>
+        ${link(`#/project/${id}/budget`, 'Budget', r.tab === 'budget', 'child')}
+        ${link(`#/project/${id}/schedule`, 'Schedule', r.tab === 'schedule', 'child')}
+        ${link(`#/project/${id}/payments`, 'Transactions', r.tab === 'payments', 'child')}
+        ${link(`#/project/${id}/contractors`, 'Contractors', r.tab === 'contractors', 'child')}
+      </div>
+      <div class="side-group">
+        <div class="side-sec">Company</div>
+        ${link('#/library', 'Library', r.view === 'library', 'top')}
+        ${link('#/vendors', 'Contractor Directory', r.view === 'vendors', 'top')}
+      </div>`;
+  } else {
+    html += `<div class="side-group">
+        <div class="side-sec">Home</div>
+        ${link('#/projects', 'All Projects', r.view === 'projects', 'top')}
+      </div>
+      <div class="side-group">
+        <div class="side-sec">Company</div>
+        ${link('#/library', 'Library', r.view === 'library', 'top')}
+        ${link('#/vendors', 'Contractor Directory', r.view === 'vendors', 'top')}
+      </div>`;
+  }
+  html += `<div class="side-foot"><button class="side-btn" data-act="sign-out">Sign Out</button></div>`;
+  $('#side').innerHTML = html;
+}
+
+function setNav(r){
+  if (r.view !== 'project') renderSide(r);
+  const key = r.view === 'project' ? 'projects' : r.view;
+  document.querySelectorAll('[data-nav]').forEach(a => {
+    if (a.dataset.nav === key) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current');
+  });
+}
+
+let rendering = 0;
+async function render(){
+  if (!session) return;
+  const r = route();
+  setNav(r);
+  const token = ++rendering;
+  $('#main').innerHTML = '<p class="muted" style="text-align:center;padding:30px 0">Loading…</p>';
+  try {
+    if (r.view === 'projects') await renderProjects();
+    else if (r.view === 'project') await renderProject(r);
+    else if (r.view === 'library') await renderLibrary();
+    else if (r.view === 'vendors') await renderVendors();
+    if (token !== rendering) return;
+  } catch (e) {
+    if (token !== rendering) return;
+    $('#main').innerHTML = `<div class="notice bad">Could not load: ${esc(msg(e))}</div>`;
+  }
+}
+window.addEventListener('hashchange', render);
+
+// ---------- Sign in and session ----------
 $('#loginForm').addEventListener('submit', async e => {
   e.preventDefault();
   const v = Object.fromEntries(new FormData(e.currentTarget));
   const res = await sb.auth.signInWithPassword({email: v.email.trim(), password: v.password});
-  if (res.error){ $('#loginErr').textContent = res.error.message; $('#loginErr').hidden = false; }
-});
-
-// ---------- Session ----------
-function showSignedIn(on){
-  signedIn = on;
-  $('#gate').classList.toggle('hidden', on);
-  $('#app').classList.toggle('hidden', !on);
-  $('#quickBtn').classList.toggle('hidden', !on);
-  if (!on){ state.project = null; state.cats = null; state.tasks = null; state.receipts = []; }
-}
-
-sb.auth.onAuthStateChange(async (_event, session) => {
-  if (session){
-    showSignedIn(true);
-    renderAll();
-    await loadAll();
-  } else {
-    showSignedIn(false);
+  if (res.error){
+    $('#loginErr').textContent = res.error.message;
+    $('#loginErr').hidden = false;
   }
 });
+
+function showSignedIn(on){
+  $('#gate').classList.toggle('hidden', on);
+  $('#app').classList.toggle('hidden', !on);
+}
+
+sb.auth.onAuthStateChange((_event, s) => {
+  session = s;
+  // Run app queries after the auth callback returns. Awaiting queries inside it can hang in some browsers.
+  setTimeout(() => startApp(s), 0);
+});
+
+async function startApp(s){
+  if (!s){ showSignedIn(false); return; }
+  showSignedIn(true);
+  try {
+    await loadLibrary();
+    if (!location.hash) location.hash = '#/projects';
+    await render();
+  } catch (e) {
+    $('#main').innerHTML = `<div class="notice bad">Could not load: ${esc(msg(e))}</div>`;
+  }
+}
 </script>
 </body>
 </html>
