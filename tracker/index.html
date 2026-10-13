@@ -119,7 +119,14 @@ main{padding:14px 16px 110px;display:flex;flex-direction:column;gap:12px;max-wid
 .bud-entry input[type=checkbox]{width:auto;height:auto;margin:0}
 .bud-tbl.no-bank th:last-child,.bud-tbl.no-bank td:last-child{display:none}
 .bud-tbl{table-layout:fixed;width:100%}
+.bud-wrap .bud-tbl tr.item td,.bud-wrap .bud-tbl tr.grp td,.bud-wrap .bud-tbl tr.tr-grand td{height:28px;padding-top:0;padding-bottom:0;line-height:1.25;vertical-align:middle}
+.bud-wrap .bud-tbl td.desc{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sheet-tbl.bud-tbl td.desc,.sheet-tbl.bud-tbl th.desc{min-width:0;max-width:none}
+.bud-wrap .bud-tbl .bud-name{display:inline-block;max-width:calc(100% - 22px);overflow:hidden;text-overflow:ellipsis;vertical-align:middle}
+.bud-wrap .bud-tbl .bud-note{display:inline-flex;vertical-align:middle;color:#059669;margin-left:4px}
+.bud-wrap .bud-tbl .bud-note svg{width:14px;height:14px}
 .bud-tbl.no-bank col:last-child{visibility:collapse}
+.bud-tbl.no-bank col:nth-child(2){width:252px !important}
 .bud-tbl thead tr.band th.gh{border-bottom:2px solid #5EEAD4;padding-top:6px}
 .bud-tbl .g-start{border-left:2px solid #CBD5E1}
 .bud-tbl thead tr.band th.g-start{border-left:1px solid rgba(255,255,255,.35)}
@@ -678,7 +685,7 @@ function budgetTableHtml(P, paid, byDiv, codes, filtered){
       const t = taskForLine(P, l.id);
       body.push(`<tr class="item tr-click" data-act="edit-line" data-id="${l.id}" data-div="${esc(code)}"${isC ? ' hidden' : ''}>
         <td class="code">${esc(l.subtask_code || '')}<button class="icon-btn line-del" data-act="delete-line" data-id="${l.id}" title="Delete budget line" aria-label="Delete budget line">${ICON_TRASH}</button></td>
-        <td class="desc wrap m-name">${esc(lineName(l))}${l.notes ? `<div class="note">${esc(l.notes)}</div>` : ''}</td>
+        <td class="desc m-name"><span class="bud-name">${esc(lineName(l))}</span>${l.notes ? ` <span class="bud-note" title="${esc(l.notes)}">${ICON_NOTE}</span>` : ''}</td>
         <td class="g-start">${esc(l.unit || '')}</td>
         <td class="r">${fmtQty(l.qty)}</td>
         <td class="r">${money(l.rate)}</td>
@@ -703,7 +710,7 @@ function budgetTableHtml(P, paid, byDiv, codes, filtered){
   </tr>`);
   return `<div class="card bud-wrap" style="padding:0;overflow-x:auto">
     <table class="sheet-tbl bud-tbl${S.showBank ? '' : ' no-bank'}">
-      <colgroup>${[96, null, 56, 72, 76, 96, 96, 92, 92, 84, 88, 88, 72].map(w => w ? `<col style="width:${w}px">` : '<col>').join('')}</colgroup>
+      <colgroup>${[88, 180, 56, 72, 64, 88, 88, 92, 92, 84, 88, 88, 72].map(w => w ? `<col style="width:${w}px">` : '<col>').join('')}</colgroup>
       <thead>
         <tr class="band"><th class="code"></th><th class="desc"></th>
           <th colspan="3" class="gh g-start">Quantity</th>
