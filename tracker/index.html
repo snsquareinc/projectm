@@ -71,6 +71,10 @@ main{padding:14px 16px 110px;display:flex;flex-direction:column;gap:12px;max-wid
 .look .card-h>div{white-space:nowrap}
 .look select{width:auto;min-width:150px;flex:none;font:inherit;font-size:14px;font-weight:600;padding:6px 10px;border:1px solid var(--line);border-radius:10px;background:#fff;color:var(--ink)}
 .tx-q{width:100%;margin-bottom:12px}
+.tx-draft td{background:#F0FDFA;padding:6px 8px;vertical-align:middle}
+.tx-draft input,.tx-draft select{width:100%;min-width:90px;font:inherit;font-size:13px;padding:6px 8px;border:1px solid var(--line);border-radius:8px;background:#fff;color:var(--ink)}
+.tx-draft .hint{font-size:11px;color:var(--muted);margin-top:2px;min-height:0}
+.tx-draft .small{font-size:13px}
 .tx-filter-row th{text-transform:none;letter-spacing:0;padding:6px 8px;background:var(--card)}
 .tx-filter-row input{width:100%;min-width:90px;font:inherit;font-size:12px;font-weight:400;padding:6px 8px;border:1px solid var(--line);border-radius:8px;background:#fff;color:var(--ink)}
 .tx-tbl tfoot td{font-weight:700;border-top:2px solid var(--line)}
@@ -707,6 +711,7 @@ function renderPayments(P){
       <button class="btn primary sm" data-act="new-payment">+ Add Transaction</button>
     </div>
     <div class="small muted" style="margin:-4px 0 12px">${P.pays.length} ${P.pays.length === 1 ? 'transaction' : 'transactions'} · ${money(total)} total</div>
+    ${txDatalists(P)}
     <input type="search" id="txQ" class="tx-q" placeholder="Search all transactions" value="${esc(S.txQ || '')}">
     <div class="card tx-wrap" id="txTableWrap" style="padding:0;overflow-x:auto">
       <table class="sheet-tbl tx-tbl">
@@ -714,6 +719,7 @@ function renderPayments(P){
           <tr><th>Date</th><th class="r">Amount</th><th>Expense Classification</th><th>Notes / Purpose</th><th>Paid To</th><th>Method</th><th>Check #</th><th class="ctr">Receipts</th></tr>
           <tr class="tx-filter-row">${col('date', 'date')}${col('amount', 'amount', 'r')}${col('cls', 'classification')}${col('purpose', 'purpose')}${col('vendor', 'paid to')}${col('method', 'method')}${col('ref', 'check number')}<th></th></tr>
         </thead>
+        <tbody id="txDraftBody">${draftRow()}</tbody>
         <tbody id="txRows"></tbody>
         <tfoot id="txFoot"></tfoot>
       </table>
@@ -1053,65 +1059,148 @@ function lineSheet(line){
 }
 
 // Payment (classification required)
+// Shared by the desktop entry row and the phone form.
+async function savePaymentRecord(P, d){
+  if (!d.date) throw new Error('Enter the payment date.');
+  if (!(d.amount > 0)) throw new Error('Enter the amount.');
+  const projectId = P.project.id;
+  const out = {newVendor: false, newLine: false, vName: '', cls: ''};
+
+  let vendorId = null;
+  const vName = (d.vendorName || '').trim();
+  if (vName){
+    const hit = S.vendors.find(v => v.name.toLowerCase() === vName.toLowerCase());
+    if (hit) vendorId = hit.id;
+    else {
+      const nv = check(await sb.from('vendors').insert({name: vName}).select().single());
+      S.vendors.push(nv);
+      S.vendors.sort((a, b) => a.name.localeCompare(b.name));
+      vendorId = nv.id;
+      out.newVendor = true; out.vName = vName;
+    }
+    check(await sb.from('project_vendors').upsert({project_id: projectId, vendor_id: vendorId}, {onConflict: 'project_id,vendor_id', ignoreDuplicates: true}));
+  }
+
+  let lineId = null;
+  const cls = (d.classText || '').trim();
+  if (cls){
+    const hit = P.lines.find(l => lineName(l).toLowerCase() === cls.toLowerCase());
+    if (hit) lineId = hit.id;
+    else {
+      if (!d.newDiv) throw new Error('Choose the division for the new budget line.');
+      const line = check(await sb.from('project_lines').insert({
+        project_id: projectId, division_code: d.newDiv, subtask_code: null, label: cls,
+        budget: 0, bank_funded: !!S.divMap[d.newDiv]?.bank_funded
+      }).select().single());
+      lineId = line.id;
+      out.newLine = true; out.cls = cls;
+    }
+  }
+  if (!lineId) throw new Error('Not classified. Choose a budget line first. Nothing is saved without one.');
+
+  const pay = check(await sb.from('payments').insert({
+    project_id: projectId, vendor_id: vendorId, budget_line_id: lineId,
+    pay_date: d.date, amount: d.amount, method: d.method,
+    reference: (d.reference || '').trim(), invoice_number: (d.invoice || '').trim()
+  }).select().single());
+  if (d.files && d.files.length) await attachFiles(`payments/${pay.id}`, pay.id, d.files);
+
+  S.txDate = d.date; S.txMethod = d.method;
+  const notes = [];
+  if (out.newVendor) notes.push(`Added ${out.vName} to the Contractor Directory`);
+  if (out.newLine) notes.push(`Added "${out.cls}" as a budget line. Set its budget on the Budget tab`);
+  return notes.length ? notes.join('. ') + '.' : 'Transaction saved.';
+}
+
+function txDatalists(P){
+  const names = [...new Set(P.lines.map(l => lineName(l)))];
+  return `<datalist id="txLines">${names.map(n => `<option value="${esc(n)}">`).join('')}</datalist>
+    <datalist id="txVendors">${S.vendors.map(v => `<option value="${esc(v.name)}">`).join('')}</datalist>`;
+}
+
+function draftRow(){
+  const methodOpts = PAY_METHODS.map(m => `<option ${m === (S.txMethod || 'Check') ? 'selected' : ''}>${m}</option>`).join('');
+  return `<tr class="tx-draft">
+    <td><input type="date" data-d="date" value="${S.txDate || todayISO()}" aria-label="Date"></td>
+    <td><input type="text" class="money" data-d="amount" inputmode="decimal" placeholder="0.00" aria-label="Amount"></td>
+    <td><input data-d="cls" list="txLines" placeholder="Pick or type a budget line" autocomplete="off" aria-label="Expense classification"></td>
+    <td><span class="small muted" data-d="purposeTxt"></span><select data-d="newDiv" hidden aria-label="Division for the new line">${divOptions()}</select></td>
+    <td><input data-d="vendor" list="txVendors" placeholder="Contractor" autocomplete="off" aria-label="Paid to"><div class="hint" data-d="vhint"></div></td>
+    <td><select data-d="method" aria-label="Method">${methodOpts}</select></td>
+    <td><input data-d="ref" placeholder="Check or ref #" aria-label="Check number"></td>
+    <td class="ctr"><button class="btn primary sm" data-act="save-draft">Save</button></td>
+  </tr>`;
+}
+
+function updateDraftPurpose(){
+  const P = S.proj, body = $('#txDraftBody');
+  if (!P || !body) return;
+  const cls = body.querySelector('[data-d=cls]').value.trim().toLowerCase();
+  const hit = cls && P.lines.find(l => lineName(l).toLowerCase() === cls);
+  const txt = body.querySelector('[data-d=purposeTxt]');
+  const sel = body.querySelector('[data-d=newDiv]');
+  if (hit){ txt.textContent = divName(hit.division_code); sel.hidden = true; }
+  else if (cls){ txt.textContent = 'New budget line'; sel.hidden = false; }
+  else { txt.textContent = ''; sel.hidden = true; }
+}
+function updateDraftVendorHint(){
+  const body = $('#txDraftBody');
+  if (!body) return;
+  const vn = body.querySelector('[data-d=vendor]').value.trim().toLowerCase();
+  const known = S.vendors.some(v => v.name.toLowerCase() === vn);
+  body.querySelector('[data-d=vhint]').textContent = vn && !known ? 'New contractor. Saved to the directory.' : '';
+}
+
+async function saveDraft(){
+  const body = $('#txDraftBody');
+  const q = k => body.querySelector(`[data-d="${k}"]`);
+  const d = {
+    date: q('date').value, amount: num(q('amount').value),
+    vendorName: q('vendor').value, classText: q('cls').value, newDiv: q('newDiv').value,
+    method: q('method').value, reference: q('ref').value
+  };
+  try {
+    const msg_ = await savePaymentRecord(S.proj, d);
+    toast(msg_);
+    await render();
+    document.querySelector('#txDraftBody [data-d=amount]')?.focus();
+  } catch (e) { toast(msg(e), true); }
+}
+
 function paymentSheet(){
   const P = S.proj;
-  const vendorOpts = S.vendors.map(v => `<option value="${v.id}">${esc(v.name)}</option>`).join('');
   sheet({
-    title: 'Record Payment',
-    submit: 'Save Payment',
-    html: `<div class="grid">
-      <label>Date<input type="date" name="pay_date" value="${todayISO()}" required></label>
-      <label>Amount ($)<input type="text" class="money" name="amount" inputmode="decimal" step="0.01" min="0"></label>
-      <label class="full">Paid To<select name="vendor_id"><option value="">No Vendor</option>${vendorOpts}</select></label>
-      <label class="full">What Is This For?<input name="what" placeholder="e.g. Floor 2 framing, draw 1" autocomplete="off"></label>
-      <div class="notice full" data-notice hidden></div>
-      <label class="full">Budget Line<select name="budget_line_id"><option value="">Choose A Budget Line</option>${lineOptions(P.lines)}<option value="new">+ New Line For This Description</option></select></label>
+    title: 'Add Transaction',
+    submit: 'Save Transaction',
+    html: `${txDatalists(P)}<div class="grid">
+      <label>Date<input type="date" name="pay_date" value="${S.txDate || todayISO()}"></label>
+      <label>Amount ($)<input type="text" class="money" name="amount" inputmode="decimal"></label>
+      <label class="full">Paid To<input name="vendor" list="txVendors" autocomplete="off" placeholder="Contractor"></label>
+      <label class="full">Expense Classification<input name="cls" list="txLines" autocomplete="off" placeholder="Pick or type a budget line"></label>
       <label class="full" data-newdiv hidden>Division For The New Line<select name="new_division">${divOptions()}</select></label>
-      <label>Method<select name="method">${PAY_METHODS.map(m => `<option>${m}</option>`).join('')}</select></label>
+      <label>Method<select name="method">${PAY_METHODS.map(m => `<option ${m === (S.txMethod || 'Check') ? 'selected' : ''}>${m}</option>`).join('')}</select></label>
       <label>Check Or Reference #<input name="reference"></label>
       <label>Invoice #<input name="invoice_number"></label>
       <label class="full">Receipts And Invoices<input type="file" name="files" multiple accept="image/*,application/pdf"></label>
     </div>`,
-    onOpen: (form) => {
+    onOpen: form => {
       const v = form.elements;
-      const notice = form.querySelector('[data-notice]');
-      const newDiv = form.querySelector('[data-newdiv]');
-      const refresh = () => {
-        const what = v.what.value.trim().toLowerCase();
-        const chosen = v.budget_line_id.value;
-        newDiv.hidden = chosen !== 'new';
-        const matched = what && P.lines.some(l => lineName(l).toLowerCase().includes(what));
-        notice.textContent = 'Not classified yet. This does not match a budget line. Choose the line it belongs to, or pick "+ New line" to add it. Nothing is saved without a line.';
-        notice.hidden = !(!chosen && what && !matched);
+      const box = form.querySelector('[data-newdiv]');
+      const upd = () => {
+        const c = v.cls.value.trim().toLowerCase();
+        box.hidden = !c || P.lines.some(l => lineName(l).toLowerCase() === c);
       };
-      v.what.addEventListener('input', refresh);
-      v.budget_line_id.addEventListener('change', refresh);
-      refresh();
+      v.cls.addEventListener('input', upd);
+      upd();
     },
     onSubmit: async form => {
       const v = form.elements;
-      const amount = num(v.amount.value);
-      if (!v.pay_date.value) throw new Error('Enter the payment date.');
-      if (!(amount > 0)) throw new Error('Enter the amount.');
-      let lineId = v.budget_line_id.value;
-      if (!lineId) throw new Error('Not classified. Choose a budget line first. Nothing is saved without one.');
-      const projectId = S.proj.project.id;
-      if (lineId === 'new'){
-        const what = v.what.value.trim();
-        if (!what) throw new Error('Describe what this payment is for, so the new line has a name.');
-        const code = v.new_division.value;
-        const line = check(await sb.from('project_lines').insert({
-          project_id: projectId, division_code: code, subtask_code: null, label: what,
-          budget: 0, bank_funded: !!S.divMap[code]?.bank_funded
-        }).select().single());
-        lineId = line.id;
-      }
-      const pay = check(await sb.from('payments').insert({
-        project_id: projectId, vendor_id: v.vendor_id.value || null, budget_line_id: lineId,
-        pay_date: v.pay_date.value, amount, method: v.method.value,
-        reference: v.reference.value.trim(), invoice_number: v.invoice_number.value.trim()
-      }).select().single());
-      await attachFiles(`payments/${pay.id}`, pay.id, v.files.files);
+      const msg_ = await savePaymentRecord(S.proj, {
+        date: v.pay_date.value, amount: num(v.amount.value), vendorName: v.vendor.value,
+        classText: v.cls.value, newDiv: v.new_division.value, method: v.method.value,
+        reference: v.reference.value, invoice: v.invoice_number.value, files: v.files.files
+      });
+      toast(msg_);
     }
   });
 }
@@ -1401,7 +1490,13 @@ const actions = {
   'edit-project': () => projectSheet(S.proj.project),
   'add-line': () => lineSheet(null),
   'edit-line': (t, id) => lineSheet(S.proj.lines.find(l => l.id === id)),
-  'new-payment': () => paymentSheet(),
+  'new-payment': () => {
+    if (window.matchMedia('(max-width:640px)').matches) return paymentSheet();
+    const el = document.querySelector('#txDraftBody [data-d=amount]');
+    el.scrollIntoView({block: 'center'});
+    el.focus();
+  },
+  'save-draft': () => saveDraft(),
   'new-task': () => taskSheet(null, S.proj),
   'edit-task': (t, id) => taskSheet(S.proj.tasks.find(x => x.id === id), S.proj),
   'open-pay': (t, id) => paymentDetail(S.proj.pays.find(p => p.id === id)),
@@ -1432,7 +1527,18 @@ document.addEventListener('click', async e => {
   catch (ex) { toast(msg(ex), true); }
 });
 
+document.addEventListener('keydown', e => {
+  if (!e.target.closest || !e.target.closest('#txDraftBody')) return;
+  if (e.key === 'Enter'){ e.preventDefault(); saveDraft(); }
+  if (e.key === 'Escape'){ e.target.value = ''; updateDraftPurpose(); updateDraftVendorHint(); }
+});
+
 document.addEventListener('input', e => {
+  if (e.target.closest && e.target.closest('#txDraftBody')){
+    if (e.target.classList.contains('money')) e.target.value = formatMoneyText(e.target.value);
+    if (e.target.dataset.d === 'cls') updateDraftPurpose();
+    if (e.target.dataset.d === 'vendor') updateDraftVendorHint();
+  }
   if (e.target.id === 'txQ' && S.proj){
     S.txQ = e.target.value;
     txFill(S.proj);
