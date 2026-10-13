@@ -70,6 +70,17 @@ main{padding:14px 16px 110px;display:flex;flex-direction:column;gap:12px;max-wid
 .look{gap:8px;margin:12px 0 16px}
 .look .card-h>div{white-space:nowrap}
 .look select{width:auto;min-width:150px;flex:none;font:inherit;font-size:14px;font-weight:600;padding:6px 10px;border:1px solid var(--line);border-radius:10px;background:#fff;color:var(--ink)}
+.tx-q{width:100%;margin-bottom:12px}
+.tx-filter-row th{text-transform:none;letter-spacing:0;padding:6px 8px;background:var(--card)}
+.tx-filter-row input{width:100%;min-width:90px;font:inherit;font-size:12px;font-weight:400;padding:6px 8px;border:1px solid var(--line);border-radius:8px;background:#fff;color:var(--ink)}
+.tx-tbl tfoot td{font-weight:700;border-top:2px solid var(--line)}
+.tx-tbl td.num{white-space:nowrap}
+.tx-cards{display:none}
+@media (max-width:640px){
+  .tx-filter-row,.tx-wrap{display:none}
+  .tx-cards{display:block}
+  .tx-q{margin-bottom:10px}
+}
 .la-row{display:flex;justify-content:space-between;gap:12px;padding:8px 0;border-top:1px solid var(--soft);font-size:14px}
 .card-h{display:flex;justify-content:space-between;align-items:baseline;gap:10px}
 .card-h strong{font-size:16px;font-weight:700;overflow-wrap:anywhere}
@@ -468,7 +479,7 @@ async function renderProject(r){
     <div class="tabs" role="tablist">
       <a href="#/project/${pr.id}/budget" ${r.tab === 'budget' ? 'aria-current="page"' : ''}>Budget</a>
       <a href="#/project/${pr.id}/schedule" ${r.tab === 'schedule' ? 'aria-current="page"' : ''}>Schedule</a>
-      <a href="#/project/${pr.id}/payments" ${r.tab === 'payments' ? 'aria-current="page"' : ''}>Payments</a>
+      <a href="#/project/${pr.id}/payments" ${r.tab === 'payments' ? 'aria-current="page"' : ''}>Transactions</a>
       <a href="#/project/${pr.id}/contractors" ${r.tab === 'contractors' ? 'aria-current="page"' : ''}>Contractors</a>
     </div>`);
   if (r.tab === 'payments') renderPayments(P);
@@ -636,34 +647,79 @@ function exportBudgetCsv(){
 }
 
 // ---------- Payments ----------
+// ---------- Transactions (payments) ----------
+function txRows(P){
+  const rc = {};
+  P.receipts.forEach(r => { rc[r.payment_id] = (rc[r.payment_id] || 0) + 1; });
+  return P.pays.map(p => {
+    const line = P.lines.find(l => l.id === p.budget_line_id);
+    return {p, line,
+      date: fmtDate(p.pay_date), amt: num(p.amount),
+      cls: line ? lineName(line) : '',
+      purpose: line ? divName(line.division_code) : '',
+      vendor: p.vendors?.name || 'No vendor',
+      method: p.method || '', ref: p.reference || '',
+      files: rc[p.id] || 0};
+  });
+}
+function txFiltered(P){
+  const q = (S.txQ || '').trim().toLowerCase();
+  const f = S.txF || {};
+  const cols = r => ({date: r.date, amount: String(r.amt), cls: r.cls, purpose: r.purpose, vendor: r.vendor, method: r.method, ref: r.ref});
+  return txRows(P).filter(r => {
+    if (q && ![r.date, r.amt, r.cls, r.purpose, r.vendor, r.method, r.ref].join(' ').toLowerCase().includes(q)) return false;
+    const c = cols(r);
+    return Object.keys(f).every(k => !f[k] || String(c[k] || '').toLowerCase().includes(f[k].toLowerCase()));
+  });
+}
+function txFill(P){
+  const rows = txFiltered(P);
+  const total = rows.reduce((a, r) => a + r.amt, 0);
+  const empty = P.pays.length ? 'No transactions match these filters.' : 'No transactions yet. Every transaction needs a budget line before it is saved.';
+  const desk = $('#txRows'), foot = $('#txFoot'), cards = $('#txCards');
+  if (!desk) return;
+  desk.innerHTML = rows.length ? rows.map(r => `<tr class="item tr-click" data-act="open-pay" data-id="${r.p.id}">
+      <td class="num">${r.date}</td>
+      <td class="r num">${money(r.amt)}</td>
+      <td>${r.line ? esc(r.cls) : '<span class="badge b-warn">Unclassified</span>'}</td>
+      <td>${esc(r.purpose)}</td>
+      <td>${esc(r.vendor)}</td>
+      <td>${esc(r.method)}</td>
+      <td>${esc(r.ref)}</td>
+      <td class="ctr">${r.files ? r.files + (r.files > 1 ? ' files' : ' file') : ''}</td>
+    </tr>`).join('') : `<tr><td colspan="8" class="small muted" style="text-align:center;padding:20px">${empty}</td></tr>`;
+  foot.innerHTML = rows.length ? `<tr><td>Total</td><td class="r num">${money(total)}</td><td colspan="6" class="small muted">${rows.length} of ${P.pays.length} shown</td></tr>` : '';
+  cards.innerHTML = rows.length ? rows.map(r => `
+    <button class="row" data-act="open-pay" data-id="${r.p.id}">
+      <div><div class="t">${esc(r.vendor)}</div>
+        <div class="s">${r.date} · ${r.line ? esc(r.cls) : '<span class="badge b-warn">Unclassified</span>'}</div>
+        <div class="s">${esc(r.method)}${r.ref ? ' #' + esc(r.ref) : ''}${r.files ? ' · ' + r.files + (r.files > 1 ? ' files' : ' file') : ''}</div></div>
+      <div class="amt">${money(r.amt)}</div>
+    </button>`).join('') : `<div class="empty">${empty}</div>`;
+}
+
 function renderPayments(P){
   const total = P.pays.reduce((a, p) => a + num(p.amount), 0);
-  const rcCount = {};
-  P.receipts.forEach(r => { rcCount[r.payment_id] = (rcCount[r.payment_id] || 0) + 1; });
-
-  let html = `
+  const col = (k, label, cls = '') => `<th class="${cls}"><input data-tx-col="${k}" value="${esc((S.txF || {})[k] || '')}" placeholder="Search" aria-label="Filter ${label}"></th>`;
+  $('#main').innerHTML = `
     <div class="page-h">
-      <h2>Payments · ${money(total)}</h2>
-      <button class="btn primary sm" data-act="new-payment">+ Record Payment</button>
-    </div>`;
-
-  if (!P.pays.length){
-    html += `<div class="empty">No payments yet. Every payment needs a budget line before it is saved.</div>`;
-  } else {
-    html += `<div class="card" style="padding:4px 16px"><div class="rows">`;
-    P.pays.forEach(p => {
-      const line = P.lines.find(l => l.id === p.budget_line_id);
-      html += `
-        <button class="row" data-act="open-pay" data-id="${p.id}">
-          <div><div class="t">${esc(p.vendors?.name || 'No vendor')}</div>
-            <div class="s">${fmtDate(p.pay_date)} · ${esc(line ? lineName(line) : 'Unclassified')}</div>
-            <div class="s">${esc(p.method)}${p.reference ? ' #' + esc(p.reference) : ''}${rcCount[p.id] ? ' · ' + rcCount[p.id] + ' receipt' + (rcCount[p.id] > 1 ? 's' : '') : ''}</div></div>
-          <div class="amt">${money(p.amount)}</div>
-        </button>`;
-    });
-    html += `</div></div>`;
-  }
-  $('#main').innerHTML = html;
+      <h2>Transactions</h2>
+      <button class="btn primary sm" data-act="new-payment">+ Add Transaction</button>
+    </div>
+    <div class="small muted" style="margin:-4px 0 12px">${P.pays.length} ${P.pays.length === 1 ? 'transaction' : 'transactions'} · ${money(total)} total</div>
+    <input type="search" id="txQ" class="tx-q" placeholder="Search all transactions" value="${esc(S.txQ || '')}">
+    <div class="card tx-wrap" id="txTableWrap" style="padding:0;overflow-x:auto">
+      <table class="sheet-tbl tx-tbl">
+        <thead>
+          <tr><th>Date</th><th class="r">Amount</th><th>Expense Classification</th><th>Notes / Purpose</th><th>Paid To</th><th>Method</th><th>Check #</th><th class="ctr">Receipts</th></tr>
+          <tr class="tx-filter-row">${col('date', 'date')}${col('amount', 'amount', 'r')}${col('cls', 'classification')}${col('purpose', 'purpose')}${col('vendor', 'paid to')}${col('method', 'method')}${col('ref', 'check number')}<th></th></tr>
+        </thead>
+        <tbody id="txRows"></tbody>
+        <tfoot id="txFoot"></tfoot>
+      </table>
+    </div>
+    <div class="tx-cards" id="txCards"></div>`;
+  txFill(P);
 }
 
 // ---------- Contractors (assigned to this project) ----------
@@ -1377,6 +1433,14 @@ document.addEventListener('click', async e => {
 });
 
 document.addEventListener('input', e => {
+  if (e.target.id === 'txQ' && S.proj){
+    S.txQ = e.target.value;
+    txFill(S.proj);
+  }
+  if (e.target.matches && e.target.matches('[data-tx-col]') && S.proj){
+    S.txF = {...(S.txF || {}), [e.target.dataset.txCol]: e.target.value};
+    txFill(S.proj);
+  }
   if (e.target.id === 'budgetSearch' && S.proj){
     S.budgetQuery = e.target.value;
     const el = $('#budgetTable');
@@ -1623,7 +1687,7 @@ function renderSide(r){
         <div class="side-sec">Project</div>
         ${link(`#/project/${id}/budget`, 'Budget', r.tab === 'budget', 'child')}
         ${link(`#/project/${id}/schedule`, 'Schedule', r.tab === 'schedule', 'child')}
-        ${link(`#/project/${id}/payments`, 'Payments', r.tab === 'payments', 'child')}
+        ${link(`#/project/${id}/payments`, 'Transactions', r.tab === 'payments', 'child')}
         ${link(`#/project/${id}/contractors`, 'Contractors', r.tab === 'contractors', 'child')}
       </div>
       <div class="side-group">
