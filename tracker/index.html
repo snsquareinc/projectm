@@ -104,6 +104,24 @@ main{padding:14px 16px 110px;display:flex;flex-direction:column;gap:12px;max-wid
 .tx-tbl th,.tx-tbl td{padding-left:8px;padding-right:8px}
 .tx-tbl tfoot td{font-weight:700;border-top:2px solid var(--line)}
 .tx-tbl td.num{white-space:nowrap}
+/* Excel-style grid: compact rows, grey sticky header, cells with light gridlines */
+.tx-wrap{max-height:calc(100vh - 230px);overflow:auto}
+.tx-tbl{border-collapse:separate;border-spacing:0}
+.tx-tbl thead th{position:sticky;top:0;z-index:3;background:#F1F5F9;border-bottom:1px solid #CBD5E1;border-right:1px solid #E2E8F0;padding:6px 8px;font-size:11px;line-height:1.2;white-space:nowrap}
+.tx-tbl thead th:last-child{border-right:0}
+.tx-tbl tbody td{border-bottom:1px solid #E2E8F0;border-right:1px solid #EEF2F6;vertical-align:middle}
+.tx-tbl tbody td:last-child{border-right:0}
+.tx-tbl .tx-draft td{background:#ECFDF5;height:32px;padding:2px 3px;border-bottom:2px solid #A7F3D0}
+.tx-tbl .tx-edit td{height:28px;padding:0 3px}
+.tx-tbl .tx-edit:hover td{background:#F8FAFC}
+.tx-tbl .tx-edit input,.tx-tbl .tx-edit select,.tx-tbl .tx-draft input,.tx-tbl .tx-draft select{height:26px;padding:0 6px;font-size:13px;border:1px solid transparent;border-radius:3px;background:transparent}
+.tx-tbl .tx-draft input,.tx-tbl .tx-draft select{background:#fff;border-color:#D1FAE5}
+.tx-tbl .tx-edit input:hover,.tx-tbl .tx-edit select:hover{border-color:#CBD5E1;background:#fff}
+.tx-tbl .tx-edit input:focus,.tx-tbl .tx-edit select:focus,.tx-tbl .tx-draft input:focus,.tx-tbl .tx-draft select:focus{border-color:var(--teal);background:#fff;outline:none;box-shadow:inset 0 0 0 1px var(--teal)}
+.tx-tbl .tx-unc td{background:#FEF9C3}
+.tx-tbl .tx-unc:hover td{background:#FEF08A}
+.tx-tbl .icon-btn,.tx-tbl .link-btn{padding:2px 4px}
+.tx-tbl tfoot td{position:sticky;bottom:0;z-index:3;background:#F1F5F9;border-top:2px solid #CBD5E1;height:auto;padding:6px 8px}
 .tx-cards{display:none}
 @media (max-width:640px){
   .tx-wrap{display:none}
@@ -728,8 +746,8 @@ function txRowHtml(r){
     <td><input type="date" data-f="date" value="${r.p.pay_date || ''}" aria-label="Date"></td>
     <td><input type="text" class="money r" data-f="amount" value="${fmtInput(r.amt)}" aria-label="Amount"></td>
     <td><select data-f="div" aria-label="Expense classification (division)"><option value="">Choose A Division</option>${divOptions(r.div)}</select></td>
-    <td><input data-f="task" list="txLines" value="${esc(r.task)}" placeholder="Task (budget line)" autocomplete="off" aria-label="Task"></td>
-    <td><input data-f="vendor" list="txVendors" value="${esc(r.vendor)}" placeholder="Contractor" autocomplete="off" aria-label="Paid to"></td>
+    <td><select data-f="task" aria-label="Task">${taskOptions(r.div, r.p.budget_line_id || '')}</select><input data-f="task-new" placeholder="Type the new task name" hidden aria-label="New task name"></td>
+    <td><select data-f="vendor" aria-label="Paid to">${vendorOptions(r.p.vendor_id || '')}</select><input data-f="vendor-new" placeholder="Type the new contractor name" hidden aria-label="New contractor name"></td>
     <td><select data-f="method" aria-label="Method">${methods.map(m => `<option ${m === r.method ? 'selected' : ''}>${esc(m)}</option>`).join('')}</select></td>
     <td><input data-f="ref" value="${esc(r.ref)}" aria-label="Check number"></td>
     <td class="ctr"><button class="icon-btn ${r.notes ? 'has' : ''}" data-act="edit-notes" data-id="${r.p.id}" title="${r.notes ? 'Edit notes' : 'Add notes'}" aria-label="${r.notes ? 'Edit notes' : 'Add notes'}">${ICON_NOTE}</button></td>
@@ -1162,18 +1180,23 @@ async function resolveVendorId(P, name){
   check(await sb.from('project_vendors').upsert({project_id: P.project.id, vendor_id: vendorId}, {onConflict: 'project_id,vendor_id', ignoreDuplicates: true}));
   return {vendorId, name: shown, created};
 }
-async function resolveLineId(P, task, div){
-  const t = (task || '').trim();
+async function resolveLineId(P, lineId, name, div){
   if (!div) throw new Error('Choose the division for this transaction.');
-  if (!t) throw new Error('Enter the task for this transaction. Nothing is saved without one.');
+  if (lineId){
+    const hit = P.lines.find(l => l.id === lineId && l.division_code === div);
+    if (!hit) throw new Error('Choose the task for this transaction. Nothing is saved without one.');
+    return {lineId: hit.id, created: false, label: lineName(hit), division_code: div};
+  }
+  const t = (name || '').trim();
+  if (!t) throw new Error('Choose the task for this transaction. Nothing is saved without one.');
   const hit = P.lines.find(l => l.division_code === div && lineName(l).toLowerCase() === t.toLowerCase());
-  if (hit) return {lineId: hit.id, created: false};
+  if (hit) return {lineId: hit.id, created: false, label: lineName(hit), division_code: div};
   const line = check(await sb.from('project_lines').insert({
     project_id: P.project.id, division_code: div, subtask_code: null, label: t,
     budget: 0, bank_funded: !!S.divMap[div]?.bank_funded
   }).select().single());
   P.lines.push(line);
-  return {lineId: line.id, created: true, label: t};
+  return {lineId: line.id, created: true, label: t, division_code: div};
 }
 function txNotes(v, l){
   const notes = [];
@@ -1185,8 +1208,8 @@ function txNotes(v, l){
 async function savePaymentRecord(P, d){
   if (!d.date) throw new Error('Enter the payment date.');
   if (!(d.amount > 0)) throw new Error('Enter the amount.');
-  const l = await resolveLineId(P, d.task, d.div);
-  const v = await resolveVendorId(P, d.vendorName);
+  const l = await resolveLineId(P, d.lineId || null, d.task, d.div);
+  const v = await vendorFor(P, d.vendorId || null, d.vendorName);
   const pay = check(await sb.from('payments').insert({
     project_id: P.project.id, vendor_id: v.vendorId, budget_line_id: l.lineId,
     pay_date: d.date, amount: d.amount, method: d.method,
@@ -1206,17 +1229,74 @@ async function saveRow(tr){
   const date = q('date').value, amount = num(q('amount').value);
   if (!date) throw new Error('Enter the payment date.');
   if (!(amount > 0)) throw new Error('Enter the amount.');
-  const l = await resolveLineId(P, q('task').value, q('div').value);
-  const v = await resolveVendorId(P, q('vendor').value);
+  const taskVal = q('task').value, vendorVal = q('vendor').value;
+  const div = q('div').value;
+  const l = await resolveLineId(P, taskVal && taskVal !== '__new' ? taskVal : null, q('task-new').value, div);
+  const v = await vendorFor(P, vendorVal && vendorVal !== '__new' ? vendorVal : null, vendorVal === '__new' ? q('vendor-new').value : '');
   const row = {pay_date: date, amount, method: q('method').value, reference: q('ref').value.trim(),
     vendor_id: v.vendorId, budget_line_id: l.lineId};
   check(await sb.from('payments').update(row).eq('id', pay.id));
   Object.assign(pay, row);
   pay.vendors = v.vendorId ? {name: v.name} : null;
   tr.classList.remove('tx-unc');
+  // Show the saved values in this row, and refresh the lists so new entries appear everywhere.
+  fillSelect(q('task'), taskOptions(div, l.lineId), l.lineId);
+  fillSelect(q('vendor'), vendorOptions(v.vendorId || ''), v.vendorId || '');
+  q('task-new').hidden = true; q('task-new').value = '';
+  q('vendor-new').hidden = true; q('vendor-new').value = '';
+  if (v.created || l.created) refreshTxSelects(tr);
   txFoot(P);
   const note = txNotes(v, l);
   if (note) toast(note);
+}
+
+// Dropdown options. Task lists only the tasks in the chosen division.
+function taskOptions(div, selectedId = ''){
+  if (!div) return '<option value="">Choose Division First</option>';
+  const seen = new Set();
+  const lines = S.proj.lines
+    .filter(l => l.division_code === div || l.id === selectedId)
+    .sort((a, b) => lineName(a).localeCompare(lineName(b)))
+    .filter(l => { const k = lineName(l).toLowerCase(); if (seen.has(k) && l.id !== selectedId) return false; seen.add(k); return true; });
+  return '<option value="">Choose A Task</option>' +
+    lines.map(l => `<option value="${l.id}" ${l.id === selectedId ? 'selected' : ''}>${esc(lineName(l))}</option>`).join('') +
+    '<option value="__new">+ New Task…</option>';
+}
+function vendorOptions(selectedId = ''){
+  return '<option value="">No Contractor</option>' +
+    S.vendors.map(v => `<option value="${v.id}" ${v.id === selectedId ? 'selected' : ''}>${esc(v.name)}</option>`).join('') +
+    '<option value="__new">+ New Contractor…</option>';
+}
+// Replaces a select's options and keeps its current value when it still exists.
+function fillSelect(sel, html, value){
+  sel.innerHTML = html;
+  sel.value = value;
+}
+// Rebuilds the contractor and task dropdowns in the other rows and the entry row.
+function refreshTxSelects(except){
+  document.querySelectorAll('#txRows tr').forEach(tr => {
+    if (tr === except) return;
+    const v = tr.querySelector('[data-f=vendor]'), t = tr.querySelector('[data-f=task]');
+    if (v) fillSelect(v, vendorOptions(), v.value);
+    if (t) fillSelect(t, taskOptions(tr.querySelector('[data-f=div]').value), t.value);
+  });
+  refreshDraftSelects();
+}
+function refreshDraftSelects(){
+  const body = $('#txDraftBody');
+  if (!body) return;
+  const v = body.querySelector('[data-d=vendor]'), t = body.querySelector('[data-d=task]');
+  if (v) fillSelect(v, vendorOptions(), v.value);
+  if (t) fillSelect(t, taskOptions(body.querySelector('[data-d=div]').value), t.value);
+}
+// Contractor for a payment: an existing one by id, or a typed name (added to the directory if new).
+async function vendorFor(P, vendorId, name){
+  if (vendorId){
+    const hit = S.vendors.find(v => v.id === vendorId);
+    check(await sb.from('project_vendors').upsert({project_id: P.project.id, vendor_id: vendorId}, {onConflict: 'project_id,vendor_id', ignoreDuplicates: true}));
+    return {vendorId, name: hit?.name || '', created: false};
+  }
+  return resolveVendorId(P, name);
 }
 
 function txDatalists(P){
@@ -1227,12 +1307,13 @@ function txDatalists(P){
 
 function draftRow(){
   const methodOpts = PAY_METHODS.map(m => `<option ${m === (S.txMethod || 'Check') ? 'selected' : ''}>${m}</option>`).join('');
+  const div = S.txDiv || '';
   return `<tr class="tx-draft">
     <td><input type="date" data-d="date" value="${S.txDate || todayISO()}" aria-label="Date"></td>
     <td><input type="text" class="money" data-d="amount" inputmode="decimal" placeholder="0.00" aria-label="Amount"></td>
-    <td><select data-d="div" aria-label="Expense classification (division)"><option value="">Choose A Division</option>${divOptions(S.txDiv || '')}</select></td>
-    <td><input data-d="task" list="txLines" placeholder="Task (budget line)" autocomplete="off" aria-label="Task"></td>
-    <td><input data-d="vendor" list="txVendors" placeholder="Contractor" autocomplete="off" aria-label="Paid to"><div class="hint" data-d="vhint"></div></td>
+    <td><select data-d="div" aria-label="Expense classification (division)"><option value="">Choose A Division</option>${divOptions(div)}</select></td>
+    <td><select data-d="task" aria-label="Task">${taskOptions(div)}</select><input data-d="task-new" placeholder="Type the new task name" hidden aria-label="New task name"></td>
+    <td><select data-d="vendor" aria-label="Paid to">${vendorOptions()}</select><input data-d="vendor-new" placeholder="Type the new contractor name" hidden aria-label="New contractor name"></td>
     <td><select data-d="method" aria-label="Method">${methodOpts}</select></td>
     <td><input data-d="ref" placeholder="Check or ref #" aria-label="Check number"></td>
     <td class="ctr"></td>
@@ -1241,21 +1322,17 @@ function draftRow(){
   </tr>`;
 }
 
-function updateDraftVendorHint(){
-  const body = $('#txDraftBody');
-  if (!body) return;
-  const vn = body.querySelector('[data-d=vendor]').value.trim().toLowerCase();
-  const known = S.vendors.some(v => v.name.toLowerCase() === vn);
-  body.querySelector('[data-d=vhint]').textContent = vn && !known ? 'New contractor. Saved to the directory.' : '';
-}
 
 async function saveDraft(){
   const body = $('#txDraftBody');
   const q = k => body.querySelector(`[data-d="${k}"]`);
+  const taskVal = q('task').value, vendorVal = q('vendor').value;
   const d = {
     date: q('date').value, amount: num(q('amount').value),
-    vendorName: q('vendor').value, task: q('task').value, div: q('div').value,
-    method: q('method').value, reference: q('ref').value
+    lineId: taskVal && taskVal !== '__new' ? taskVal : null, task: q('task-new').value, div: q('div').value,
+    method: q('method').value, reference: q('ref').value,
+    vendorId: vendorVal && vendorVal !== '__new' ? vendorVal : null,
+    vendorName: vendorVal === '__new' ? q('vendor-new').value : ''
   };
   try {
     const out = await savePaymentRecord(S.proj, d);
@@ -1646,7 +1723,7 @@ document.addEventListener('click', async e => {
 document.addEventListener('keydown', e => {
   if (!e.target.closest || !e.target.closest('#txDraftBody')) return;
   if (e.key === 'Enter'){ e.preventDefault(); saveDraft(); }
-  if (e.key === 'Escape'){ e.target.value = ''; updateDraftVendorHint(); }
+  if (e.key === 'Escape'){ e.target.value = ''; }
 });
 
 document.addEventListener('change', e => {
@@ -1656,28 +1733,39 @@ document.addEventListener('change', e => {
     if (S.proj) txFill(S.proj);
     return;
   }
-  const tr = t.closest && t.closest('#txRows tr');
-  if (!tr || !S.proj) return;
-  if (t.dataset.f === 'div'){
-    // A different division means a different task list: clear the task and ask for it.
-    const task = tr.querySelector('[data-f=task]');
-    task.value = '';
-    tr.classList.add('tx-unc');
+  if (!S.proj || !t.closest) return;
+  const isDraft = !!t.closest('#txDraftBody');
+  const row = t.closest(isDraft ? '#txDraftBody tr' : '#txRows tr');
+  if (!row) return;
+  const attr = isDraft ? 'd' : 'f';
+  const key = t.dataset[attr];
+  if (!key) return;
+  const el = k => row.querySelector(`[data-${attr}="${k}"]`);
+  const save = () => { if (!isDraft) saveRow(row).catch(err => toast(msg(err), true)); };
+
+  if (key === 'div'){
+    // A different division means a different task list: fill it and open it for the next pick.
+    fillSelect(el('task'), taskOptions(t.value), '');
+    el('task-new').hidden = true;
+    if (!isDraft) row.classList.add('tx-unc');
+    const task = el('task');
     task.focus();
+    try { task.showPicker(); } catch (_) { /* browser opens it on click instead */ }
     return;
   }
-  saveRow(tr).catch(err => toast(msg(err), true));
-});
-
-// The task suggestions only show tasks in the row's division.
-document.addEventListener('focusin', e => {
-  const t = e.target;
-  if (!S.proj || !t.dataset || !(t.dataset.f === 'task' || t.dataset.d === 'task')) return;
-  const row = t.closest('tr');
-  const div = row?.querySelector('[data-f=div], [data-d=div]')?.value || '';
-  const names = [...new Set(S.proj.lines.filter(l => l.division_code === div).map(l => lineName(l)))];
-  const list = $('#txLines');
-  if (list) list.innerHTML = names.map(n => `<option value="${esc(n)}">`).join('');
+  if (key === 'task' || key === 'vendor'){
+    const isNew = t.value === '__new';
+    const extra = el(key + '-new');
+    extra.hidden = !isNew;
+    if (isNew){ extra.value = ''; extra.focus(); return; }
+    save();
+    return;
+  }
+  if (key === 'task-new' || key === 'vendor-new'){
+    if (t.value.trim()) save();
+    return;
+  }
+  save();
 });
 
 document.addEventListener('input', e => {
@@ -1686,7 +1774,6 @@ document.addEventListener('input', e => {
   }
   if (e.target.closest && e.target.closest('#txDraftBody')){
     if (e.target.classList.contains('money')) e.target.value = formatMoneyText(e.target.value);
-    if (e.target.dataset.d === 'vendor') updateDraftVendorHint();
   }
   if (e.target.id === 'txQ' && S.proj){
     S.txQ = e.target.value;
