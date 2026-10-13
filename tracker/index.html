@@ -123,7 +123,7 @@ main{padding:14px 16px 110px;display:flex;flex-direction:column;gap:12px;max-wid
 .bud-tbl thead tr.band th.g-start{border-left:1px solid rgba(255,255,255,.35)}
 .bud-tbl .caret{display:inline-block;width:14px;color:var(--teal-d);font-size:11px}
 .bud-tbl .var-neg{color:#B91C1C;font-weight:600}
-.bud-tbl .var-pos{color:#047857}
+.bud-tbl .var-pos{color:inherit}
 .bud-wrap .bud-tbl tr.grp{cursor:pointer}
 .bud-wrap .bud-tbl tr.grp:hover td{background:#E8F3F1}
 .bud-entry input:focus,.bud-entry select:focus{border-color:var(--teal);outline:none;box-shadow:inset 0 0 0 1px var(--teal)}
@@ -646,7 +646,7 @@ function budgetTableHtml(P, paid, byDiv, codes, filtered){
   const body = [];
   let gBud = 0, gTot = 0, gPaid = 0;
   const collapsed = S.collapsedDivs || (S.collapsedDivs = new Set());
-  // Variance = Total minus Paid. Over budget shows in red brackets.
+  // Variance = Budget minus Total. Negative (red, in brackets) means the total is over the budget.
   const varHtml = v => v < -0.005 ? `<span class="var-neg">(${money(-v)})</span>` : `<span class="var-pos">${money(v)}</span>`;
   codes.forEach(code => {
     const ls = byDiv[code];
@@ -663,7 +663,7 @@ function budgetTableHtml(P, paid, byDiv, codes, filtered){
       <td class="g-start"></td><td></td><td></td>
       <td class="g-start">${dateOr(dStart)}</td><td>${dateOr(dEnd)}</td>
       <td class="r g-start">${money(dBud)}</td><td class="r">${money(dTot)}</td>
-      <td class="r g-start">${money(dPaid)}</td><td class="r m-owed">${money(Math.max(0, dTot - dPaid))}</td><td class="r var">${varHtml(dTot - dPaid)}</td>
+      <td class="r g-start">${money(dPaid)}</td><td class="r m-owed">${money(Math.max(0, dTot - dPaid))}</td><td class="r var">${varHtml(dBud - dTot)}</td>
       <td class="g-start"></td>
     </tr>`);
     ls.forEach(l => {
@@ -681,7 +681,7 @@ function budgetTableHtml(P, paid, byDiv, codes, filtered){
         <td class="r m-amt">${money(bl)}</td>
         <td class="r g-start m-meta">${money(lp)}</td>
         <td class="r m-owed">${money(Math.max(0, bl - lp))}</td>
-        <td class="r var">${varHtml(bl - lp)}</td>
+        <td class="r var">${varHtml(num(l.budget) - bl)}</td>
         <td class="ctr g-start">${l.bank_funded ? 'Yes' : 'No'}</td>
       </tr>`);
     });
@@ -691,7 +691,7 @@ function budgetTableHtml(P, paid, byDiv, codes, filtered){
     <td colspan="3" class="m-name">${filtered ? 'Shown Total' : 'Total Budget'}</td>
     <td></td><td></td><td class="g-start"></td><td></td>
     <td class="r g-start">${money(gBud)}</td><td class="r">${money(gTot)}</td>
-    <td class="r g-start">${money(gPaid)}</td><td class="r m-owed">${money(Math.max(0, gTot - gPaid))}</td><td class="r var">${varHtml(gTot - gPaid)}</td>
+    <td class="r g-start">${money(gPaid)}</td><td class="r m-owed">${money(Math.max(0, gTot - gPaid))}</td><td class="r var">${varHtml(gBud - gTot)}</td>
     <td class="g-start"></td>
   </tr>`);
   return `<div class="card bud-wrap" style="padding:0;overflow-x:auto">
@@ -709,7 +709,7 @@ function budgetTableHtml(P, paid, byDiv, codes, filtered){
       <tbody>${body.join('')}</tbody>
     </table>
   </div>
-  <div class="small muted" style="text-align:center">Click a division to show or hide its sub-tasks. Variance is Total minus Paid; red brackets mean over budget. Tap a line to edit it.</div>`;
+  <div class="small muted" style="text-align:center">Click a division to show or hide its sub-tasks. Variance is Budget minus Total; red brackets mean over budget. Tap a line to edit it.</div>`;
 }
 
 function exportBudgetCsv(){
