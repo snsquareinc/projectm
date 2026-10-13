@@ -67,11 +67,10 @@ main{padding:14px 16px 110px;display:flex;flex-direction:column;gap:12px;max-wid
 .g-hdr{display:flex;overflow:hidden;height:100%}
 .g-mon{font-size:11px;font-weight:700;color:var(--ink2);border-left:1px solid var(--line);padding-left:6px;line-height:26px;overflow:hidden;white-space:nowrap;box-sizing:border-box;flex:none}
 .g-day{font-size:10px;color:var(--muted);text-align:center;line-height:26px;flex:none}
-.la-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin:12px 0 16px}
-.la-card{gap:6px}
-.la-n{font-size:30px;font-weight:800;line-height:1;margin-top:6px}
-.la-t{font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-@media (max-width:900px){.la-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.look{gap:8px;margin:12px 0 16px}
+.look .card-h>div{white-space:nowrap}
+.look select{width:auto;min-width:150px;flex:none;font:inherit;font-size:14px;font-weight:600;padding:6px 10px;border:1px solid var(--line);border-radius:10px;background:#fff;color:var(--ink)}
+.la-row{display:flex;justify-content:space-between;gap:12px;padding:8px 0;border-top:1px solid var(--soft);font-size:14px}
 .card-h{display:flex;justify-content:space-between;align-items:baseline;gap:10px}
 .card-h strong{font-size:16px;font-weight:700;overflow-wrap:anywhere}
 .tiles{display:grid;grid-template-columns:1fr 1fr;gap:10px}
@@ -1386,6 +1385,10 @@ document.addEventListener('input', e => {
 });
 
 document.addEventListener('change', e => {
+  if (e.target.id === 'lookSel'){
+    S.lookWin = e.target.value;
+    render();
+  }
   if (e.target.id === 'yearSel'){
     S.year = Number(e.target.value);
     render();
@@ -1465,16 +1468,21 @@ async function renderSchedule(P){
     ['This Month', new Date(y, m, 1, 12), new Date(y, m + 1, 0, 12)],
     ['Next Month', new Date(y, m + 1, 1, 12), new Date(y, m + 2, 0, 12)]
   ];
-  const look = windows.map(([label, a, b]) => {
-    const list = tasks.filter(t => toDate(t.start_date) <= b && toDate(t.end_date) >= a);
-    return `<div class="card la-card">
-      <div class="card-h"><strong>${label}</strong><span class="small muted">${rangeLabel(a, b)}</span></div>
-      <div class="la-n num">${list.length}</div>
-      <div class="small muted">${list.length === 1 ? 'Task' : 'Tasks'} Active</div>
-      ${list.slice(0, 4).map(t => `<div class="la-t">${esc(t.name)}</div>`).join('')}
-      ${list.length > 4 ? `<div class="small muted">+${list.length - 4} More</div>` : ''}
-    </div>`;
-  }).join('');
+  const opts = {thisWeek: 0, nextWeek: 1, thisMonth: 2, nextMonth: 3};
+  const pick = S.lookWin in opts ? S.lookWin : 'thisWeek';
+  const [wLabel, wa, wb] = windows[opts[pick]];
+  const active = tasks.filter(t => toDate(t.start_date) <= wb && toDate(t.end_date) >= wa);
+  const look = `<div class="card look">
+    <div class="card-h">
+      <div><strong>Look-Ahead</strong> <span class="small muted">${rangeLabel(wa, wb)}</span></div>
+      <select id="lookSel" aria-label="Look-ahead window">${windows.map(([l], i) => {
+        const key = Object.keys(opts).find(k => opts[k] === i);
+        return `<option value="${key}" ${key === pick ? 'selected' : ''}>${l}</option>`;
+      }).join('')}</select>
+    </div>
+    <div class="small muted">${active.length} ${active.length === 1 ? 'Task' : 'Tasks'} Active</div>
+    ${active.map(t => `<div class="la-row"><span>${esc(t.name)}</span><span class="small muted num">${dateOr(t.start_date)} – ${dateOr(t.end_date)}</span></div>`).join('')}
+  </div>`;
 
   const rows = ganttRows(P);
   const dated = rows.filter(r => r.task);
@@ -1545,7 +1553,7 @@ async function renderSchedule(P){
       <h2>Schedule</h2>
       <button class="btn primary sm" data-act="new-task">+ Add Task</button>
     </div>
-    <div class="la-grid">${look}</div>
+    ${look}
     <div class="page-h">
       <h3>Timeline</h3>
       <span class="small muted">${tasks.length} ${tasks.length === 1 ? 'task' : 'tasks'} · ${avg.toFixed(0)}% average complete</span>
