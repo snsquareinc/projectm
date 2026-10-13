@@ -302,6 +302,7 @@ function setLibrary(divs, subs){
 const divName = code => S.divMap[code] ? `${code} ${S.divMap[code].name}` : code;
 const lineName = l => l.subtask_code ? (S.subMap[l.subtask_code]?.name || l.subtask_code) : (l.label || 'Custom line');
 const budgetOf = l => num(l.budget) + num(l.revision);
+const dateOr = s => s ? toDate(s).toLocaleDateString('en-US', {month:'numeric', day:'numeric', year:'2-digit'}) : '';
 
 function toast(text, bad = false){
   document.querySelectorAll('.toast').forEach(t => t.remove());
@@ -406,13 +407,14 @@ async function renderProjects(){
 
 // ---------- Project shell ----------
 async function loadProject(id){
-  const [p, l, pay, pv, ins, v] = await Promise.all([
+  const [p, l, pay, pv, ins, v, tk] = await Promise.all([
     sb.from('projects').select('*').eq('id', id).single(),
     sb.from('project_lines').select('*').eq('project_id', id).order('created_at'),
     sb.from('payments').select('*, vendors(name)').eq('project_id', id).order('pay_date', {ascending:false}),
     sb.from('project_vendors').select('vendor_id').eq('project_id', id),
     sb.from('vendor_insurance').select('*').eq('project_id', id).order('created_at', {ascending:false}),
-    sb.from('vendors').select('*').order('name')
+    sb.from('vendors').select('*').order('name'),
+    sb.from('schedule_tasks').select('*').eq('project_id', id).order('start_date')
   ]);
   const pays = check(pay);
   const ids = pays.map(x => x.id);
@@ -424,7 +426,9 @@ async function loadProject(id){
     pays,
     receipts,
     assignedIds: new Set(check(pv).map(x => x.vendor_id)),
-    insMap: latestInsMap(check(ins))
+    insMap: latestInsMap(check(ins)),
+    tasks: tk.error ? [] : (tk.data || []),
+    tasksError: tk.error ? tk.error.message : ''
   };
 }
 
@@ -530,10 +534,13 @@ function budgetTableHtml(P, paid, byDiv, codes, filtered){
     const dRev = ls.reduce((a, l) => a + num(l.revision), 0);
     const dTot = dBud + dRev;
     const dPaid = ls.reduce((a, l) => a + (paid[l.id] || 0), 0);
+    const dates = ls.map(l => taskForLine(P, l.id)).filter(Boolean);
+    const dStart = dates.map(t => t.start_date).sort()[0];
+    const dEnd = dates.map(t => t.end_date).sort().slice(-1)[0];
     body.push(`<tr class="grp">
       <td class="code">${esc(code)}</td>
       <td class="desc m-name">${esc((S.divMap[code]?.name || 'Unnamed Division').toUpperCase())}</td>
-      <td></td><td></td><td></td>
+      <td></td><td>${dateOr(dStart)}</td><td>${dateOr(dEnd)}</td><td></td><td></td>
       <td class="r">${money(dBud)}</td>
       <td class="r">${dRev ? money(dRev) : ''}</td>
       <td class="r m-amt">${money(dTot)}</td>
@@ -547,6 +554,8 @@ function budgetTableHtml(P, paid, byDiv, codes, filtered){
         <td class="code">${esc(l.subtask_code || '')}</td>
         <td class="desc wrap m-name">${esc(lineName(l))}${l.notes ? `<div class="note">${esc(l.notes)}</div>` : ''}</td>
         <td>${esc(l.unit || '')}</td>
+        <td>${dateOr(taskForLine(P, l.id)?.start_date)}</td>
+        <td>${dateOr(taskForLine(P, l.id)?.end_date)}</td>
         <td class="r">${fmtQty(l.qty)}</td>
         <td class="r">${money(l.rate)}</td>
         <td class="r">${money(l.budget)}</td>
@@ -562,7 +571,7 @@ function budgetTableHtml(P, paid, byDiv, codes, filtered){
   const gTot = gBud + gRev;
   body.push(`<tr class="tr-grand">
     <td colspan="3" class="m-name">${filtered ? 'Shown Total' : 'Total Budget'}</td>
-    <td></td><td></td>
+    <td></td><td></td><td></td><td></td>
     <td class="r">${money(gBud)}</td>
     <td class="r">${gRev ? money(gRev) : ''}</td>
     <td class="r m-amt">${money(gTot)}</td>
@@ -573,8 +582,8 @@ function budgetTableHtml(P, paid, byDiv, codes, filtered){
   return `<div class="card" style="padding:0;overflow-x:auto">
     <table class="sheet-tbl">
       <thead>
-        <tr class="band"><th class="code"></th><th class="desc"></th><th></th><th colspan="2">Quantity</th><th colspan="3">Estimated Cost</th><th colspan="2">Paid To Date</th><th>Funding</th></tr>
-        <tr><th class="code">Code</th><th class="desc">Description</th><th>Unit</th><th class="r">Sq.Ft. / Qty</th><th class="r">Rate</th><th class="r">Budget</th><th class="r">Revision</th><th class="r">Total</th><th class="r">Paid</th><th class="r">Owed</th><th class="ctr">Bank Funded</th></tr>
+        <tr class="band"><th class="code"></th><th class="desc"></th><th></th><th colspan="2">Schedule</th><th colspan="2">Quantity</th><th colspan="3">Estimated Cost</th><th colspan="2">Paid To Date</th><th>Funding</th></tr>
+        <tr><th class="code">Code</th><th class="desc">Description</th><th>Unit</th><th>Start</th><th>End</th><th class="r">Sq.Ft. / Qty</th><th class="r">Rate</th><th class="r">Budget</th><th class="r">Revision</th><th class="r">Total</th><th class="r">Paid</th><th class="r">Owed</th><th class="ctr">Bank Funded</th></tr>
       </thead>
       <tbody>${body.join('')}</tbody>
     </table>
@@ -585,10 +594,10 @@ function budgetTableHtml(P, paid, byDiv, codes, filtered){
 function exportBudgetCsv(){
   const P = S.proj;
   const paid = paidByLine(P);
-  const rows = [['Division', 'Code', 'Sub-Task', 'Unit', 'Sq.Ft. / Qty', 'Rate', 'Budget', 'Revision', 'Total', 'Paid', 'Owed', 'Bank Funded', 'Notes']];
+  const rows = [['Division', 'Code', 'Sub-Task', 'Unit', 'Start', 'End', 'Sq.Ft. / Qty', 'Rate', 'Budget', 'Revision', 'Total', 'Paid', 'Owed', 'Bank Funded', 'Notes']];
   P.lines.slice().sort((a, b) => a.division_code.localeCompare(b.division_code)).forEach(l => {
     const bl = budgetOf(l), lp = paid[l.id] || 0;
-    rows.push([divName(l.division_code), l.subtask_code || 'Custom', lineName(l), l.unit || '', num(l.qty), num(l.rate), num(l.budget), num(l.revision), bl, lp, Math.max(0, bl - lp), l.bank_funded ? 'Yes' : 'No', l.notes || '']);
+    rows.push([divName(l.division_code), l.subtask_code || 'Custom', lineName(l), l.unit || '', taskForLine(P, l.id)?.start_date || '', taskForLine(P, l.id)?.end_date || '', num(l.qty), num(l.rate), num(l.budget), num(l.revision), bl, lp, Math.max(0, bl - lp), l.bank_funded ? 'Yes' : 'No', l.notes || '']);
   });
   const csv = rows.map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\r\n');
   const blob = new Blob(['﻿' + csv], {type: 'text/csv;charset=utf-8'});
@@ -866,12 +875,14 @@ function lineSheet(line){
   if (line){
     const paidHere = P.pays.filter(p => p.budget_line_id === line.id).reduce((a, p) => a + num(p.amount), 0);
     const custom = !line.subtask_code;
+    const linked = taskForLine(P, line.id);
     sheet({
       title: lineName(line),
       html: `<div class="small muted">${esc(divName(line.division_code))}${line.subtask_code ? ' · ' + esc(line.subtask_code) : ''}</div>
         <div class="grid">
           ${custom ? `<label class="full">Line Name<input name="label" value="${esc(line.label)}"></label>` : ''}
           <label>Unit${unitSelect(line.unit)}</label>
+          ${dateFields(linked)}
           <label>Sq.Ft. / Qty<input type="text" class="money" name="qty" inputmode="decimal" value="${esc(fmtInput(line.qty))}"></label>
           <label>Rate ($)<input type="text" class="money" name="rate" inputmode="decimal" value="${esc(fmtInput(line.rate))}"></label>
           <label class="check"><input type="checkbox" name="bank_funded" ${line.bank_funded ? 'checked' : ''}> Bank Funds This Line</label>
@@ -883,13 +894,18 @@ function lineSheet(line){
         <div class="small muted">Paid so far: ${money(paidHere)}. ${paidHere ? 'Lines with payments cannot be deleted.' : ''}</div>`,
       danger: paidHere ? null : {
         label: 'Delete Line',
-        run: async () => check(await sb.from('project_lines').delete().eq('id', line.id))
+        run: async () => {
+          const t = taskForLine(P, line.id);
+          if (t) check(await sb.from('schedule_tasks').delete().eq('id', t.id));
+          check(await sb.from('project_lines').delete().eq('id', line.id));
+        }
       },
       onOpen: form => bindCalc(form),
       onSubmit: async form => {
         const v = form.elements;
         const rev = num(v.revision.value);
         if (rev !== num(line.revision) && !v.revision_reason.value.trim()) throw new Error('Give a reason for the revision.');
+        checkLineDates(v);
         const qty = num(v.qty.value), rate = num(v.rate.value);
         const row = {
           qty, rate, budget: qty * rate, unit: v.unit.value.trim(), notes: v.notes.value.trim(),
@@ -901,6 +917,7 @@ function lineSheet(line){
           row.label = label;
         }
         check(await sb.from('project_lines').update(row).eq('id', line.id));
+        await syncLineTask(S.proj, line.id, {...line, ...row}, v);
       }
     });
     return;
@@ -915,6 +932,7 @@ function lineSheet(line){
       <label>Unit${unitSelect()}</label>
       <label>Sq.Ft. / Qty<input type="text" class="money" name="qty" inputmode="decimal" value="1"></label>
       <label>Rate ($)<input type="text" class="money" name="rate" inputmode="decimal" value="0"></label>
+      ${dateFields(null)}
       <label class="check"><input type="checkbox" name="bank_funded" checked> Bank Funds This Line</label>
       <label class="full">Notes<input name="notes" placeholder="Scope, vendor, or reference"></label>
     </div>
@@ -941,11 +959,13 @@ function lineSheet(line){
       if (!sub && !label) throw new Error('Name the custom line, or pick a sub-task.');
       if (sub && S.proj.lines.some(l => l.subtask_code === sub)) throw new Error('That sub-task is already on this budget.');
       const qty = num(v.qty.value), rate = num(v.rate.value);
-      check(await sb.from('project_lines').insert({
+      checkLineDates(v);
+      const created = check(await sb.from('project_lines').insert({
         project_id: S.proj.project.id, division_code: v.division_code.value,
         subtask_code: sub, label: sub ? '' : label, unit: v.unit.value.trim(), notes: v.notes.value.trim(),
         qty, rate, budget: qty * rate, bank_funded: v.bank_funded.checked
-      }));
+      }).select().single());
+      await syncLineTask(S.proj, created.id, created, v);
     }
   });
 }
@@ -1301,7 +1321,7 @@ const actions = {
   'edit-line': (t, id) => lineSheet(S.proj.lines.find(l => l.id === id)),
   'new-payment': () => paymentSheet(),
   'new-task': () => taskSheet(null, S.proj),
-  'edit-task': async (t, id) => taskSheet(check(await sb.from('schedule_tasks').select('*').eq('id', id).single()), S.proj),
+  'edit-task': (t, id) => taskSheet(S.proj.tasks.find(x => x.id === id), S.proj),
   'open-pay': (t, id) => paymentDetail(S.proj.pays.find(p => p.id === id)),
   'open-file': (t) => openFile(t.dataset.path).catch(e => toast(msg(e), true)),
   'del-receipt': async (t, id) => {
@@ -1345,6 +1365,34 @@ document.addEventListener('change', e => {
   }
 });
 
+// ---------- Line Dates (shared with Schedule) ----------
+const taskForLine = (P, lineId) => (P.tasks || []).find(t => t.budget_line_id === lineId);
+function checkLineDates(v){
+  const start = v.start_date.value, end = v.end_date.value;
+  if (!start && !end) return;
+  if (!start || !end) throw new Error('Enter both the start and end date, or clear both.');
+  if (end < start) throw new Error('End date cannot be before the start date.');
+  const pct = num(v.percent_complete.value);
+  if (pct < 0 || pct > 100) throw new Error('% complete must be between 0 and 100.');
+}
+// Keeps the schedule task for a budget line in step with the dates typed on the line.
+async function syncLineTask(P, lineId, line, v){
+  const start = v.start_date.value, end = v.end_date.value;
+  const existing = taskForLine(P, lineId);
+  if (!start && !end){
+    if (existing) check(await sb.from('schedule_tasks').delete().eq('id', existing.id));
+    return;
+  }
+  const row = {project_id: P.project.id, budget_line_id: lineId, name: lineName(line),
+    start_date: start, end_date: end, percent_complete: num(v.percent_complete.value)};
+  if (existing) check(await sb.from('schedule_tasks').update(row).eq('id', existing.id));
+  else check(await sb.from('schedule_tasks').insert(row));
+}
+const dateFields = t => `
+      <label>Start Date<input type="date" name="start_date" value="${t ? t.start_date : ''}"></label>
+      <label>End Date<input type="date" name="end_date" value="${t ? t.end_date : ''}"></label>
+      <label>% Complete<input type="number" name="percent_complete" min="0" max="100" step="1" value="${t ? num(t.percent_complete) : 0}"></label>`;
+
 // ---------- Schedule ----------
 const atNoon = d => new Date(d.getFullYear(), d.getMonth(), d.getDate(), 12);
 const addDays = (d, n) => { const x = new Date(d); x.setDate(x.getDate() + n); return x; };
@@ -1360,7 +1408,7 @@ function taskStatus(t, today){
 const STATUS_BADGE = {Complete:'b-ok', Late:'b-bad', 'In Progress':'b-info', 'Not Started':''};
 
 async function renderSchedule(P){
-  const tasks = check(await sb.from('schedule_tasks').select('*').eq('project_id', P.project.id).order('start_date'));
+  const tasks = P.tasks || [];
   const today = atNoon(new Date());
   const weekStart = addDays(today, -((today.getDay() + 6) % 7));
   const y = today.getFullYear(), m = today.getMonth();
@@ -1399,6 +1447,7 @@ async function renderSchedule(P){
   }).join('');
 
   $('#main').innerHTML = `
+    ${P.tasksError ? `<div class="notice bad">Schedule is not set up yet. Run supabase/005_schedule.sql in Supabase. (${esc(P.tasksError)})</div>` : ''}
     <div class="page-h">
       <h2>Schedule</h2>
       <button class="btn primary sm" data-act="new-task">+ Add Task</button>
@@ -1440,8 +1489,11 @@ function taskSheet(task, P){
       if (!end) throw new Error('Enter the end date.');
       if (end < start) throw new Error('End date cannot be before the start date.');
       if (pct < 0 || pct > 100) throw new Error('% complete must be between 0 and 100.');
+      const bl = v.budget_line_id.value || null;
+      if (bl && P.tasks.some(t => t.budget_line_id === bl && (!task || t.id !== task.id)))
+        throw new Error('That budget line already has a schedule task. Change its dates on the budget line.');
       const row = {project_id: P.project.id, name, start_date: start, end_date: end, percent_complete: pct,
-        budget_line_id: v.budget_line_id.value || null, notes: v.notes.value.trim()};
+        budget_line_id: bl, notes: v.notes.value.trim()};
       if (task) check(await sb.from('schedule_tasks').update(row).eq('id', task.id));
       else check(await sb.from('schedule_tasks').insert(row));
     }
