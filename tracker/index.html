@@ -70,6 +70,8 @@ main{padding:14px 16px 110px;display:flex;flex-direction:column;gap:12px;max-wid
 .look{gap:8px;margin:12px 0 16px}
 .look .card-h>div{white-space:nowrap}
 .look select{width:auto;min-width:150px;flex:none;font:inherit;font-size:14px;font-weight:600;padding:6px 10px;border:1px solid var(--line);border-radius:10px;background:#fff;color:var(--ink)}
+.tx-add-btn{display:none}
+@media (max-width:640px){.tx-add-btn{display:inline-flex}}
 .tx-tools{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;align-items:center}
 .tx-tools .tx-q{flex:1 1 220px;margin:0}
 .tx-tools select{width:auto;flex:0 0 auto;padding:8px 10px;font:inherit;font-size:14px}
@@ -713,8 +715,10 @@ function txRows(P){
 function txFiltered(P){
   const q = (S.txQ || '').trim().toLowerCase();
   const div = S.txFilterDiv || '';
+  const ven = S.txFilterVendor || '';
   return txRows(P).filter(r => {
     if (div && r.div !== div) return false;
+    if (ven && (ven === '__none' ? !!r.p.vendor_id : r.p.vendor_id !== ven)) return false;
     return !q || [r.p.pay_date, r.amt, divName(r.div), r.task, r.vendor, r.method, r.ref, r.notes].join(' ').toLowerCase().includes(q);
   });
 }
@@ -804,7 +808,7 @@ function renderPayments(P){
   $('#main').innerHTML = `
     <div class="page-h">
       <h2>Transactions</h2>
-      <button class="btn primary sm" data-act="new-payment">+ Add Transaction</button>
+      <button class="btn primary sm tx-add-btn" data-act="new-payment">+ Add Transaction</button>
     </div>
     <div class="small muted" style="margin:-4px 0 12px">${P.pays.length} ${P.pays.length === 1 ? 'transaction' : 'transactions'} · ${money(total)} total</div>
     ${txDatalists(P)}
@@ -812,7 +816,12 @@ function renderPayments(P){
       <input type="search" id="txQ" class="tx-q" placeholder="Search transactions" value="${esc(S.txQ || '')}" aria-label="Search transactions">
       <select id="txDivSel" aria-label="Filter by division">
         <option value="">All Divisions</option>
-        ${[...new Set(P.lines.map(l => l.division_code))].sort().map(c => `<option value="${c}" ${S.txFilterDiv === c ? 'selected' : ''}>${esc(divName(c))}</option>`).join('')}
+        ${S.divs.map(d => `<option value="${esc(d.code)}" ${S.txFilterDiv === d.code ? 'selected' : ''}>${esc(divName(d.code))}</option>`).join('')}
+      </select>
+      <select id="txVendorSel" aria-label="Filter by contractor">
+        <option value="">All Contractors</option>
+        <option value="__none" ${S.txFilterVendor === '__none' ? 'selected' : ''}>No Contractor</option>
+        ${S.vendors.map(v => `<option value="${v.id}" ${S.txFilterVendor === v.id ? 'selected' : ''}>${esc(v.name)}</option>`).join('')}
       </select>
       <select id="txSortSel" aria-label="Sort transactions">
         ${[['date_desc', 'Date: Newest First'], ['date_asc', 'Date: Oldest First'], ['amount_desc', 'Amount: High to Low'], ['amount_asc', 'Amount: Low to High'], ['division', 'Division'], ['task', 'Task'], ['vendor', 'Paid To']]
@@ -1243,7 +1252,7 @@ async function savePaymentRecord(P, d){
     reference: (d.reference || '').trim(), invoice_number: (d.invoice || '').trim()
   }).select().single());
   if (d.files && d.files.length) await attachFiles(`payments/${pay.id}`, pay.id, d.files);
-  S.txDate = d.date; S.txMethod = d.method; S.txDiv = d.div;
+  S.txDate = d.date; S.txMethod = d.method; // date and method stay for the next entry; division, task, contractor, amount and check # clear
   return txNotes(v, l) || 'Transaction saved.';
 }
 
@@ -1784,8 +1793,10 @@ function openNewVendor(row, sel, isDraft){
 
 document.addEventListener('change', e => {
   const t = e.target;
-  if (t.id === 'txDivSel' || t.id === 'txSortSel'){
-    if (t.id === 'txDivSel') S.txFilterDiv = t.value; else S.txSort = t.value;
+  if (t.id === 'txDivSel' || t.id === 'txSortSel' || t.id === 'txVendorSel'){
+    if (t.id === 'txDivSel') S.txFilterDiv = t.value;
+    else if (t.id === 'txVendorSel') S.txFilterVendor = t.value;
+    else S.txSort = t.value;
     if (S.proj) txFill(S.proj);
     return;
   }
