@@ -83,6 +83,15 @@ main{padding:14px 16px 110px;display:flex;flex-direction:column;gap:12px;max-wid
 .tx-edit td:nth-child(2){width:120px}
 .tx-unc td{background:#FEF9C3}
 .link-btn{background:none;border:0;color:var(--teal-d);font:inherit;font-size:13px;font-weight:600;cursor:pointer;padding:4px 6px}
+.tx-edit select{padding-right:4px}
+.icon-btn{display:inline-flex;align-items:center;justify-content:center;background:none;border:1px solid transparent;border-radius:8px;padding:6px;color:#94A3B8;cursor:pointer}
+.icon-btn:hover{border-color:var(--line);color:var(--ink2)}
+.icon-btn.has{color:#059669}
+.tx-icons{white-space:nowrap}
+.sheet textarea{width:100%;font:inherit;padding:10px 12px;border:1px solid var(--line);border-radius:10px;resize:vertical}
+.bud-tbl th,.bud-tbl td{padding-left:8px;padding-right:8px;white-space:nowrap}
+.sheet-tbl.bud-tbl td.desc,.sheet-tbl.bud-tbl th.desc{white-space:normal;min-width:150px;max-width:196px}
+.bud-tbl td.code,.bud-tbl th.code{white-space:nowrap}
 .tx-tbl tfoot td{font-weight:700;border-top:2px solid var(--line)}
 .tx-tbl td.num{white-space:nowrap}
 .tx-cards{display:none}
@@ -627,7 +636,7 @@ function budgetTableHtml(P, paid, byDiv, codes, filtered){
     <td></td>
   </tr>`);
   return `<div class="card" style="padding:0;overflow-x:auto">
-    <table class="sheet-tbl">
+    <table class="sheet-tbl bud-tbl">
       <thead>
         <tr class="band"><th class="code"></th><th class="desc"></th><th></th><th colspan="2">Schedule</th><th colspan="2">Quantity</th><th colspan="3">Estimated Cost</th><th colspan="2">Paid To Date</th><th>Funding</th></tr>
         <tr><th class="code">Code</th><th class="desc">Description</th><th>Unit</th><th>Start</th><th>End</th><th class="r">Sq.Ft. / Qty</th><th class="r">Rate</th><th class="r">Budget</th><th class="r">Revision</th><th class="r">Total</th><th class="r">Paid</th><th class="r">Owed</th><th class="ctr">Bank Funded</th></tr>
@@ -665,35 +674,41 @@ function txRows(P){
     const line = P.lines.find(l => l.id === p.budget_line_id);
     return {p, line,
       amt: num(p.amount),
-      cls: line ? lineName(line) : '',
-      purpose: line ? divName(line.division_code) : '',
+      div: line ? line.division_code : '',
+      task: line ? lineName(line) : '',
       vendor: p.vendors?.name || '',
       method: p.method || '', ref: p.reference || '',
+      notes: p.notes || '',
       files: rc[p.id] || 0};
   });
 }
 function txFiltered(P){
   const q = (S.txQ || '').trim().toLowerCase();
-  return txRows(P).filter(r => !q || [r.p.pay_date, r.amt, r.cls, r.purpose, r.vendor, r.method, r.ref].join(' ').toLowerCase().includes(q));
+  return txRows(P).filter(r => !q || [r.p.pay_date, r.amt, divName(r.div), r.task, r.vendor, r.method, r.ref, r.notes].join(' ').toLowerCase().includes(q));
 }
 function txFoot(P){
   const rows = txFiltered(P);
   const total = rows.reduce((a, r) => a + num(r.p.amount), 0);
   const foot = $('#txFoot');
-  if (foot) foot.innerHTML = rows.length ? `<tr><td>Total</td><td class="r num">${money(total)}</td><td colspan="6" class="small muted">${rows.length} of ${P.pays.length} shown</td></tr>` : '';
+  if (foot) foot.innerHTML = rows.length ? `<tr><td>Total</td><td class="r num">${money(total)}</td><td colspan="7" class="small muted">${rows.length} of ${P.pays.length} shown</td></tr>` : '';
 }
+const ICON_CLIP = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/></svg>`;
+const ICON_NOTE = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 4h16v12l-4 4H4z"/><path d="M8 9h8M8 13h5"/></svg>`;
 function txRowHtml(r){
-  const P = S.proj;
   const methods = PAY_METHODS.includes(r.method) ? PAY_METHODS : [r.method, ...PAY_METHODS];
   return `<tr data-id="${r.p.id}" class="tx-edit ${r.line ? '' : 'tx-unc'}">
     <td><input type="date" data-f="date" value="${r.p.pay_date || ''}" aria-label="Date"></td>
     <td><input type="text" class="money r" data-f="amount" value="${fmtInput(r.amt)}" aria-label="Amount"></td>
-    <td><input data-f="cls" list="txLines" value="${esc(r.cls)}" placeholder="Pick a budget line" autocomplete="off" aria-label="Expense classification"></td>
-    <td><span class="small" data-f="purposeTxt">${esc(r.purpose)}</span><select data-f="newDiv" hidden aria-label="Division for the new line"><option value="">Choose A Division</option>${divOptions()}</select></td>
+    <td><select data-f="div" aria-label="Expense classification (division)"><option value="">Choose A Division</option>${divOptions(r.div)}</select></td>
+    <td><input data-f="task" list="txLines" value="${esc(r.task)}" placeholder="Task (budget line)" autocomplete="off" aria-label="Task"></td>
     <td><input data-f="vendor" list="txVendors" value="${esc(r.vendor)}" placeholder="Contractor" autocomplete="off" aria-label="Paid to"></td>
     <td><select data-f="method" aria-label="Method">${methods.map(m => `<option ${m === r.method ? 'selected' : ''}>${esc(m)}</option>`).join('')}</select></td>
     <td><input data-f="ref" value="${esc(r.ref)}" aria-label="Check number"></td>
-    <td class="ctr"><button class="link-btn" data-act="open-pay" data-id="${r.p.id}">${r.files ? r.files + (r.files > 1 ? ' files' : ' file') : 'Add files'}</button></td>
+    <td class="ctr tx-icons">
+      <button class="icon-btn ${r.files ? 'has' : ''}" data-act="attach-receipt" data-id="${r.p.id}" title="Attach files" aria-label="Attach files">${ICON_CLIP}</button>
+      ${r.files ? `<button class="link-btn" data-act="open-pay" data-id="${r.p.id}">${r.files}</button>` : ''}
+    </td>
+    <td class="ctr"><button class="icon-btn ${r.notes ? 'has' : ''}" data-act="edit-notes" data-id="${r.p.id}" title="${r.notes ? 'Edit notes' : 'Add notes'}" aria-label="${r.notes ? 'Edit notes' : 'Add notes'}">${ICON_NOTE}</button></td>
   </tr>`;
 }
 function txFill(P){
@@ -701,11 +716,11 @@ function txFill(P){
   const empty = P.pays.length ? 'No transactions match this search.' : 'No transactions yet. Add one above.';
   const desk = $('#txRows'), cards = $('#txCards');
   if (!desk) return;
-  desk.innerHTML = rows.length ? rows.map(txRowHtml).join('') : `<tr><td colspan="8" class="small muted" style="text-align:center;padding:20px">${empty}</td></tr>`;
+  desk.innerHTML = rows.length ? rows.map(txRowHtml).join('') : `<tr><td colspan="9" class="small muted" style="text-align:center;padding:20px">${empty}</td></tr>`;
   cards.innerHTML = rows.length ? rows.map(r => `
     <button class="row" data-act="open-pay" data-id="${r.p.id}">
       <div><div class="t">${esc(r.vendor || 'No vendor')}</div>
-        <div class="s">${fmtDate(r.p.pay_date)} · ${r.line ? esc(r.cls) : '<span class="badge b-warn">Unclassified</span>'}</div>
+        <div class="s">${fmtDate(r.p.pay_date)} · ${r.line ? esc(divName(r.div) + ' · ' + r.task) : '<span class="badge b-warn">Unclassified</span>'}</div>
         <div class="s">${esc(r.method)}${r.ref ? ' #' + esc(r.ref) : ''}${r.files ? ' · ' + r.files + (r.files > 1 ? ' files' : ' file') : ''}</div></div>
       <div class="amt">${money(r.amt)}</div>
     </button>`).join('') : `<div class="empty">${empty}</div>`;
@@ -725,7 +740,7 @@ function renderPayments(P){
     <div class="card tx-wrap" id="txTableWrap" style="padding:0;overflow-x:auto">
       <table class="sheet-tbl tx-tbl">
         <thead>
-          <tr><th>Date</th><th class="r">Amount</th><th>Expense Classification</th><th>Notes / Purpose</th><th>Paid To</th><th>Method</th><th>Check #</th><th class="ctr">Receipts</th></tr>
+          <tr><th>Date</th><th class="r">Amount</th><th>Expense Classification</th><th>Task</th><th>Paid To</th><th>Method</th><th>Check #</th><th class="ctr">Receipts</th><th class="ctr">Notes</th></tr>
         </thead>
         <tbody id="txDraftBody">${draftRow()}</tbody>
         <tbody id="txRows"></tbody>
@@ -1082,38 +1097,38 @@ async function resolveVendorId(P, name){
   check(await sb.from('project_vendors').upsert({project_id: P.project.id, vendor_id: vendorId}, {onConflict: 'project_id,vendor_id', ignoreDuplicates: true}));
   return {vendorId, name: shown, created};
 }
-async function resolveLineId(P, cls, newDiv){
-  const c = (cls || '').trim();
-  if (!c) throw new Error('Not classified. Choose a budget line first. Nothing is saved without one.');
-  const hit = P.lines.find(l => lineName(l).toLowerCase() === c.toLowerCase());
+async function resolveLineId(P, task, div){
+  const t = (task || '').trim();
+  if (!div) throw new Error('Choose the division for this transaction.');
+  if (!t) throw new Error('Enter the task for this transaction. Nothing is saved without one.');
+  const hit = P.lines.find(l => l.division_code === div && lineName(l).toLowerCase() === t.toLowerCase());
   if (hit) return {lineId: hit.id, created: false};
-  if (!newDiv) throw new Error('Choose the division for the new budget line.');
   const line = check(await sb.from('project_lines').insert({
-    project_id: P.project.id, division_code: newDiv, subtask_code: null, label: c,
-    budget: 0, bank_funded: !!S.divMap[newDiv]?.bank_funded
+    project_id: P.project.id, division_code: div, subtask_code: null, label: t,
+    budget: 0, bank_funded: !!S.divMap[div]?.bank_funded
   }).select().single());
   P.lines.push(line);
-  return {lineId: line.id, created: true, label: c};
+  return {lineId: line.id, created: true, label: t};
 }
 function txNotes(v, l){
   const notes = [];
   if (v && v.created) notes.push(`Added ${v.name} to the Contractor Directory`);
-  if (l && l.created) notes.push(`Added "${l.label}" as a budget line. Set its budget on the Budget tab`);
+  if (l && l.created) notes.push(`Added "${l.label}" as a task under ${divName(l.division_code || '')}. Set its budget on the Budget tab`);
   return notes.length ? notes.join('. ') + '.' : '';
 }
 
 async function savePaymentRecord(P, d){
   if (!d.date) throw new Error('Enter the payment date.');
   if (!(d.amount > 0)) throw new Error('Enter the amount.');
+  const l = await resolveLineId(P, d.task, d.div);
   const v = await resolveVendorId(P, d.vendorName);
-  const l = await resolveLineId(P, d.classText, d.newDiv);
   const pay = check(await sb.from('payments').insert({
     project_id: P.project.id, vendor_id: v.vendorId, budget_line_id: l.lineId,
     pay_date: d.date, amount: d.amount, method: d.method,
     reference: (d.reference || '').trim(), invoice_number: (d.invoice || '').trim()
   }).select().single());
   if (d.files && d.files.length) await attachFiles(`payments/${pay.id}`, pay.id, d.files);
-  S.txDate = d.date; S.txMethod = d.method;
+  S.txDate = d.date; S.txMethod = d.method; S.txDiv = d.div;
   return txNotes(v, l) || 'Transaction saved.';
 }
 
@@ -1124,25 +1139,15 @@ async function saveRow(tr){
   if (!pay) return;
   const q = f => tr.querySelector(`[data-f="${f}"]`);
   const date = q('date').value, amount = num(q('amount').value);
-  const cls = q('cls').value.trim();
   if (!date) throw new Error('Enter the payment date.');
   if (!(amount > 0)) throw new Error('Enter the amount.');
-  const known = cls && P.lines.some(l => lineName(l).toLowerCase() === cls.toLowerCase());
-  if (cls && !known && !q('newDiv').value){
-    q('newDiv').hidden = false;
-    q('purposeTxt').textContent = 'New budget line';
-    throw new Error('Choose the division for the new budget line.');
-  }
+  const l = await resolveLineId(P, q('task').value, q('div').value);
   const v = await resolveVendorId(P, q('vendor').value);
-  const l = await resolveLineId(P, cls, q('newDiv').value);
   const row = {pay_date: date, amount, method: q('method').value, reference: q('ref').value.trim(),
     vendor_id: v.vendorId, budget_line_id: l.lineId};
   check(await sb.from('payments').update(row).eq('id', pay.id));
   Object.assign(pay, row);
   pay.vendors = v.vendorId ? {name: v.name} : null;
-  const line = P.lines.find(x => x.id === l.lineId);
-  q('purposeTxt').textContent = line ? divName(line.division_code) : '';
-  q('newDiv').hidden = true;
   tr.classList.remove('tx-unc');
   txFoot(P);
   const note = txNotes(v, l);
@@ -1160,26 +1165,16 @@ function draftRow(){
   return `<tr class="tx-draft">
     <td><input type="date" data-d="date" value="${S.txDate || todayISO()}" aria-label="Date"></td>
     <td><input type="text" class="money" data-d="amount" inputmode="decimal" placeholder="0.00" aria-label="Amount"></td>
-    <td><input data-d="cls" list="txLines" placeholder="Pick or type a budget line" autocomplete="off" aria-label="Expense classification"></td>
-    <td><span class="small muted" data-d="purposeTxt"></span><select data-d="newDiv" hidden aria-label="Division for the new line"><option value="">Choose A Division</option>${divOptions()}</select></td>
+    <td><select data-d="div" aria-label="Expense classification (division)"><option value="">Choose A Division</option>${divOptions(S.txDiv || '')}</select></td>
+    <td><input data-d="task" list="txLines" placeholder="Task (budget line)" autocomplete="off" aria-label="Task"></td>
     <td><input data-d="vendor" list="txVendors" placeholder="Contractor" autocomplete="off" aria-label="Paid to"><div class="hint" data-d="vhint"></div></td>
     <td><select data-d="method" aria-label="Method">${methodOpts}</select></td>
     <td><input data-d="ref" placeholder="Check or ref #" aria-label="Check number"></td>
+    <td class="ctr"></td>
     <td class="ctr"><button class="btn primary sm" data-act="save-draft">Save</button></td>
   </tr>`;
 }
 
-function updateDraftPurpose(){
-  const P = S.proj, body = $('#txDraftBody');
-  if (!P || !body) return;
-  const cls = body.querySelector('[data-d=cls]').value.trim().toLowerCase();
-  const hit = cls && P.lines.find(l => lineName(l).toLowerCase() === cls);
-  const txt = body.querySelector('[data-d=purposeTxt]');
-  const sel = body.querySelector('[data-d=newDiv]');
-  if (hit){ txt.textContent = divName(hit.division_code); sel.hidden = true; }
-  else if (cls){ txt.textContent = 'New budget line'; sel.hidden = false; }
-  else { txt.textContent = ''; sel.hidden = true; }
-}
 function updateDraftVendorHint(){
   const body = $('#txDraftBody');
   if (!body) return;
@@ -1193,15 +1188,28 @@ async function saveDraft(){
   const q = k => body.querySelector(`[data-d="${k}"]`);
   const d = {
     date: q('date').value, amount: num(q('amount').value),
-    vendorName: q('vendor').value, classText: q('cls').value, newDiv: q('newDiv').value,
+    vendorName: q('vendor').value, task: q('task').value, div: q('div').value,
     method: q('method').value, reference: q('ref').value
   };
   try {
-    const msg_ = await savePaymentRecord(S.proj, d);
-    toast(msg_);
+    const out = await savePaymentRecord(S.proj, d);
+    toast(out);
     await render();
     document.querySelector('#txDraftBody [data-d=amount]')?.focus();
   } catch (e) { toast(msg(e), true); }
+}
+
+function notesSheet(p){
+  sheet({
+    title: 'Notes',
+    submit: 'Save Notes',
+    html: `<label class="full">Notes<textarea name="notes" rows="5" placeholder="Anything about this transaction">${esc(p.notes || '')}</textarea></label>`,
+    onSubmit: async form => {
+      const notes = form.elements.notes.value.trim();
+      check(await sb.from('payments').update({notes}).eq('id', p.id));
+      p.notes = notes;
+    }
+  });
 }
 
 function paymentSheet(){
@@ -1212,32 +1220,21 @@ function paymentSheet(){
     html: `${txDatalists(P)}<div class="grid">
       <label>Date<input type="date" name="pay_date" value="${S.txDate || todayISO()}"></label>
       <label>Amount ($)<input type="text" class="money" name="amount" inputmode="decimal"></label>
+      <label class="full">Expense Classification<select name="div"><option value="">Choose A Division</option>${divOptions(S.txDiv || '')}</select></label>
+      <label class="full">Task<input name="task" list="txLines" autocomplete="off" placeholder="Task (budget line)"></label>
       <label class="full">Paid To<input name="vendor" list="txVendors" autocomplete="off" placeholder="Contractor"></label>
-      <label class="full">Expense Classification<input name="cls" list="txLines" autocomplete="off" placeholder="Pick or type a budget line"></label>
-      <label class="full" data-newdiv hidden>Division For The New Line<select name="new_division"><option value="">Choose A Division</option>${divOptions()}</select></label>
       <label>Method<select name="method">${PAY_METHODS.map(m => `<option ${m === (S.txMethod || 'Check') ? 'selected' : ''}>${m}</option>`).join('')}</select></label>
       <label>Check Or Reference #<input name="reference"></label>
       <label>Invoice #<input name="invoice_number"></label>
       <label class="full">Receipts And Invoices<input type="file" name="files" multiple accept="image/*,application/pdf"></label>
     </div>`,
-    onOpen: form => {
-      const v = form.elements;
-      const box = form.querySelector('[data-newdiv]');
-      const upd = () => {
-        const c = v.cls.value.trim().toLowerCase();
-        box.hidden = !c || P.lines.some(l => lineName(l).toLowerCase() === c);
-      };
-      v.cls.addEventListener('input', upd);
-      upd();
-    },
     onSubmit: async form => {
       const v = form.elements;
-      const msg_ = await savePaymentRecord(S.proj, {
+      toast(await savePaymentRecord(S.proj, {
         date: v.pay_date.value, amount: num(v.amount.value), vendorName: v.vendor.value,
-        classText: v.cls.value, newDiv: v.new_division.value, method: v.method.value,
+        task: v.task.value, div: v.div.value, method: v.method.value,
         reference: v.reference.value, invoice: v.invoice_number.value, files: v.files.files
-      });
-      toast(msg_);
+      }));
     }
   });
 }
@@ -1534,6 +1531,20 @@ const actions = {
     el.focus();
   },
   'save-draft': () => saveDraft(),
+  'edit-notes': (t, id) => notesSheet(S.proj.pays.find(p => p.id === id)),
+  'attach-receipt': (t, id) => {
+    const inp = document.createElement('input');
+    inp.type = 'file'; inp.multiple = true; inp.accept = 'image/*,application/pdf';
+    inp.addEventListener('change', async () => {
+      if (!inp.files.length) return;
+      try {
+        await attachFiles(`payments/${id}`, id, inp.files);
+        toast(`Attached ${inp.files.length} file${inp.files.length > 1 ? 's' : ''}.`);
+        await render();
+      } catch (e) { toast(msg(e), true); }
+    });
+    inp.click();
+  },
   'new-task': () => taskSheet(null, S.proj),
   'edit-task': (t, id) => taskSheet(S.proj.tasks.find(x => x.id === id), S.proj),
   'open-pay': (t, id) => paymentDetail(S.proj.pays.find(p => p.id === id)),
@@ -1567,7 +1578,7 @@ document.addEventListener('click', async e => {
 document.addEventListener('keydown', e => {
   if (!e.target.closest || !e.target.closest('#txDraftBody')) return;
   if (e.key === 'Enter'){ e.preventDefault(); saveDraft(); }
-  if (e.key === 'Escape'){ e.target.value = ''; updateDraftPurpose(); updateDraftVendorHint(); }
+  if (e.key === 'Escape'){ e.target.value = ''; updateDraftVendorHint(); }
 });
 
 document.addEventListener('change', e => {
@@ -1581,7 +1592,6 @@ document.addEventListener('input', e => {
   }
   if (e.target.closest && e.target.closest('#txDraftBody')){
     if (e.target.classList.contains('money')) e.target.value = formatMoneyText(e.target.value);
-    if (e.target.dataset.d === 'cls') updateDraftPurpose();
     if (e.target.dataset.d === 'vendor') updateDraftVendorHint();
   }
   if (e.target.id === 'txQ' && S.proj){
