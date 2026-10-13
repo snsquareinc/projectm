@@ -101,7 +101,7 @@ main{padding:14px 16px 110px;display:flex;flex-direction:column;gap:12px;max-wid
 .tx-icons{white-space:nowrap}
 .sheet textarea{width:100%;font:inherit;padding:10px 12px;border:1px solid var(--line);border-radius:10px;resize:vertical}
 .bud-tbl th,.bud-tbl td{padding-left:8px;padding-right:8px;white-space:nowrap}
-.sheet-tbl.bud-tbl td.desc,.sheet-tbl.bud-tbl th.desc{white-space:normal;min-width:150px;max-width:196px}
+.sheet-tbl.bud-tbl td.desc,.sheet-tbl.bud-tbl th.desc{white-space:normal;min-width:120px;max-width:150px}
 .bud-tbl td.code,.bud-tbl th.code{white-space:nowrap}
 .tx-tbl th,.tx-tbl td{padding-left:8px;padding-right:8px}
 .tx-tbl tfoot td{font-weight:700;border-top:2px solid var(--line)}
@@ -110,7 +110,7 @@ main{padding:14px 16px 110px;display:flex;flex-direction:column;gap:12px;max-wid
 .bud-wrap{max-height:calc(100vh - 250px);overflow:auto}
 .bud-wrap thead tr:first-child th{position:sticky;top:0;z-index:3}
 .bud-wrap thead tr:nth-child(2) th{position:sticky;top:30px;z-index:3;background:#F1F5F9;border-bottom:1px solid #CBD5E1}
-.bud-wrap .bud-tbl tbody td{height:28px;padding:2px 6px;border-bottom:1px solid #E2E8F0;border-right:1px solid #EEF2F6;vertical-align:middle}
+.bud-wrap .bud-tbl tbody td{height:28px;padding:2px 4px;border-bottom:1px solid #E2E8F0;border-right:1px solid #EEF2F6;vertical-align:middle}
 .bud-wrap .bud-tbl tr.grp td{background:#F8FAFC;font-weight:600}
 .bud-wrap .bud-tbl tr.item:hover td{background:#F8FAFC;cursor:pointer}
 .bud-wrap .bud-tbl tr.tr-grand td{position:sticky;bottom:0;background:#F1F5F9;border-top:2px solid #CBD5E1}
@@ -121,8 +121,9 @@ main{padding:14px 16px 110px;display:flex;flex-direction:column;gap:12px;max-wid
 .bud-tbl thead tr.band th.gh{border-bottom:2px solid #5EEAD4;padding-top:6px}
 .bud-tbl .g-start{border-left:2px solid #CBD5E1}
 .bud-tbl thead tr.band th.g-start{border-left:1px solid rgba(255,255,255,.35)}
+.bud-tbl td:nth-child(8),.bud-tbl td:nth-child(9),.bud-tbl th:nth-child(8),.bud-tbl th:nth-child(9){width:96px;min-width:96px;max-width:96px}
 .bud-tbl .caret{display:inline-block;width:14px;color:var(--teal-d);font-size:11px}
-.bud-tbl .line-del{float:right;padding:2px 4px;margin-left:6px;opacity:.55}
+.bud-tbl .line-del{padding:0 2px;margin-left:4px;opacity:.5;vertical-align:middle}
 .bud-tbl tr.item:hover .line-del{opacity:1}
 .bud-tbl .var-neg{color:#B91C1C;font-weight:600}
 .bud-tbl .var-pos{color:inherit}
@@ -131,8 +132,8 @@ main{padding:14px 16px 110px;display:flex;flex-direction:column;gap:12px;max-wid
 .bud-entry input:focus,.bud-entry select:focus{border-color:var(--teal);outline:none;box-shadow:inset 0 0 0 1px var(--teal)}
 .bud-entry td:nth-child(1) select{width:100px}
 .bud-entry td:nth-child(2) select{width:100%;min-width:120px}
-.bud-entry td:nth-child(3) select{width:64px;padding:0 2px}
-.bud-entry td:nth-child(6) input,.bud-entry td:nth-child(7) input{width:112px;font-size:12px;padding:0 4px}
+.bud-entry td:nth-child(3) select{width:56px;padding:0 2px}
+.bud-entry td:nth-child(6) input,.bud-entry td:nth-child(7) input{width:104px;font-size:12px;padding:0 3px}
 .bud-entry td:nth-child(4) input,.bud-entry td:nth-child(5) input{width:64px}
 .bud-entry td:nth-child(8){white-space:nowrap}
 .bud-wrap .bud-tbl tr.tr-grand td{color:var(--ink)}
@@ -674,8 +675,8 @@ function budgetTableHtml(P, paid, byDiv, codes, filtered){
       const bl = budgetOf(l), lp = paid[l.id] || 0;
       const t = taskForLine(P, l.id);
       body.push(`<tr class="item tr-click" data-act="edit-line" data-id="${l.id}" data-div="${esc(code)}"${isC ? ' hidden' : ''}>
-        <td class="code">${esc(l.subtask_code || '')}</td>
-        <td class="desc wrap m-name">${esc(lineName(l))}${l.notes ? `<div class="note">${esc(l.notes)}</div>` : ''}<button class="icon-btn line-del" data-act="delete-line" data-id="${l.id}" title="Delete budget line" aria-label="Delete budget line">${ICON_TRASH}</button></td>
+        <td class="code">${esc(l.subtask_code || '')}<button class="icon-btn line-del" data-act="delete-line" data-id="${l.id}" title="Delete budget line" aria-label="Delete budget line">${ICON_TRASH}</button></td>
+        <td class="desc wrap m-name">${esc(lineName(l))}${l.notes ? `<div class="note">${esc(l.notes)}</div>` : ''}</td>
         <td class="g-start">${esc(l.unit || '')}</td>
         <td class="r">${fmtQty(l.qty)}</td>
         <td class="r">${money(l.rate)}</td>
@@ -1182,7 +1183,7 @@ const UNIT_HINTS = ['SF', 'EA', 'HR'];
 const unitSelect = (current = '') => {
   const cur = String(current || '').trim();
   const opts = UNIT_HINTS;
-  return `<select name="unit"><option value="">Select Unit</option>${opts.map(u => `<option value="${esc(u)}" ${u === cur ? 'selected' : ''}>${esc(u)}</option>`).join('')}</select>`;
+  return `<select name="unit"><option value="">—</option>${opts.map(u => `<option value="${esc(u)}" ${u === cur ? 'selected' : ''}>${esc(u)}</option>`).join('')}</select>`;
 };
 
 function lineSheet(line){
