@@ -14,6 +14,7 @@ It runs on Netlify (hosting) and Supabase (database, login, and file storage). Y
 - `supabase/004_line_fields.sql`: unit and notes on budget lines.
 - `supabase/005_schedule.sql`: project schedule tasks with dates, progress, and budget line links.
 - `supabase/006_payment_notes.sql`: notes on each transaction.
+- `supabase/007_contract.sql`: signed contract amount per budget line.
 
 ## One-time setup
 
@@ -21,7 +22,7 @@ It runs on Netlify (hosting) and Supabase (database, login, and file storage). Y
 1. Go to supabase.com, sign in, and create a new project. Choose a region near Massachusetts and save the database password.
 2. Open **SQL Editor**, paste `supabase/001_phase1.sql`, and click **Run**.
 3. In a new query, paste `supabase/002_project_vendors.sql` and click **Run**.
-4. In new queries, paste `supabase/003_qty_rate.sql`, then `004_line_fields.sql`, then `005_schedule.sql`, then `006_payment_notes.sql`, clicking **Run** on each.
+4. In new queries, paste `supabase/003_qty_rate.sql`, then `004_line_fields.sql`, then `005_schedule.sql`, then `006_payment_notes.sql`, then `007_contract.sql`, clicking **Run** on each.
 
 ### 2. Lock down sign-ups and add yourself
 1. In Supabase, go to **Authentication > Sign In / Providers > Email**, keep Email enabled, and turn off "Allow new users to sign up".

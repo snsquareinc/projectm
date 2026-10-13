@@ -416,7 +416,8 @@ function setLibrary(divs, subs){
 }
 const divName = code => S.divMap[code] ? `${code} ${S.divMap[code].name}` : code;
 const lineName = l => l.subtask_code ? (S.subMap[l.subtask_code]?.name || l.subtask_code) : (l.label || 'Custom line');
-const budgetOf = l => num(l.budget) + num(l.revision);
+// Total = signed contract when one is entered; until then, budget plus any revision.
+const budgetOf = l => num(l.contract_amount) > 0 ? num(l.contract_amount) : num(l.budget) + num(l.revision);
 const dateOr = s => s ? toDate(s).toLocaleDateString('en-US', {month:'numeric', day:'numeric', year:'2-digit'}) : '';
 
 function toast(text, bad = false){
@@ -595,17 +596,18 @@ function budgetGroups(P){
 
 function renderBudget(P){
   const paid = paidByLine(P);
-  const totalBudget = P.lines.reduce((a, l) => a + budgetOf(l), 0);
+  const totalBudget = P.lines.reduce((a, l) => a + num(l.budget), 0);
+  const totalContract = P.lines.reduce((a, l) => a + budgetOf(l), 0);
   const totalPaid = P.pays.reduce((a, p) => a + num(p.amount), 0);
   const bankBudget = P.lines.filter(l => l.bank_funded).reduce((a, l) => a + budgetOf(l), 0);
-  const notBank = totalBudget - bankBudget;
+  const notBank = totalContract - bankBudget;
   const divCount = new Set(P.lines.map(l => l.division_code)).size;
 
   let html = `
     <div class="strip">
       <div><div class="l">Total Budget</div><div class="v">${money(totalBudget)}</div></div>
       <div><div class="l">Paid Out</div><div class="v">${money(totalPaid)}</div></div>
-      <div><div class="l">Still Owed</div><div class="v warnText">${money(Math.max(0, totalBudget - totalPaid))}</div></div>
+      <div><div class="l">Still Owed</div><div class="v warnText">${money(totalContract - totalPaid)}</div></div>
       <div><div class="l">Bank Funded</div><div class="v">${money(bankBudget)}</div>${notBank ? `<div class="small muted">${money(notBank)} not bank funded</div>` : ''}</div>
     </div>
     <div class="page-h">
@@ -663,7 +665,7 @@ function budgetTableHtml(P, paid, byDiv, codes, filtered){
       <td class="g-start"></td><td></td><td></td>
       <td class="g-start">${dateOr(dStart)}</td><td>${dateOr(dEnd)}</td>
       <td class="r g-start">${money(dBud)}</td><td class="r">${money(dTot)}</td>
-      <td class="r g-start">${money(dPaid)}</td><td class="r m-owed">${money(Math.max(0, dTot - dPaid))}</td><td class="r var">${varHtml(dBud - dTot)}</td>
+      <td class="r g-start">${money(dPaid)}</td><td class="r m-owed">${money(dTot - dPaid)}</td><td class="r var">${varHtml(dBud - dTot)}</td>
       <td class="g-start"></td>
     </tr>`);
     ls.forEach(l => {
@@ -680,7 +682,7 @@ function budgetTableHtml(P, paid, byDiv, codes, filtered){
         <td class="r g-start">${money(l.budget)}</td>
         <td class="r m-amt">${money(bl)}</td>
         <td class="r g-start m-meta">${money(lp)}</td>
-        <td class="r m-owed">${money(Math.max(0, bl - lp))}</td>
+        <td class="r m-owed">${money(bl - lp)}</td>
         <td class="r var">${varHtml(num(l.budget) - bl)}</td>
         <td class="ctr g-start">${l.bank_funded ? 'Yes' : 'No'}</td>
       </tr>`);
@@ -691,7 +693,7 @@ function budgetTableHtml(P, paid, byDiv, codes, filtered){
     <td colspan="3" class="m-name">${filtered ? 'Shown Total' : 'Total Budget'}</td>
     <td></td><td></td><td class="g-start"></td><td></td>
     <td class="r g-start">${money(gBud)}</td><td class="r">${money(gTot)}</td>
-    <td class="r g-start">${money(gPaid)}</td><td class="r m-owed">${money(Math.max(0, gTot - gPaid))}</td><td class="r var">${varHtml(gBud - gTot)}</td>
+    <td class="r g-start">${money(gPaid)}</td><td class="r m-owed">${money(gTot - gPaid)}</td><td class="r var">${varHtml(gBud - gTot)}</td>
     <td class="g-start"></td>
   </tr>`);
   return `<div class="card bud-wrap" style="padding:0;overflow-x:auto">
@@ -700,16 +702,16 @@ function budgetTableHtml(P, paid, byDiv, codes, filtered){
         <tr class="band"><th class="code"></th><th class="desc"></th>
           <th colspan="3" class="gh g-start">Quantity</th>
           <th colspan="2" class="gh g-start">Schedule</th>
-          <th colspan="2" class="gh g-start">Estimated Cost</th>
+          <th colspan="2" class="gh g-start">Cost</th>
           <th colspan="3" class="gh g-start">Paid To Date</th>
           <th class="gh g-start">Funding</th></tr>
-        <tr><th class="code">Code</th><th class="desc">Description</th><th class="g-start">Unit</th><th class="r">Sq.Ft. / Qty</th><th class="r">Rate</th><th class="g-start">Start</th><th>End</th><th class="r g-start">Budget</th><th class="r">Total</th><th class="r g-start">Paid</th><th class="r">Owed</th><th class="r">Variance</th><th class="ctr g-start">Bank Funded</th></tr>
+        <tr><th class="code">Code</th><th class="desc">Description</th><th class="g-start">Unit</th><th class="r">Sq.Ft. / Qty</th><th class="r">Rate</th><th class="g-start">Start</th><th>End</th><th class="r g-start">Budget</th><th class="r">Contract</th><th class="r g-start">Paid</th><th class="r">Owed</th><th class="r">Variance</th><th class="ctr g-start">Bank Funded</th></tr>
       </thead>
       ${budDraftRow()}
       <tbody>${body.join('')}</tbody>
     </table>
   </div>
-  <div class="small muted" style="text-align:center">Click a division to show or hide its sub-tasks. Variance is Budget minus Total; red brackets mean over budget. Tap a line to edit it.</div>`;
+  <div class="small muted" style="text-align:center">Click a division to show or hide its sub-tasks. Budget is the amount set aside. Contract is the signed amount. Owed = Contract minus Paid. Variance = Budget minus Contract; red brackets mean over budget. Tap a line to edit it.</div>`;
 }
 
 function exportBudgetCsv(){
@@ -718,7 +720,7 @@ function exportBudgetCsv(){
   const rows = [['Division', 'Code', 'Sub-Task', 'Unit', 'Start', 'End', 'Sq.Ft. / Qty', 'Rate', 'Budget', 'Revision', 'Total', 'Paid', 'Owed', 'Bank Funded', 'Notes']];
   P.lines.slice().sort((a, b) => a.division_code.localeCompare(b.division_code)).forEach(l => {
     const bl = budgetOf(l), lp = paid[l.id] || 0;
-    rows.push([divName(l.division_code), l.subtask_code || 'Custom', lineName(l), l.unit || '', taskForLine(P, l.id)?.start_date || '', taskForLine(P, l.id)?.end_date || '', num(l.qty), num(l.rate), num(l.budget), num(l.revision), bl, lp, Math.max(0, bl - lp), l.bank_funded ? 'Yes' : 'No', l.notes || '']);
+    rows.push([divName(l.division_code), l.subtask_code || 'Custom', lineName(l), l.unit || '', taskForLine(P, l.id)?.start_date || '', taskForLine(P, l.id)?.end_date || '', num(l.qty), num(l.rate), num(l.budget), num(l.revision), bl, lp, bl - lp, l.bank_funded ? 'Yes' : 'No', l.notes || '']);
   });
   const csv = rows.map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\r\n');
   const blob = new Blob(['﻿' + csv], {type: 'text/csv;charset=utf-8'});
@@ -750,7 +752,7 @@ function budDraftRow(){
     <td class="g-start"><input type="date" data-b="start" aria-label="Start date"></td>
     <td><input type="date" data-b="end" aria-label="End date"></td>
     <td class="r g-start" data-b="budget">${money(0)}</td>
-    <td></td><td class="g-start"></td><td></td>
+    <td class="r"><input type="text" class="money r" data-b="contract" placeholder="Contract" inputmode="decimal" aria-label="Signed contract"></td><td class="g-start"></td><td></td>
     <td class="ctr"><button class="btn primary sm" data-act="save-bud">Save</button></td>
     <td class="ctr g-start"><input type="checkbox" data-b="bank" checked aria-label="Bank funded"></td>
   </tr></tbody>`;
@@ -787,7 +789,7 @@ async function saveBudDraft(P, body){
   const label = sub === '__custom' ? custom : divLevel ? `${S.divMap[div]?.name || 'Division'} Budget` : '';
   const line = check(await sb.from('project_lines').insert({
     project_id: P.project.id, division_code: div, subtask_code: sub === '__custom' || divLevel ? null : sub, label,
-    unit: q('unit').value.trim(), notes: '', qty, rate, budget: qty * rate, bank_funded: q('bank').checked
+    unit: q('unit').value.trim(), notes: '', qty, rate, budget: qty * rate, contract_amount: num(q('contract').value), bank_funded: q('bank').checked
   }).select().single());
   await syncLineTask(P, line.id, line, {start_date: {value: start}, end_date: {value: end}, percent_complete: {value: '0'}});
   toast(divLevel ? 'Division budget added. Break it into sub-tasks later if you need to.' : 'Budget line added. Tap the line to set a revision or notes.');
@@ -1198,6 +1200,7 @@ function lineSheet(line){
           <label>Rate ($)<input type="text" class="money" name="rate" inputmode="decimal" value="${esc(fmtInput(line.rate))}"></label>
           <label class="check"><input type="checkbox" name="bank_funded" ${line.bank_funded ? 'checked' : ''}> Bank Funds This Line</label>
           <label class="full">Notes<input name="notes" value="${esc(line.notes)}" placeholder="Scope, vendor, or reference"></label>
+          <label class="full">Signed Contract ($)<input type="text" class="money" name="contract_amount" value="${esc(fmtInput(line.contract_amount))}" placeholder="Leave blank until signed"></label>
           <label class="full">Revision ($)<input type="text" class="money" name="revision" inputmode="decimal" value="${esc(fmtInput(line.revision))}"></label>
           <label class="full">Reason For Revision<input name="revision_reason" value="${esc(line.revision_reason)}" placeholder="e.g. Change Order 2"></label>
         </div>
@@ -1220,7 +1223,8 @@ function lineSheet(line){
         const qty = num(v.qty.value), rate = num(v.rate.value);
         const row = {
           qty, rate, budget: qty * rate, unit: v.unit.value.trim(), notes: v.notes.value.trim(),
-          revision: rev, revision_reason: v.revision_reason.value.trim(), bank_funded: v.bank_funded.checked
+          revision: rev, revision_reason: v.revision_reason.value.trim(), bank_funded: v.bank_funded.checked,
+          contract_amount: num(v.contract_amount.value)
         };
         if (custom){
           const label = v.label.value.trim();
