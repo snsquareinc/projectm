@@ -681,7 +681,7 @@ function budgetTableHtml(P, paid, byDiv, codes, filtered){
         <td>${dateOr(t?.end_date)}</td>
         <td class="r g-start">${money(l.budget)}</td>
         <td class="r m-amt">${money(bl)}</td>
-        <td class="r g-start m-meta">${money(lp)}</td>
+        <td class="r g-start m-meta"><button class="link-btn" data-act="pay-line" data-id="${l.id}" title="Record a payment on this line">${money(lp)}</button></td>
         <td class="r m-owed">${money(bl - lp)}</td>
         <td class="r var">${varHtml(num(l.budget) - bl)}</td>
         <td class="ctr g-start">${l.bank_funded ? 'Yes' : 'No'}</td>
@@ -1445,6 +1445,8 @@ function txDatalists(P){
 }
 
 function draftRow(){
+  const preTask = S.txPreTask || '';
+  S.txPreTask = '';
   const methodOpts = PAY_METHODS.map(m => `<option ${m === (S.txMethod || 'Check') ? 'selected' : ''}>${m}</option>`).join('');
   const div = S.txDiv || '';
   return `<tr class="tx-draft">
@@ -1452,7 +1454,7 @@ function draftRow(){
     <td><input type="date" data-d="date" value="${S.txDate || todayISO()}" aria-label="Date"></td>
     <td><input type="text" class="money" data-d="amount" inputmode="decimal" placeholder="0.00" aria-label="Amount"></td>
     <td><select data-d="div" aria-label="Expense classification (division)"><option value="">Choose A Division</option>${divOptions(div)}</select></td>
-    <td><select data-d="task" aria-label="Task">${taskOptions(div)}</select></td>
+    <td><select data-d="task" aria-label="Task">${taskOptions(div, preTask)}</select></td>
     <td><select data-d="vendor" aria-label="Paid to">${vendorOptions()}</select></td>
     <td><select data-d="method" aria-label="Method">${methodOpts}</select></td>
     <td><input data-d="ref" placeholder="Check or ref #" aria-label="Check number"></td>
@@ -1816,6 +1818,13 @@ const actions = {
     el?.focus();
   },
   'save-bud': t => saveBudDraft(S.proj, t.closest('.bud-entry')),
+  'pay-line': (t, id) => {
+    const l = S.proj.lines.find(x => x.id === id);
+    if (!l) return;
+    S.txDiv = l.division_code;
+    S.txPreTask = l.id;
+    location.hash = `#/project/${S.proj.project.id}/payments`;
+  },
   'toggle-div': t => {
     const code = t.dataset.code;
     const set = S.collapsedDivs || (S.collapsedDivs = new Set());
