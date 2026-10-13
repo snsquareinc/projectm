@@ -849,7 +849,11 @@ function bindCalc(form){
   v.rate.addEventListener('input', upd);
 }
 const UNIT_HINTS = ['SF', 'LF', 'EA', 'LS', 'HR', 'CY', 'SY', 'Day', 'Month'];
-const unitList = () => `<datalist id="unitList">${UNIT_HINTS.map(u => `<option value="${u}">`).join('')}</datalist>`;
+const unitSelect = (current = '') => {
+  const cur = String(current || '').trim();
+  const opts = UNIT_HINTS.includes(cur) || !cur ? UNIT_HINTS : [...UNIT_HINTS, cur];
+  return `<select name="unit"><option value="">Select Unit</option>${opts.map(u => `<option value="${esc(u)}" ${u === cur ? 'selected' : ''}>${esc(u)}</option>`).join('')}</select>`;
+};
 
 function lineSheet(line){
   const P = S.proj;
@@ -859,10 +863,9 @@ function lineSheet(line){
     sheet({
       title: lineName(line),
       html: `<div class="small muted">${esc(divName(line.division_code))}${line.subtask_code ? ' · ' + esc(line.subtask_code) : ''}</div>
-        ${unitList()}
         <div class="grid">
           ${custom ? `<label class="full">Line Name<input name="label" value="${esc(line.label)}"></label>` : ''}
-          <label>Unit<input name="unit" list="unitList" value="${esc(line.unit)}" placeholder="SF, LF, EA"></label>
+          <label>Unit${unitSelect(line.unit)}</label>
           <label>Sq.Ft. / Qty<input type="text" class="money" name="qty" inputmode="decimal" value="${esc(fmtInput(line.qty))}"></label>
           <label>Rate ($)<input type="text" class="money" name="rate" inputmode="decimal" value="${esc(fmtInput(line.rate))}"></label>
           <label class="check"><input type="checkbox" name="bank_funded" ${line.bank_funded ? 'checked' : ''}> Bank Funds This Line</label>
@@ -899,11 +902,11 @@ function lineSheet(line){
 
   sheet({
     title: 'Add Budget Line',
-    html: `${unitList()}<div class="grid">
+    html: `<div class="grid">
       <label class="full">Division<select name="division_code">${divOptions()}</select></label>
       <label class="full">Sub-Task<select name="subtask_code"></select></label>
       <label class="full" data-custom hidden>Line Name<input name="label" placeholder="e.g. Permit Fee, Unexpected"></label>
-      <label>Unit<input name="unit" list="unitList" placeholder="SF, LF, EA"></label>
+      <label>Unit${unitSelect()}</label>
       <label>Sq.Ft. / Qty<input type="text" class="money" name="qty" inputmode="decimal" value="1"></label>
       <label>Rate ($)<input type="text" class="money" name="rate" inputmode="decimal" value="0"></label>
       <label class="check"><input type="checkbox" name="bank_funded" checked> Bank Funds This Line</label>
