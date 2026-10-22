@@ -1007,10 +1007,15 @@ function renderDraws(P){
       <div><div class="small muted">Left to fund</div><div class="num" style="font-size:18px">${money(Math.max(0, loan - fundedSoFar))}</div></div>
     </div>`;
   const addBtn = '<button class="btn primary sm" data-act="new-draw">+ New Draw</button>';
+  const howTo = `<div class="small muted" style="margin:4px 0 12px;line-height:1.5">
+    A draw is one request to the bank for the work built since the last draw.<br>
+    1. Click <strong>New Draw</strong>. 2. Enter how much of each line is built to date (0 to 100%).
+    3. Untick <strong>Bank funds</strong> for lines the bank does not pay. 4. <strong>Save draw</strong>.
+    The request is the amount built since the last draw, times the line budget.</div>`;
   const cur = currentDraw(P);
   if (!cur){
-    $('#main').innerHTML = `<div class="page-h"><h2>Draws</h2>${addBtn}</div>${head}
-      <div class="empty" style="margin-top:12px">No draws yet. A draw is a funding request to the bank for the work built so far.</div>`;
+    $('#main').innerHTML = `<div class="page-h"><h2>Draws</h2>${addBtn}</div>${howTo}${head}
+      <div class="empty" style="margin-top:12px">No draws yet. Click <strong>New Draw</strong> to start the first one.</div>`;
     return;
   }
   const rows = drawRows(P, cur);
@@ -1019,6 +1024,7 @@ function renderDraws(P){
   const built = budgetTotal ? rows.reduce((a, r) => a + r.budget * r.pct, 0) / budgetTotal : 0;
   $('#main').innerHTML = `
     <div class="page-h"><h2>Draws</h2>${addBtn}</div>
+    ${howTo}
     ${head}
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin:12px 0">
       ${P.draws.map(d => `<button class="btn sm ${d.id === cur.id ? 'primary' : ''}" data-act="select-draw" data-id="${d.id}">Draw ${d.draw_number} · ${esc(d.status)}</button>`).join('')}
@@ -1028,12 +1034,12 @@ function renderDraws(P){
       <input type="hidden" id="drawId" value="${cur.id}">
       <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:flex-end;margin-bottom:10px">
         <label>Due date<input type="date" id="drawDue" value="${esc(cur.due_date || '')}"></label>
-        <div><div class="small muted">This draw request</div><div class="num" style="font-size:18px">${money(request)}</div></div>
-        <div><div class="small muted">Built overall</div><div class="num" style="font-size:18px">${Math.round(built)}%</div></div>
+        <div><div class="small muted">Request for this draw</div><div class="num" style="font-size:18px">${money(request)}</div></div>
+        <div><div class="small muted">Whole project built</div><div class="num" style="font-size:18px">${Math.round(built)}%</div></div>
       </div>
       <div style="overflow-x:auto">
         <table class="sheet-tbl">
-          <thead><tr><th>Line</th><th class="r">Budget</th><th class="r">Built before</th><th class="r">Built now</th><th class="ctr">Bank funds</th><th class="r">This draw</th></tr></thead>
+          <thead><tr><th>Line</th><th class="r">Budget</th><th class="r">Built at last draw</th><th class="r">Built to date (%)</th><th class="ctr">Bank funds</th><th class="r">Request</th></tr></thead>
           <tbody>${rows.map(r => `<tr>
             <td>${esc(lineName(r.line))}</td>
             <td class="r num">${money(r.budget)}</td>
