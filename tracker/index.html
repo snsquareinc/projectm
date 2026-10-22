@@ -28,6 +28,11 @@ button,input,select,textarea{font:inherit;color:inherit}
 .tabs{display:flex;gap:4px;margin-top:10px;background:rgba(255,255,255,.08);border-radius:12px;padding:4px;max-width:100%;overflow-x:auto}
 .tabs a{flex:1 0 auto;text-align:center;text-decoration:none;color:#CBD5E1;padding:7px 10px;border-radius:9px;font-size:14px;font-weight:600;white-space:nowrap}
 .tabs a[aria-current="page"]{background:#fff;color:var(--navy)}
+.photo-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
+.photo-cell{all:unset;cursor:pointer;display:flex;flex-direction:column;gap:4px;min-width:0}
+.photo-cell:focus-visible{outline:2px solid var(--teal,#0D9488);outline-offset:2px;border-radius:10px}
+.photo-cell img{width:100%;aspect-ratio:4/3;object-fit:cover;border-radius:10px;background:#E2E8F0;display:block}
+.photo-cell span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .back{color:#94A3B8;text-decoration:none;font-size:13px;font-weight:600}
 main{padding:14px 16px 110px;display:flex;flex-direction:column;gap:12px;max-width:1180px;margin:0 auto}
 .bottomnav{position:fixed;left:0;right:0;bottom:0;background:#fff;border-top:1px solid var(--line);display:flex;justify-content:space-around;padding:8px 8px calc(8px + env(safe-area-inset-bottom,0px));z-index:4}
@@ -547,6 +552,7 @@ async function loadProject(id){
   const receipts = ids.length ? check(await sb.from('payment_receipts').select('*').in('payment_id', ids).order('created_at')) : [];
   const drawRows = check(await sb.from('draws').select('*').eq('project_id', id).order('draw_number'));
   const drawLines = drawRows.length ? check(await sb.from('draw_lines').select('*').in('draw_id', drawRows.map(d => d.id))) : [];
+  const photos = check(await sb.from('project_photos').select('*').eq('project_id', id).order('taken_on', {ascending: false}).order('created_at', {ascending: false}));
   S.vendors = check(v);
   S.proj = {
     project: check(p),
@@ -555,6 +561,7 @@ async function loadProject(id){
     receipts,
     draws: drawRows,
     drawLines,
+    photos,
     assignedIds: new Set(check(pv).map(x => x.vendor_id)),
     insMap: latestInsMap(check(ins)),
     tasks: tk.error ? [] : (tk.data || []),
@@ -577,12 +584,14 @@ async function renderProject(r){
       <a href="#/project/${pr.id}/draws" ${r.tab === 'draws' ? 'aria-current="page"' : ''}>Draws</a>
       <a href="#/project/${pr.id}/reports" ${r.tab === 'reports' ? 'aria-current="page"' : ''}>Reports</a>
       <a href="#/project/${pr.id}/files" ${r.tab === 'files' ? 'aria-current="page"' : ''}>Files</a>
+      <a href="#/project/${pr.id}/photos" ${r.tab === 'photos' ? 'aria-current="page"' : ''}>Photos</a>
     </div>`);
   if (r.tab === 'payments') renderPayments(P);
   else if (r.tab === 'contractors') renderContractors(P);
   else if (r.tab === 'draws') renderDraws(P);
   else if (r.tab === 'reports') renderReports(P);
   else if (r.tab === 'files') renderFiles(P);
+  else if (r.tab === 'photos') renderPhotos(P);
   else if (r.tab === 'schedule') await renderSchedule(P);
   else renderBudget(P);
 }
@@ -1107,6 +1116,96 @@ function renderDraws(P){
         ${cur.status !== 'Funded' ? '<button class="btn sm" data-act="mark-funded">Mark funded</button>' : ''}
       </div>
     </div>`;
+}
+
+// ---------- Photos (job-site pictures per project) ----------
+// Shrinks an image on the device before upload: longest side 1600px, JPEG 80%. Keeps storage small.
+async function shrinkImage(file){
+  if (!file.type.startsWith('image/')) throw new Error(file.name + ' is not a picture.');
+  const url = URL.createObjectURL(file);
+  try {
+    const img = await new Promise((res, rej) => {
+      const i = new Image();
+      i.onload = () => res(i);
+      i.onerror = () => rej(new Error('Could not read ' + file.name + '. Try a JPG or PNG.'));
+      i.src = url;
+    });
+    const scale = Math.min(1, 1600 / Math.max(img.naturalWidth, img.naturalHeight));
+    const c = document.createElement('canvas');
+    c.width = Math.round(img.naturalWidth * scale);
+    c.height = Math.round(img.naturalHeight * scale);
+    c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+    const blob = await new Promise(res => c.toBlob(res, 'image/jpeg', 0.8));
+    if (!blob) throw new Error('Could not shrink ' + file.name + '.');
+    return blob;
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
+
+async function uploadPhotos(P, files){
+  const list = [...files];
+  let done = 0;
+  for (const f of list){
+    const blob = await shrinkImage(f);
+    const path = `photos/${P.project.id}/${crypto.randomUUID()}.jpg`;
+    check(await sb.storage.from('receipts').upload(path, blob, {contentType: 'image/jpeg'}));
+    check(await sb.from('project_photos').insert({project_id: P.project.id, path, taken_on: todayISO(), caption: ''}));
+    done++;
+    toast(`Uploaded ${done} of ${list.length}`);
+  }
+  toast(`${done} photo${done === 1 ? '' : 's'} added`);
+  await render();
+}
+
+async function loadPhotoThumbs(){
+  await Promise.all([...document.querySelectorAll('img[data-photo-path]')].map(async img => {
+    const res = await sb.storage.from('receipts').createSignedUrl(img.dataset.photoPath, 3600);
+    if (res.data) img.src = res.data.signedUrl;
+  }));
+}
+
+function renderPhotos(P){
+  const body = P.photos.length
+    ? `<div class="photo-grid">${P.photos.map(ph => `
+        <button type="button" class="photo-cell" data-act="open-photo" data-id="${ph.id}" aria-label="Open photo from ${esc(fmtDate(ph.taken_on))}">
+          <img data-photo-path="${esc(ph.path)}" alt="" loading="lazy">
+          <span class="small muted">${esc(fmtDate(ph.taken_on))}${ph.caption ? ' · ' + esc(ph.caption) : ''}</span>
+        </button>`).join('')}</div>`
+    : '<div class="empty">No photos yet. Add photos as the work goes. Each one is saved to this project with the date.</div>';
+  $('#main').innerHTML = `
+    <div class="page-h"><h2>Photos</h2><button class="btn primary sm" data-act="add-photos">+ Add Photos</button></div>
+    <div class="small muted" style="margin:-4px 0 12px">Pictures are shrunk on your device before upload to save space. Tap one to add a caption or delete it.</div>
+    <input type="file" id="photoIn" accept="image/*" multiple hidden>
+    ${body}`;
+  $('#photoIn').addEventListener('change', e => {
+    const input = e.target;
+    uploadPhotos(P, input.files).catch(err => toast(msg(err), true)).finally(() => { input.value = ''; });
+  });
+  loadPhotoThumbs();
+}
+
+async function photoSheet(ph){
+  const res = await sb.storage.from('receipts').createSignedUrl(ph.path, 3600);
+  const src = res.data ? res.data.signedUrl : '';
+  sheet({
+    title: 'Photo',
+    submit: 'Save',
+    danger: {label: 'Delete photo', run: async () => {
+      check(await sb.storage.from('receipts').remove([ph.path]));
+      check(await sb.from('project_photos').delete().eq('id', ph.id));
+    }},
+    html: `${src ? `<img src="${esc(src)}" alt="" style="width:100%;border-radius:10px;margin-bottom:10px">` : ''}
+      <div class="grid">
+        <label>Date taken<input type="date" name="taken_on" value="${esc(ph.taken_on)}"></label>
+        <label class="full">Caption<input name="caption" value="${esc(ph.caption || '')}" placeholder="e.g. Framing east wall"></label>
+      </div>`,
+    onSubmit: async form => {
+      const v = form.elements;
+      check(await sb.from('project_photos').update({taken_on: v.taken_on.value || ph.taken_on, caption: v.caption.value.trim()}).eq('id', ph.id));
+      await render();
+    }
+  });
 }
 
 // ---------- Reports (computed from this project's data) ----------
@@ -2149,6 +2248,8 @@ const actions = {
       }
     });
   },
+  'add-photos': () => $('#photoIn').click(),
+  'open-photo': (t, id) => photoSheet(S.proj.photos.find(x => x.id === id)),
   'open-pay': (t, id) => paymentDetail(S.proj.pays.find(p => p.id === id)),
   'open-file': (t) => openFile(t.dataset.path).catch(e => toast(msg(e), true)),
   'del-receipt': async (t, id) => {
@@ -2515,6 +2616,7 @@ function renderSide(r){
         ${link(`#/project/${id}/draws`, 'Draws', r.tab === 'draws', 'child')}
         ${link(`#/project/${id}/reports`, 'Reports', r.tab === 'reports', 'child')}
         ${link(`#/project/${id}/files`, 'Files', r.tab === 'files', 'child')}
+        ${link(`#/project/${id}/photos`, 'Photos', r.tab === 'photos', 'child')}
       </div>
       <div class="side-group">
         <div class="side-sec">Company</div>
