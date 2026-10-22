@@ -406,6 +406,16 @@ const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt
 const num = v => { if (v === '' || v == null) return 0; const n = Number(String(v).replace(/[$,\s]/g, '')); return Number.isFinite(n) ? n : 0; };
 const money = n => Number(n || 0).toLocaleString('en-US', {style:'currency', currency:'USD', minimumFractionDigits:0, maximumFractionDigits:2});
 const fmtInput = n => (n === '' || n == null) ? '' : Number(n).toLocaleString('en-US', {maximumFractionDigits:2});
+// US phone as you type: (508) 555-1234. A leading 1 (country code) is dropped.
+function formatPhone(raw){
+  let d = String(raw || '').replace(/\D/g, '');
+  if (d.length === 11 && d[0] === '1') d = d.slice(1);
+  d = d.slice(0, 10);
+  if (d.length <= 3) return d;
+  if (d.length <= 6) return `(${d.slice(0, 3)}) ${d.slice(3)}`;
+  return `(${d.slice(0, 3)}) ${d.slice(3, 6)}-${d.slice(6)}`;
+}
+
 function formatMoneyText(raw){
   const cleaned = String(raw).replace(/[^0-9.]/g, '');
   if (!cleaned) return '';
@@ -1504,6 +1514,10 @@ function sheet({title, html, submit = 'Save', onSubmit, onOpen, danger, keepPage
   d.addEventListener('close', () => { d.remove(); if (!finished && onCancel) onCancel(); });
   const form = d.querySelector('form');
   d.querySelectorAll('input.money').forEach(el => el.addEventListener('input', () => { el.value = formatMoneyText(el.value); }));
+  d.querySelectorAll('input[type=tel]').forEach(el => {
+    el.value = formatPhone(el.value);
+    el.addEventListener('input', () => { el.value = formatPhone(el.value); });
+  });
   const err = d.querySelector('.err');
   const showErr = e => { err.textContent = msg(e); err.hidden = false; };
   d.querySelectorAll('[data-close]').forEach(b => b.addEventListener('click', () => d.close()));
@@ -2017,7 +2031,7 @@ function assignSheet(){
         <label class="full">Name<input name="new_name" autocomplete="off"></label>
         <label>Trade<input name="new_trade" autocomplete="off" placeholder="Framing, electrical"></label>
         <label>Company<input name="new_company" autocomplete="off"></label>
-        <label>Phone<input name="new_phone" type="tel" autocomplete="off"></label>
+        <label>Phone<input name="new_phone" type="tel" inputmode="tel" autocomplete="off"></label>
         <label>Email<input name="new_email" type="email" autocomplete="off"></label>
       </div>
       <div class="small muted">Once assigned, a certificate of insurance is required for this project.</div>`,
@@ -2129,7 +2143,7 @@ async function vendorSheet(v, onCreated, onCancel){
         <label>Name<input name="name" required value="${esc(v?.name)}"></label>
         <label>Trade<input name="trade" value="${esc(v?.trade)}" placeholder="Framing, electrical"></label>
         <label>Company<input name="company" value="${esc(v?.company)}"></label>
-        <label>Phone<input name="phone" type="tel" value="${esc(v?.phone)}"></label>
+        <label>Phone<input name="phone" type="tel" inputmode="tel" value="${esc(v?.phone)}"></label>
         <label class="full">Email<input name="email" type="email" value="${esc(v?.email)}"></label>
         <label class="check full"><input type="checkbox" name="is_corporation" ${v?.is_corporation ? 'checked' : ''}> Corporation (No 1099 Needed)</label>
         <label class="full">W-9 ${v?.w9_path ? '(On File, Upload To Replace)' : '(Missing)'}<input type="file" name="w9" accept="image/*,application/pdf"></label>
