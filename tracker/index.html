@@ -570,9 +570,13 @@ async function renderProject(r){
       <a href="#/project/${pr.id}/schedule" ${r.tab === 'schedule' ? 'aria-current="page"' : ''}>Schedule</a>
       <a href="#/project/${pr.id}/payments" ${r.tab === 'payments' ? 'aria-current="page"' : ''}>Transactions</a>
       <a href="#/project/${pr.id}/contractors" ${r.tab === 'contractors' ? 'aria-current="page"' : ''}>Contractors</a>
+      <a href="#/project/${pr.id}/reports" ${r.tab === 'reports' ? 'aria-current="page"' : ''}>Reports</a>
+      <a href="#/project/${pr.id}/files" ${r.tab === 'files' ? 'aria-current="page"' : ''}>Files</a>
     </div>`);
   if (r.tab === 'payments') renderPayments(P);
   else if (r.tab === 'contractors') renderContractors(P);
+  else if (r.tab === 'reports') renderReports(P);
+  else if (r.tab === 'files') renderFiles(P);
   else if (r.tab === 'schedule') await renderSchedule(P);
   else renderBudget(P);
 }
@@ -955,6 +959,78 @@ function renderPayments(P){
     </div>
     <div class="tx-cards" id="txCards"></div>`;
   txFill(P);
+}
+
+// ---------- Reports (computed from this project's data) ----------
+function renderReports(P){
+  const paidBy = paidByLine(P);
+  const budget = P.lines.reduce((a, l) => a + budgetOf(l), 0);
+  const paid = P.pays.reduce((a, p) => a + num(p.amount), 0);
+  const owed = Math.max(0, budget - paid);
+  const waiting = P.pays.filter(p => p.status === 'Waiting on vendor');
+  const divs = {};
+  P.lines.forEach(l => {
+    const d = (divs[l.division_code] ||= {budget: 0, paid: 0});
+    d.budget += budgetOf(l);
+    d.paid += paidBy[l.id] || 0;
+  });
+  const divRows = Object.keys(divs).sort().map(code => {
+    const d = divs[code];
+    return `<div class="rep-row"><span>${esc(divName(code))}</span><span class="num">${money(d.paid)} of ${money(d.budget)} paid</span></div>`;
+  }).join('') || '<div class="small muted">No budget lines yet.</div>';
+  const vend = {};
+  P.pays.forEach(p => {
+    const name = (p.vendors && p.vendors.name) || 'No contractor';
+    const v = (vend[name] ||= {paid: 0, count: 0});
+    v.paid += num(p.amount);
+    v.count++;
+  });
+  const vendRows = Object.keys(vend).sort().map(name => `<div class="rep-row"><span>${esc(name)} <span class="small muted">· ${vend[name].count} paid</span></span><span class="num">${money(vend[name].paid)}</span></div>`).join('')
+    || '<div class="small muted">No payments yet.</div>';
+  const coiRows = [...P.assignedIds].map(id => {
+    const v = S.vendors.find(x => x.id === id);
+    const st = coiStatus(P.insMap[id + '|' + P.project.id]);
+    return {name: v ? v.name : 'Contractor', st};
+  }).filter(x => x.st !== 'ok' && x.st !== 'dismissed');
+  const coiHtml = coiRows.map(x => `<div class="rep-row"><span>${esc(x.name)}</span>${coiBadge(x.st)}</div>`).join('')
+    || '<div class="small muted">Every assigned contractor has a certificate of insurance on file.</div>';
+  $('#main').innerHTML = `
+    <div class="page-h"><h2>Reports</h2></div>
+    <div class="small muted" style="margin:-4px 0 12px">Built from this project's budget and transactions. Updates as you enter data.</div>
+    <div class="card" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px">
+      <div><div class="small muted">Budget</div><div class="num" style="font-size:18px">${money(budget)}</div></div>
+      <div><div class="small muted">Paid</div><div class="num" style="font-size:18px">${money(paid)}</div></div>
+      <div><div class="small muted">Owed</div><div class="num" style="font-size:18px">${money(owed)}</div></div>
+      <div><div class="small muted">Waiting on vendor confirmation</div><div class="num" style="font-size:18px">${waiting.length} · ${money(waiting.reduce((a, p) => a + num(p.amount), 0))}</div></div>
+    </div>
+    <div class="card" style="margin-top:12px"><h3 style="margin:0 0 8px">Paid by division</h3>${divRows}</div>
+    <div class="card" style="margin-top:12px"><h3 style="margin:0 0 8px">Payments by contractor</h3>${vendRows}</div>
+    <div class="card" style="margin-top:12px"><h3 style="margin:0 0 8px">Insurance needing attention</h3>${coiHtml}</div>`;
+}
+
+// ---------- Files (receipts and insurance certificates for this project) ----------
+function renderFiles(P){
+  const payOf = id => P.pays.find(p => p.id === id) || {};
+  const receipts = P.receipts.map(r => {
+    const p = payOf(r.payment_id);
+    return {path: r.path, name: r.filename || 'Receipt', kind: 'Receipt', date: p.pay_date || '',
+      sub: `${p.pay_date ? fmtDate(p.pay_date) : ''} · ${(p.vendors && p.vendors.name) || 'No contractor'} · ${money(p.amount)}`};
+  });
+  const cois = Object.values(P.insMap).filter(r => r.file_path).map(r => {
+    const v = S.vendors.find(x => x.id === r.vendor_id);
+    return {path: r.file_path, name: 'Insurance certificate', kind: 'COI', date: r.expires_on || '',
+      sub: `${v ? v.name : 'Contractor'}${r.expires_on ? ' · expires ' + fmtDate(r.expires_on) : ''}${r.holder_listed ? ' · bank listed' : ''}`};
+  });
+  const rows = [...cois, ...receipts].sort((a, b) => String(b.date).localeCompare(String(a.date)));
+  const list = rows.map(f => `
+    <div class="card" style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:8px">
+      <div><strong>${esc(f.name)}</strong> <span class="badge">${f.kind}</span><div class="small muted">${esc(f.sub)}</div></div>
+      <button class="btn sm" data-act="open-file" data-path="${esc(f.path)}">Open</button>
+    </div>`).join('');
+  $('#main').innerHTML = `
+    <div class="page-h"><h2>Files</h2></div>
+    <div class="small muted" style="margin:-4px 0 12px">Receipts attach to transactions. Certificates of insurance attach to contractors.</div>
+    ${list || '<div class="empty">No files yet.</div>'}`;
 }
 
 // ---------- Contractors (assigned to this project) ----------
@@ -2245,6 +2321,8 @@ function renderSide(r){
         ${link(`#/project/${id}/schedule`, 'Schedule', r.tab === 'schedule', 'child')}
         ${link(`#/project/${id}/payments`, 'Transactions', r.tab === 'payments', 'child')}
         ${link(`#/project/${id}/contractors`, 'Contractors', r.tab === 'contractors', 'child')}
+        ${link(`#/project/${id}/reports`, 'Reports', r.tab === 'reports', 'child')}
+        ${link(`#/project/${id}/files`, 'Files', r.tab === 'files', 'child')}
       </div>
       <div class="side-group">
         <div class="side-sec">Company</div>
