@@ -997,6 +997,57 @@ function currentDraw(P){
   return P.draws.find(d => d.id === S.drawSel) || P.draws[P.draws.length - 1] || null;
 }
 
+// Print-ready draw request. The user picks "Save as PDF" in the print dialog and sends it to the bank inspector.
+function printDraw(P, cur){
+  const rows = drawRows(P, cur);
+  const request = rows.reduce((a, r) => a + r.amt, 0);
+  const loan = num(P.project.loan_amount);
+  const fundedBefore = P.draws.filter(d => d.status === 'Funded' && d.draw_number < cur.draw_number)
+    .reduce((a, d) => a + num(d.funded_amount), 0);
+  const w = window.open('', '_blank');
+  if (!w){ toast('Allow pop-ups for this site to download the draw report.', true); return; }
+  const body = rows.map(r => `<tr>
+      <td>${esc(lineName(r.line))}</td>
+      <td class="r">${money(r.budget)}</td>
+      <td class="r">${r.before}%</td>
+      <td class="r">${r.pct}%</td>
+      <td class="r">${r.bank ? 'Yes' : 'No'}</td>
+      <td class="r">${r.bank ? money(r.amt) : '—'}</td>
+    </tr>`).join('');
+  w.document.write(`<!doctype html><html><head><meta charset="utf-8">
+    <title>Draw ${cur.draw_number} · ${esc(P.project.name)}</title>
+    <style>
+      body{font-family:Arial,Helvetica,sans-serif;color:#111;margin:32px;font-size:13px}
+      h1{font-size:20px;margin:0 0 4px} .sub{color:#444;margin-bottom:16px}
+      .sum{display:flex;gap:28px;margin:14px 0;flex-wrap:wrap}
+      .sum div{min-width:150px} .lbl{color:#555;font-size:12px} .val{font-size:16px;font-weight:bold}
+      table{width:100%;border-collapse:collapse;margin-top:10px}
+      th,td{border-bottom:1px solid #ddd;padding:6px;text-align:left;vertical-align:top}
+      th{border-bottom:2px solid #111;font-size:12px} .r{text-align:right}
+      .tot td{font-weight:bold;border-top:2px solid #111}
+      .sig{margin-top:56px;display:flex;gap:40px} .sig div{flex:1;border-top:1px solid #111;padding-top:4px}
+      @media print{ .noprint{display:none} }
+    </style></head><body>
+    <h1>Draw ${cur.draw_number} request</h1>
+    <div class="sub">${esc(P.project.name)}${P.project.address ? ' · ' + esc(P.project.address) : ''}<br>
+      ${P.project.lender ? 'Lender: ' + esc(P.project.lender) + ' · ' : ''}Prepared ${esc(fmtDate(todayISO()))}${cur.due_date ? ' · Due ' + esc(fmtDate(cur.due_date)) : ''}</div>
+    <div class="sum">
+      <div><div class="lbl">Loan amount</div><div class="val">${money(loan)}</div></div>
+      <div><div class="lbl">Funded before this draw</div><div class="val">${money(fundedBefore)}</div></div>
+      <div><div class="lbl">Requested this draw</div><div class="val">${money(request)}</div></div>
+      <div><div class="lbl">Left to fund after this draw</div><div class="val">${money(Math.max(0, loan - fundedBefore - request))}</div></div>
+    </div>
+    <table>
+      <thead><tr><th>Budget line</th><th class="r">Budget</th><th class="r">Built at last draw</th><th class="r">Built to date</th><th class="r">Bank funds</th><th class="r">Request</th></tr></thead>
+      <tbody>${body}</tbody>
+      <tfoot><tr class="tot"><td colspan="5">Total requested</td><td class="r">${money(request)}</td></tr></tfoot>
+    </table>
+    <div class="sig"><div>Borrower signature and date</div><div>Inspector approval and date</div></div>
+    <script>window.onload = () => setTimeout(() => window.print(), 200);<\/script>
+    </body></html>`);
+  w.document.close();
+}
+
 function renderDraws(P){
   const loan = num(P.project.loan_amount);
   const fundedSoFar = P.draws.filter(d => d.status === 'Funded').reduce((a, d) => a + num(d.funded_amount), 0);
@@ -1052,7 +1103,7 @@ function renderDraws(P){
       </div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">
         <button class="btn primary sm" data-act="save-draw">Save draw</button>
-        ${cur.status === 'Draft' ? '<button class="btn sm" data-act="mark-sent">Mark sent to bank</button>' : ''}
+        <button class="btn sm" data-act="print-draw">Download draw report (PDF)</button>
         ${cur.status !== 'Funded' ? '<button class="btn sm" data-act="mark-funded">Mark funded</button>' : ''}
       </div>
     </div>`;
@@ -2079,11 +2130,7 @@ const actions = {
     toast('Draw saved');
     render();
   },
-  'mark-sent': async () => {
-    const cur = currentDraw(S.proj);
-    check(await sb.from('draws').update({status: 'Sent'}).eq('id', cur.id));
-    render();
-  },
+  'print-draw': () => printDraw(S.proj, currentDraw(S.proj)),
   'mark-funded': () => {
     const P = S.proj;
     const cur = currentDraw(P);
