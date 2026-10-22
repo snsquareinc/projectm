@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>Payment confirmation</title>
+<style>
+  :root{--navy:#14213D;--teal:#0D9488;--ink:#0F172A;--muted:#64748B;--line:#E2E8F0;--bg:#F1F5F9}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:Inter,system-ui,-apple-system,Segoe UI,Arial,sans-serif;font-size:15px;line-height:1.4}
+  header{background:var(--navy);color:#fff;padding:20px 16px 22px;border-radius:0 0 20px 20px}
+  header .k{font-size:11px;letter-spacing:1px;text-transform:uppercase;color:#94A3B8;font-weight:600}
+  header h1{font-size:22px;margin:4px 0 2px}
+  header .s{font-size:13px;color:#CBD5E1}
+  main{padding:16px;max-width:520px;margin:0 auto;display:flex;flex-direction:column;gap:14px}
+  .card{background:#fff;border-radius:16px;padding:16px;box-shadow:0 1px 2px rgba(15,23,42,.06)}
+  .notice{border-radius:12px;padding:12px 14px;font-size:14px;border:1px solid #FDE68A;background:#FFFBEB;color:#92400E}
+  .notice.ok{border-color:#A7F3D0;background:#ECFDF5;color:#065F46}
+  .notice.bad{border-color:#FECDD3;background:#FFF1F2;color:#9F1239}
+  .row{display:flex;justify-content:space-between;gap:12px;padding:6px 0}
+  .row.total{border-top:1px solid var(--line);margin-top:6px;padding-top:10px;font-weight:700}
+  .amt{font-variant-numeric:tabular-nums;font-weight:600}
+  .lbl{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;font-weight:600;margin:4px 0 6px}
+  .pay{display:flex;justify-content:space-between;gap:12px;padding:10px 0;border-top:1px solid var(--line)}
+  .pay:first-child{border-top:0}
+  .pay .sub{font-size:12px;color:var(--muted)}
+  input,textarea{width:100%;padding:13px 14px;border:1px solid #CBD5E1;border-radius:12px;font:inherit;font-size:16px;background:#fff}
+  textarea{min-height:76px;resize:vertical}
+  button{width:100%;padding:16px;border:0;border-radius:14px;font:inherit;font-size:16px;font-weight:700;cursor:pointer}
+  button:disabled{opacity:.6;cursor:default}
+  .yes{background:#059669;color:#fff}
+  .no{background:#fff;color:var(--navy);border:1px solid #CBD5E1 !important;font-weight:600;font-size:15px}
+  .err{color:#9F1239;font-size:14px;margin:0}
+  footer{font-size:12px;color:#94A3B8;text-align:center;padding:4px 0 24px}
+  [hidden]{display:none !important}
+</style>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<script src="../config.js"></script>
+</head>
+<body>
+<header>
+  <div class="k">Payment confirmation</div>
+  <h1 id="vendor">Loading…</h1>
+  <div class="s" id="project"></div>
+</header>
+<main>
+  <div class="notice" id="message" hidden></div>
+  <div id="content" hidden>
+    <div class="notice" id="status"></div>
+
+    <div class="card">
+      <div class="row"><span>Contract</span><span class="amt" id="contract"></span></div>
+      <div class="row"><span>Paid to date</span><span class="amt" id="paid" style="color:#047857"></span></div>
+      <div class="row total"><span>Balance remaining</span><span class="amt" id="balance" style="color:#B45309"></span></div>
+    </div>
+
+    <div class="lbl">Payments on this statement</div>
+    <div class="card" id="pays"></div>
+
+    <form class="card" id="answer" style="display:flex;flex-direction:column;gap:12px" novalidate>
+      <input id="name" name="name" autocomplete="name" placeholder="Your full name" aria-label="Your full name">
+      <textarea id="note" name="note" placeholder="Anything that does not match? (optional)" aria-label="Note"></textarea>
+      <p class="err" id="err" hidden></p>
+      <button type="button" class="yes" id="yes">Yes, I received these amounts</button>
+      <button type="button" class="no" id="no">Something doesn't match</button>
+    </form>
+  </div>
+  <footer>Your answer is sent to SN Square. You do not need an account.</footer>
+</main>
+
+<script>
+  const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const usd = n => Number(n || 0).toLocaleString('en-US', {style: 'currency', currency: 'USD', maximumFractionDigits: 2});
+  const date = s => s ? new Date(s + 'T12:00:00').toLocaleDateString('en-US', {month: 'short', day: 'numeric', year: 'numeric'}) : '';
+  const sb = supabase.createClient(window.TRACKER_CONFIG.url, window.TRACKER_CONFIG.anonKey);
+  // The secret sits after the # so it is never sent to the web server.
+  const token = new URLSearchParams(location.hash.slice(1)).get('t');
+  const $ = id => document.getElementById(id);
+
+  function message(text){
+    $('vendor').textContent = 'Payment confirmation';
+    $('message').textContent = text;
+    $('message').hidden = false;
+  }
+
+  function render(d){
+    $('vendor').textContent = d.vendor_name;
+    $('project').textContent = [d.project_name, d.project_address].filter(Boolean).join(' · ');
+    $('contract').textContent = usd(d.contract_amount);
+    $('paid').textContent = usd(d.paid_to_date);
+    $('balance').textContent = usd(d.balance);
+    $('pays').innerHTML = (d.payments || []).map(p => `
+      <div class="pay">
+        <div><div>${esc(date(p.pay_date))} · ${esc(p.method)}${p.reference ? ' #' + esc(p.reference) : ''}</div></div>
+        <div class="amt">${usd(p.amount)}</div>
+      </div>`).join('') || '<div>No payments listed.</div>';
+    const status = $('status');
+    if (d.responded_at){
+      status.className = 'notice ok';
+      status.textContent = `You answered "${d.response === 'Confirmed' ? 'Yes, received' : 'Something does not match'}" on ${date(String(d.responded_at).slice(0, 10))}. Thank you.`;
+      $('answer').hidden = true;
+    } else {
+      status.className = 'notice';
+      status.textContent = `Please check these payments. Confirming takes one tap. This link expires ${date(d.expires_on)}.`;
+    }
+    $('content').hidden = false;
+  }
+
+  async function load(){
+    if (!token) return message('This link is incomplete. Ask SN Square for a new link.');
+    const {data, error} = await sb.rpc('get_payment_confirmation', {p_token: token});
+    if (error) return message('This page could not load. Try again in a few minutes.');
+    if (!data) return message('This link is not valid or has expired. Ask SN Square for a new link.');
+    render(data);
+  }
+
+  async function answer(response){
+    const name = $('name').value.trim();
+    const err = $('err');
+    err.hidden = true;
+    if (!name){ err.textContent = 'Enter your full name first.'; err.hidden = false; return; }
+    $('yes').disabled = true; $('no').disabled = true;
+    const {error} = await sb.rpc('respond_payment_confirmation', {
+      p_token: token, p_name: name, p_response: response, p_note: $('note').value.trim()
+    });
+    if (error){
+      err.textContent = error.message || 'Could not save your answer. Try again.';
+      err.hidden = false;
+      $('yes').disabled = false; $('no').disabled = false;
+      return;
+    }
+    load();
+  }
+
+  $('yes').addEventListener('click', () => answer('Confirmed'));
+  $('no').addEventListener('click', () => answer('Disputed'));
+  load();
+</script>
+</body>
+</html>
