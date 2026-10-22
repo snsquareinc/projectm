@@ -1,56 +1,59 @@
-# Construction Project Tracker
+# SN Square Project Tracker
 
-A web app for your project: budget by category, tasks with schedule and costs, and receipt uploads.
-It runs on Netlify (hosting) and Supabase (database, login, and receipt storage). You own both accounts.
+A mobile-first web app for projects: library of divisions and sub-tasks, budget roll-up, payments with
+receipts, contractors with insurance and W-9 tracking.
+It runs on Netlify (hosting) and Supabase (database, login, and file storage). You own both accounts.
 
 ## Files
 
 - `tracker/index.html`: the app. Served at `/tracker/` on your site.
 - `config.js`: your Supabase URL and public key. Served at `/config.js`.
-- `schema.sql`: database tables, access rules, and the receipts storage bucket.
+- `supabase/001_phase1.sql`: tables, access rules, library seed (21 divisions, 212 sub-tasks).
+- `supabase/002_project_vendors.sql`: contractor assignments to projects.
+- `supabase/003_qty_rate.sql`: Sq.Ft. / Qty and Rate on budget lines (budget = qty × rate).
+- `supabase/004_line_fields.sql`: unit and notes on budget lines.
+- `supabase/005_schedule.sql`: project schedule tasks with dates, progress, and budget line links.
+- `supabase/006_payment_notes.sql`: notes on each transaction.
+- `supabase/007_contract.sql`: signed contract amount per budget line.
 
 ## One-time setup
 
 ### 1. Create the Supabase project
 1. Go to supabase.com, sign in, and create a new project. Choose a region near Massachusetts and save the database password.
-2. Open **SQL Editor**, paste all of `schema.sql`, and click **Run**.
+2. Open **SQL Editor**, paste `supabase/001_phase1.sql`, and click **Run**.
+3. In a new query, paste `supabase/002_project_vendors.sql` and click **Run**.
+4. In new queries, paste `supabase/003_qty_rate.sql`, then `004_line_fields.sql`, then `005_schedule.sql`, then `006_payment_notes.sql`, then `007_contract.sql`, clicking **Run** on each.
 
 ### 2. Lock down sign-ups and add yourself
-1. In Supabase, go to **Authentication > Sign In / Providers > Email** and turn off "Allow new users to sign up". This keeps strangers out.
+1. In Supabase, go to **Authentication > Sign In / Providers > Email**, keep Email enabled, and turn off "Allow new users to sign up".
 2. Go to **Authentication > Users > Add user**, enter your email and a password, and create the user.
-   Add anyone else who should have access the same way.
 
 ### 3. Connect the app to Supabase
 1. In Supabase, go to **Project Settings > API**.
 2. Copy the **Project URL** and the **anon public** key into `config.js`.
 
-### 4. Put the files on your Netlify site
-Add the `tracker` folder and `config.js` to your site's repository, at the top level next to the site's
-other files, then push. Netlify redeploys automatically.
-
-If your site's publish folder is not the repository root, put `tracker/` and `config.js` inside that folder instead,
-and change the `../config.js` line in `tracker/index.html` to match.
-
-Open `https://snsquareinc.com/tracker/` (or your Netlify address plus `/tracker/`) and sign in.
+### 5. Deploy
+Push the repository. Netlify redeploys the site. Open `https://snsquareinc.com/tracker/` and sign in.
 
 ## Using it
 
-- **Quick add** (bottom button): name, category, status, costs, and date. Edit the task later for the rest.
-- **Add task / Edit**: all fields. Receipts can be attached once the task is saved.
-- **Categories**: add a category, then type its approved budget in the table.
-- **Project details**: name, client, manager, and dates.
-- Delete buttons ask you to press them twice.
+- **Projects**: create a project, then open it. Project details can be edited any time.
+- **Budget**: add sub-tasks from the Library, or a custom line. Division totals roll up from their lines.
+  Record a revision on a line with a reason. Lines with payments cannot be deleted.
+- **Schedule**: add tasks with start and end dates, % complete, and an optional budget line. The look-ahead
+  shows what is active this week, next week, this month, and next month.
+- **Payments**: every payment needs a budget line. If the description does not match an existing line,
+  pick one or choose "+ New line" to add it. Receipts and invoices attach to each payment.
+- **Contractors**: assign a contractor to a project. Each one needs a certificate of insurance. The reminder
+  shows every day until the certificate is added or dismissed with a reason from the list.
+- **Contractors (main tab)**: all contractors, W-9 status, and 1099 totals by year. Tap one for its payment ledger.
+- **Library**: divisions and sub-tasks shared by every project.
 
 ## Notes
 
 - Only signed-in users can read or write data. The public key in `config.js` is safe to publish;
-  the access rules in `schema.sql` are what protect the data.
-- Receipts are stored privately in Supabase. Opening one creates a link that expires after an hour.
-- Backups: in Supabase, your data is kept by the provider, but keep your own copy too. The free tier has
-  limits on storage and on paused projects; check current limits on supabase.com before relying on it.
-- Netlify and Supabase pricing and limits change. Check their pricing pages when you set up.
-
-## Changing the app later
-
-The app is one HTML file. Edits can be made here, or by a developer working from this folder.
-If you want changes made for you, share the repository or the file with me.
+  the access rules in the SQL files are what protect the data.
+- Files are stored privately. Opening one creates a link that expires after 10 minutes.
+- Not yet built: draws, the bank draw report, vendor confirmation pages,
+  statements by email, the Reports tab, and the Files tab. These are the next phases.
+- Backups: keep your own copy of important files. Check current Supabase and Netlify limits and pricing before relying on them.
