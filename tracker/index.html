@@ -1165,9 +1165,17 @@ async function loadPhotoThumbs(){
   }));
 }
 
+// Budget lines grouped under their division, like the Budget screen
+function lineOptgroups(P, selected){
+  const byDiv = {};
+  P.lines.forEach(l => { (byDiv[l.division_code] ||= []).push(l); });
+  return Object.keys(byDiv).sort().map(code => `<optgroup label="${esc(divName(code))}">${
+    byDiv[code].map(l => `<option value="${l.id}" ${l.id === selected ? 'selected' : ''}>${esc(lineName(l))}</option>`).join('')
+  }</optgroup>`).join('');
+}
+
 function photoLineOptions(P, selected, emptyLabel){
-  return `<option value="">${esc(emptyLabel)}</option>` + P.lines.map(l =>
-    `<option value="${l.id}" ${l.id === selected ? 'selected' : ''}>${esc(lineName(l))}</option>`).join('');
+  return `<option value="">${esc(emptyLabel)}</option>` + lineOptgroups(P, selected);
 }
 
 function renderPhotos(P){
@@ -1187,12 +1195,16 @@ function renderPhotos(P){
   $('#main').innerHTML = `
     <div class="page-h"><h2>Photos</h2><button class="btn primary sm" data-act="add-photos">+ Add Photos</button></div>
     <div class="tx-tools">
-      <select id="photoFilter" aria-label="Show photos for">
-        <option value="">All photos</option>
-        <option value="__none" ${f === '__none' ? 'selected' : ''}>No budget line</option>
-        ${P.lines.map(l => `<option value="${l.id}" ${l.id === f ? 'selected' : ''}>${esc(lineName(l))}</option>`).join('')}
-      </select>
-      <select id="photoNewLine" aria-label="Link new photos to a budget line">${photoLineOptions(P, S.photoNewLine || '', 'New photos: no budget line')}</select>
+      <label class="small muted">Show
+        <select id="photoFilter">
+          <option value="">All photos</option>
+          <option value="__none" ${f === '__none' ? 'selected' : ''}>No budget line</option>
+          ${lineOptgroups(P, f)}
+        </select>
+      </label>
+      <label class="small muted">New uploads go to
+        <select id="photoNewLine">${photoLineOptions(P, S.photoNewLine || '', 'No budget line')}</select>
+      </label>
     </div>
     <div class="small muted" style="margin:-4px 0 12px">Pictures are shrunk on your device before upload to save space. Pick a budget line above to link new photos to it. Tap a photo to change its date, caption or line, or delete it.</div>
     <input type="file" id="photoIn" accept="image/*" multiple hidden>
