@@ -33,6 +33,11 @@ button,input,select,textarea{font:inherit;color:inherit}
 .photo-cell:focus-visible{outline:2px solid var(--teal,#0D9488);outline-offset:2px;border-radius:10px}
 .photo-cell img{width:100%;aspect-ratio:4/3;object-fit:cover;border-radius:10px;background:#E2E8F0;display:block}
 .photo-cell span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.photo-sec{margin-bottom:20px}
+.photo-sec-h{margin-bottom:8px}
+.photo-grid.fixed{grid-template-columns:repeat(4,minmax(0,1fr))}
+.photo-sec > .btn{margin-top:8px}
+@media (max-width:640px){.photo-grid.fixed{grid-template-columns:repeat(2,minmax(0,1fr))}}
 .back{color:#94A3B8;text-decoration:none;font-size:13px;font-weight:600}
 main{padding:14px 16px 110px;display:flex;flex-direction:column;gap:12px;max-width:1180px;margin:0 auto}
 .bottomnav{position:fixed;left:0;right:0;bottom:0;background:#fff;border-top:1px solid var(--line);display:flex;justify-content:space-around;padding:8px 8px calc(8px + env(safe-area-inset-bottom,0px));z-index:4}
@@ -1178,20 +1183,46 @@ function photoLineOptions(P, selected, emptyLabel){
   return `<option value="">${esc(emptyLabel)}</option>` + lineOptgroups(P, selected);
 }
 
+function photoCell(ph){
+  return `
+    <button type="button" class="photo-cell" data-act="open-photo" data-id="${ph.id}" aria-label="Open photo from ${esc(fmtDate(ph.taken_on))}">
+      <img data-photo-path="${esc(ph.path)}" alt="" loading="lazy">
+      <span class="small muted">${esc(fmtDate(ph.taken_on))}${ph.caption ? ' · ' + esc(ph.caption) : ''}</span>
+    </button>`;
+}
+
 function renderPhotos(P){
   const f = S.photoFilter || '';
-  const shown = P.photos.filter(ph => !f ? true : f === '__none' ? !ph.budget_line_id : ph.budget_line_id === f);
-  const lineOf = id => P.lines.find(l => l.id === id);
-  const body = shown.length
-    ? `<div class="photo-grid">${shown.map(ph => {
-        const ln = lineOf(ph.budget_line_id);
-        return `
-        <button type="button" class="photo-cell" data-act="open-photo" data-id="${ph.id}" aria-label="Open photo from ${esc(fmtDate(ph.taken_on))}">
-          <img data-photo-path="${esc(ph.path)}" alt="" loading="lazy">
-          <span class="small muted">${esc(fmtDate(ph.taken_on))}${ln ? ' · ' + esc(lineName(ln)) : ''}${ph.caption ? ' · ' + esc(ph.caption) : ''}</span>
-        </button>`;
-      }).join('')}</div>`
-    : `<div class="empty">${P.photos.length ? 'No photos match this line.' : 'No photos yet. Add photos as the work goes. Each one is saved to this project with the date.'}</div>`;
+  const open = S.photoOpen || (S.photoOpen = {});
+  const narrow = window.matchMedia('(max-width:640px)').matches;
+  const limit = (narrow ? 2 : 4) * 2;   // two rows per budget line until "Show all"
+  let sections;
+  if (f){
+    const ln = P.lines.find(l => l.id === f);
+    sections = [{key: f, title: ln ? `${divName(ln.division_code)} · ${lineName(ln)}` : 'No budget line',
+      list: P.photos.filter(ph => f === '__none' ? !ph.budget_line_id : ph.budget_line_id === f)}];
+  } else {
+    const ordered = P.lines.slice().sort((x, y) => x.division_code < y.division_code ? -1 : x.division_code > y.division_code ? 1 : 0);
+    sections = ordered.map(l => ({key: l.id, title: `${divName(l.division_code)} · ${lineName(l)}`,
+      list: P.photos.filter(ph => ph.budget_line_id === l.id)}));
+    sections.push({key: '__none', title: 'No budget line', list: P.photos.filter(ph => !ph.budget_line_id)});
+    sections = sections.filter(sec => sec.list.length);
+  }
+  const sectionsHtml = sections.map(sec => {
+    const expanded = !!open[sec.key] || !!f;
+    const shown = expanded ? sec.list : sec.list.slice(0, limit);
+    const count = `${sec.list.length} ${sec.list.length === 1 ? 'photo' : 'photos'}`;
+    const more = !f && sec.list.length > limit
+      ? `<button class="btn sm" data-act="photo-more" data-id="${sec.key}">${open[sec.key] ? 'Show fewer' : 'Show all ' + sec.list.length}</button>` : '';
+    return `<section class="photo-sec">
+      <div class="photo-sec-h"><strong>${esc(sec.title)}</strong> <span class="small muted">${count}</span></div>
+      ${sec.list.length ? `<div class="photo-grid fixed">${shown.map(photoCell).join('')}</div>` : '<div class="small muted">No photos yet.</div>'}
+      ${more}
+    </section>`;
+  }).join('');
+  const emptyMsg = P.photos.length
+    ? 'No photos match this choice.'
+    : 'No photos yet. Add photos as the work goes. Each one is saved to this project with the date.';
   $('#main').innerHTML = `
     <div class="page-h"><h2>Photos</h2><button class="btn primary sm" data-act="add-photos">+ Add Photos</button></div>
     <div class="tx-tools">
@@ -1206,9 +1237,9 @@ function renderPhotos(P){
         <select id="photoNewLine">${photoLineOptions(P, S.photoNewLine || '', 'No budget line')}</select>
       </label>
     </div>
-    <div class="small muted" style="margin:-4px 0 12px">Pictures are shrunk on your device before upload to save space. Pick a budget line above to link new photos to it. Tap a photo to change its date, caption or line, or delete it.</div>
+    <div class="small muted" style="margin:-4px 0 12px">Pictures are shrunk on your device before upload to save space. Tap a photo to change its date, caption or line, or delete it.</div>
     <input type="file" id="photoIn" accept="image/*" multiple hidden>
-    ${body}`;
+    ${sectionsHtml || `<div class="empty">${emptyMsg}</div>`}`;
   $('#photoFilter').addEventListener('change', e => { S.photoFilter = e.target.value; render(); });
   $('#photoNewLine').addEventListener('change', e => { S.photoNewLine = e.target.value; });
   $('#photoIn').addEventListener('change', e => {
@@ -2284,6 +2315,7 @@ const actions = {
   },
   'add-photos': () => $('#photoIn').click(),
   'open-photo': (t, id) => photoSheet(S.proj, S.proj.photos.find(x => x.id === id)),
+  'photo-more': (t, id) => { const o = S.photoOpen || (S.photoOpen = {}); o[id] = !o[id]; render(); },
   'open-pay': (t, id) => paymentDetail(S.proj.pays.find(p => p.id === id)),
   'open-file': (t) => openFile(t.dataset.path).catch(e => toast(msg(e), true)),
   'del-receipt': async (t, id) => {
