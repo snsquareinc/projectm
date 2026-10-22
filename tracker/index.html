@@ -1943,6 +1943,41 @@ function paymentSheet(){
   });
 }
 
+// Edit one transaction on a phone. Same fields and save steps as an editable row on the desktop.
+function paymentEdit(p){
+  const P = S.proj;
+  const line = P.lines.find(l => l.id === p.budget_line_id);
+  document.querySelectorAll('dialog.sheet[open]').forEach(d => d.close());
+  sheet({
+    title: 'Edit Transaction',
+    submit: 'Save Changes',
+    html: `${txDatalists(P)}<div class="grid">
+      <label>Date<input type="date" name="pay_date" value="${esc(p.pay_date)}"></label>
+      <label>Amount ($)<input type="text" class="money" name="amount" inputmode="decimal" value="${esc(fmtInput(p.amount))}"></label>
+      <label class="full">Expense Classification<select name="div"><option value="">Choose A Division</option>${divOptions(line ? line.division_code : '')}</select></label>
+      <label class="full">Task<input name="task" list="txLines" autocomplete="off" value="${esc(line ? lineName(line) : '')}"></label>
+      <label class="full">Paid To<input name="vendor" list="txVendors" autocomplete="off" value="${esc(p.vendors ? p.vendors.name : '')}"></label>
+      <label>Method<select name="method">${PAY_METHODS.map(m => `<option ${m === p.method ? 'selected' : ''}>${m}</option>`).join('')}</select></label>
+      <label>Check Or Reference #<input name="reference" value="${esc(p.reference || '')}"></label>
+    </div>`,
+    onSubmit: async form => {
+      const v = form.elements;
+      const amount = num(v.amount.value);
+      if (!v.pay_date.value) throw new Error('Enter the payment date.');
+      if (!(amount > 0)) throw new Error('Enter the amount.');
+      const l = await resolveLineId(P, v.task.value, v.div.value);
+      const vend = await vendorFor(P, null, v.vendor.value);
+      check(await sb.from('payments').update({
+        pay_date: v.pay_date.value, amount, method: v.method.value, reference: v.reference.value.trim(),
+        vendor_id: vend.vendorId, budget_line_id: l.lineId
+      }).eq('id', p.id));
+      const note = txNotes(vend, l);
+      toast(note || 'Transaction saved.');
+      await render();
+    }
+  });
+}
+
 function lineOptions(lines, selected){
   const byDiv = {};
   lines.forEach(l => { (byDiv[l.division_code] ||= []).push(l); });
@@ -1993,6 +2028,7 @@ function paymentDetail(p){
         <dt>Invoice</dt><dd>${esc(p.invoice_number || '—')}</dd>
         <dt>Status</dt><dd>${esc(p.status)}</dd>
       </dl>
+      <button type="button" class="btn primary" data-act="edit-pay" data-id="${p.id}" style="width:100%">Edit Transaction</button>
       <div>
         <div class="small muted" style="font-weight:600;text-transform:uppercase;letter-spacing:.6px">Receipts</div>
         ${files.map(f => `<div class="file-li"><span>${esc(f.filename || f.path)}</span>
@@ -2338,6 +2374,7 @@ const actions = {
   'open-photo': (t, id) => photoSheet(S.proj, S.proj.photos.find(x => x.id === id)),
   'photo-more': (t, id) => { const o = S.photoOpen || (S.photoOpen = {}); o[id] = !o[id]; render(); },
   'open-pay': (t, id) => paymentDetail(S.proj.pays.find(p => p.id === id)),
+  'edit-pay': (t, id) => paymentEdit(S.proj.pays.find(p => p.id === id)),
   'open-file': (t) => openFile(t.dataset.path).catch(e => toast(msg(e), true)),
   'del-receipt': async (t, id) => {
     if (!confirm('Remove this receipt?')) return;
