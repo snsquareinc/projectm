@@ -545,12 +545,16 @@ async function loadProject(id){
   const pays = check(pay);
   const ids = pays.map(x => x.id);
   const receipts = ids.length ? check(await sb.from('payment_receipts').select('*').in('payment_id', ids).order('created_at')) : [];
+  const drawRows = check(await sb.from('draws').select('*').eq('project_id', id).order('draw_number'));
+  const drawLines = drawRows.length ? check(await sb.from('draw_lines').select('*').in('draw_id', drawRows.map(d => d.id))) : [];
   S.vendors = check(v);
   S.proj = {
     project: check(p),
     lines: check(l),
     pays,
     receipts,
+    draws: drawRows,
+    drawLines,
     assignedIds: new Set(check(pv).map(x => x.vendor_id)),
     insMap: latestInsMap(check(ins)),
     tasks: tk.error ? [] : (tk.data || []),
@@ -570,11 +574,13 @@ async function renderProject(r){
       <a href="#/project/${pr.id}/schedule" ${r.tab === 'schedule' ? 'aria-current="page"' : ''}>Schedule</a>
       <a href="#/project/${pr.id}/payments" ${r.tab === 'payments' ? 'aria-current="page"' : ''}>Transactions</a>
       <a href="#/project/${pr.id}/contractors" ${r.tab === 'contractors' ? 'aria-current="page"' : ''}>Contractors</a>
+      <a href="#/project/${pr.id}/draws" ${r.tab === 'draws' ? 'aria-current="page"' : ''}>Draws</a>
       <a href="#/project/${pr.id}/reports" ${r.tab === 'reports' ? 'aria-current="page"' : ''}>Reports</a>
       <a href="#/project/${pr.id}/files" ${r.tab === 'files' ? 'aria-current="page"' : ''}>Files</a>
     </div>`);
   if (r.tab === 'payments') renderPayments(P);
   else if (r.tab === 'contractors') renderContractors(P);
+  else if (r.tab === 'draws') renderDraws(P);
   else if (r.tab === 'reports') renderReports(P);
   else if (r.tab === 'files') renderFiles(P);
   else if (r.tab === 'schedule') await renderSchedule(P);
@@ -959,6 +965,91 @@ function renderPayments(P){
     </div>
     <div class="tx-cards" id="txCards"></div>`;
   txFill(P);
+}
+
+// ---------- Draws (bank funding requests) ----------
+const DRAW_BADGE = {Draft: 'b-mute', Sent: 'b-warn', Funded: 'b-ok'};
+
+// Latest built % for a line on any draw numbered below beforeNo (0 if none)
+function drawPrevPct(P, lineId, beforeNo){
+  const earlier = P.draws.filter(d => d.draw_number < beforeNo).sort((a, b) => b.draw_number - a.draw_number);
+  for (const d of earlier){
+    const row = P.drawLines.find(x => x.draw_id === d.id && x.budget_line_id === lineId);
+    if (row) return num(row.percent_built);
+  }
+  return 0;
+}
+
+// Per-line numbers for one draw. This draw's amount = change in built % times the line budget, bank-funded lines only.
+function drawRows(P, cur){
+  return P.lines.map(l => {
+    const row = P.drawLines.find(x => x.draw_id === cur.id && x.budget_line_id === l.id);
+    const before = drawPrevPct(P, l.id, cur.draw_number);
+    const pct = row ? num(row.percent_built) : before;
+    const bank = row ? row.bank_funds : true;
+    const b = budgetOf(l);
+    const amt = bank ? Math.max(0, pct - before) / 100 * b : 0;
+    return {line: l, budget: b, before, pct, bank, amt};
+  });
+}
+
+function currentDraw(P){
+  return P.draws.find(d => d.id === S.drawSel) || P.draws[P.draws.length - 1] || null;
+}
+
+function renderDraws(P){
+  const loan = num(P.project.loan_amount);
+  const fundedSoFar = P.draws.filter(d => d.status === 'Funded').reduce((a, d) => a + num(d.funded_amount), 0);
+  const head = `
+    <div class="card" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px">
+      <div><div class="small muted">Loan amount</div><div class="num" style="font-size:18px">${money(loan)}</div></div>
+      <div><div class="small muted">Bank funded so far</div><div class="num" style="font-size:18px">${money(fundedSoFar)}</div></div>
+      <div><div class="small muted">Left to fund</div><div class="num" style="font-size:18px">${money(Math.max(0, loan - fundedSoFar))}</div></div>
+    </div>`;
+  const addBtn = '<button class="btn primary sm" data-act="new-draw">+ New Draw</button>';
+  const cur = currentDraw(P);
+  if (!cur){
+    $('#main').innerHTML = `<div class="page-h"><h2>Draws</h2>${addBtn}</div>${head}
+      <div class="empty" style="margin-top:12px">No draws yet. A draw is a funding request to the bank for the work built so far.</div>`;
+    return;
+  }
+  const rows = drawRows(P, cur);
+  const request = rows.reduce((a, r) => a + r.amt, 0);
+  const budgetTotal = rows.reduce((a, r) => a + r.budget, 0);
+  const built = budgetTotal ? rows.reduce((a, r) => a + r.budget * r.pct, 0) / budgetTotal : 0;
+  $('#main').innerHTML = `
+    <div class="page-h"><h2>Draws</h2>${addBtn}</div>
+    ${head}
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin:12px 0">
+      ${P.draws.map(d => `<button class="btn sm ${d.id === cur.id ? 'primary' : ''}" data-act="select-draw" data-id="${d.id}">Draw ${d.draw_number} · ${esc(d.status)}</button>`).join('')}
+    </div>
+    <div class="card">
+      <div class="card-h"><strong>Draw ${cur.draw_number}</strong><span class="badge ${DRAW_BADGE[cur.status]}">${esc(cur.status)}</span></div>
+      <input type="hidden" id="drawId" value="${cur.id}">
+      <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:flex-end;margin-bottom:10px">
+        <label>Due date<input type="date" id="drawDue" value="${esc(cur.due_date || '')}"></label>
+        <div><div class="small muted">This draw request</div><div class="num" style="font-size:18px">${money(request)}</div></div>
+        <div><div class="small muted">Built overall</div><div class="num" style="font-size:18px">${Math.round(built)}%</div></div>
+      </div>
+      <div style="overflow-x:auto">
+        <table class="sheet-tbl">
+          <thead><tr><th>Line</th><th class="r">Budget</th><th class="r">Built before</th><th class="r">Built now</th><th class="ctr">Bank funds</th><th class="r">This draw</th></tr></thead>
+          <tbody>${rows.map(r => `<tr>
+            <td>${esc(lineName(r.line))}</td>
+            <td class="r num">${money(r.budget)}</td>
+            <td class="r num">${r.before}%</td>
+            <td class="r"><input type="number" min="0" max="100" step="1" data-pct="${r.line.id}" value="${r.pct}" style="width:70px"></td>
+            <td class="ctr"><input type="checkbox" data-bank="${r.line.id}" ${r.bank ? 'checked' : ''}></td>
+            <td class="r num">${r.bank ? money(r.amt) : '<span class="muted">Not bank funded</span>'}</td>
+          </tr>`).join('') || '<tr><td colspan="6" class="muted">No budget lines yet.</td></tr>'}</tbody>
+        </table>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">
+        <button class="btn primary sm" data-act="save-draw">Save draw</button>
+        ${cur.status === 'Draft' ? '<button class="btn sm" data-act="mark-sent">Mark sent to bank</button>' : ''}
+        ${cur.status !== 'Funded' ? '<button class="btn sm" data-act="mark-funded">Mark funded</button>' : ''}
+      </div>
+    </div>`;
 }
 
 // ---------- Reports (computed from this project's data) ----------
@@ -1958,6 +2049,53 @@ const actions = {
   },
   'new-task': () => taskSheet(null, S.proj),
   'edit-task': (t, id) => taskSheet(S.proj.tasks.find(x => x.id === id), S.proj),
+  'new-draw': async () => {
+    const P = S.proj;
+    const no = P.draws.reduce((a, d) => Math.max(a, d.draw_number), 0) + 1;
+    const d = check(await sb.from('draws').insert({project_id: P.project.id, draw_number: no, status: 'Draft'}).select().single());
+    const lines = P.lines.map(l => ({draw_id: d.id, budget_line_id: l.id, percent_built: drawPrevPct(P, l.id, no + 1), bank_funds: true}));
+    if (lines.length) check(await sb.from('draw_lines').insert(lines));
+    S.drawSel = d.id;
+    render();
+  },
+  'select-draw': (t, id) => { S.drawSel = id; render(); },
+  'save-draw': async () => {
+    const P = S.proj;
+    const main = $('#main');
+    const drawId = main.querySelector('#drawId').value;
+    const rows = P.lines.map(l => ({
+      draw_id: drawId, budget_line_id: l.id,
+      percent_built: Math.min(100, Math.max(0, num(main.querySelector(`[data-pct="${l.id}"]`).value))),
+      bank_funds: main.querySelector(`[data-bank="${l.id}"]`).checked
+    }));
+    if (rows.length) check(await sb.from('draw_lines').upsert(rows, {onConflict: 'draw_id,budget_line_id'}));
+    check(await sb.from('draws').update({due_date: main.querySelector('#drawDue').value || null}).eq('id', drawId));
+    toast('Draw saved');
+    render();
+  },
+  'mark-sent': async () => {
+    const cur = currentDraw(S.proj);
+    check(await sb.from('draws').update({status: 'Sent'}).eq('id', cur.id));
+    render();
+  },
+  'mark-funded': () => {
+    const P = S.proj;
+    const cur = currentDraw(P);
+    const req = drawRows(P, cur).reduce((a, r) => a + r.amt, 0);
+    sheet({
+      title: `Draw ${cur.draw_number} funded`,
+      submit: 'Save',
+      html: `<div class="grid">
+        <label>Amount funded ($)<input type="text" class="money" name="amt" inputmode="decimal" value="${esc(fmtInput(req))}"></label>
+        <label>Funded on<input type="date" name="dt" value="${esc(todayISO())}"></label>
+      </div>`,
+      onSubmit: async form => {
+        const v = form.elements;
+        check(await sb.from('draws').update({status: 'Funded', funded_amount: num(v.amt.value), funded_date: v.dt.value || null}).eq('id', cur.id));
+        render();
+      }
+    });
+  },
   'open-pay': (t, id) => paymentDetail(S.proj.pays.find(p => p.id === id)),
   'open-file': (t) => openFile(t.dataset.path).catch(e => toast(msg(e), true)),
   'del-receipt': async (t, id) => {
@@ -2321,6 +2459,7 @@ function renderSide(r){
         ${link(`#/project/${id}/schedule`, 'Schedule', r.tab === 'schedule', 'child')}
         ${link(`#/project/${id}/payments`, 'Transactions', r.tab === 'payments', 'child')}
         ${link(`#/project/${id}/contractors`, 'Contractors', r.tab === 'contractors', 'child')}
+        ${link(`#/project/${id}/draws`, 'Draws', r.tab === 'draws', 'child')}
         ${link(`#/project/${id}/reports`, 'Reports', r.tab === 'reports', 'child')}
         ${link(`#/project/${id}/files`, 'Files', r.tab === 'files', 'child')}
       </div>
