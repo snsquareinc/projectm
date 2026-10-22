@@ -1150,7 +1150,7 @@ async function uploadPhotos(P, files){
     const blob = await shrinkImage(f);
     const path = `photos/${P.project.id}/${crypto.randomUUID()}.jpg`;
     check(await sb.storage.from('receipts').upload(path, blob, {contentType: 'image/jpeg'}));
-    check(await sb.from('project_photos').insert({project_id: P.project.id, path, taken_on: todayISO(), caption: ''}));
+    check(await sb.from('project_photos').insert({project_id: P.project.id, path, taken_on: todayISO(), caption: '', budget_line_id: S.photoNewLine || null}));
     done++;
     toast(`Uploaded ${done} of ${list.length}`);
   }
@@ -1165,19 +1165,40 @@ async function loadPhotoThumbs(){
   }));
 }
 
+function photoLineOptions(P, selected, emptyLabel){
+  return `<option value="">${esc(emptyLabel)}</option>` + P.lines.map(l =>
+    `<option value="${l.id}" ${l.id === selected ? 'selected' : ''}>${esc(lineName(l))}</option>`).join('');
+}
+
 function renderPhotos(P){
-  const body = P.photos.length
-    ? `<div class="photo-grid">${P.photos.map(ph => `
+  const f = S.photoFilter || '';
+  const shown = P.photos.filter(ph => !f ? true : f === '__none' ? !ph.budget_line_id : ph.budget_line_id === f);
+  const lineOf = id => P.lines.find(l => l.id === id);
+  const body = shown.length
+    ? `<div class="photo-grid">${shown.map(ph => {
+        const ln = lineOf(ph.budget_line_id);
+        return `
         <button type="button" class="photo-cell" data-act="open-photo" data-id="${ph.id}" aria-label="Open photo from ${esc(fmtDate(ph.taken_on))}">
           <img data-photo-path="${esc(ph.path)}" alt="" loading="lazy">
-          <span class="small muted">${esc(fmtDate(ph.taken_on))}${ph.caption ? ' · ' + esc(ph.caption) : ''}</span>
-        </button>`).join('')}</div>`
-    : '<div class="empty">No photos yet. Add photos as the work goes. Each one is saved to this project with the date.</div>';
+          <span class="small muted">${esc(fmtDate(ph.taken_on))}${ln ? ' · ' + esc(lineName(ln)) : ''}${ph.caption ? ' · ' + esc(ph.caption) : ''}</span>
+        </button>`;
+      }).join('')}</div>`
+    : `<div class="empty">${P.photos.length ? 'No photos match this line.' : 'No photos yet. Add photos as the work goes. Each one is saved to this project with the date.'}</div>`;
   $('#main').innerHTML = `
     <div class="page-h"><h2>Photos</h2><button class="btn primary sm" data-act="add-photos">+ Add Photos</button></div>
-    <div class="small muted" style="margin:-4px 0 12px">Pictures are shrunk on your device before upload to save space. Tap one to add a caption or delete it.</div>
+    <div class="tx-tools">
+      <select id="photoFilter" aria-label="Show photos for">
+        <option value="">All photos</option>
+        <option value="__none" ${f === '__none' ? 'selected' : ''}>No budget line</option>
+        ${P.lines.map(l => `<option value="${l.id}" ${l.id === f ? 'selected' : ''}>${esc(lineName(l))}</option>`).join('')}
+      </select>
+      <select id="photoNewLine" aria-label="Link new photos to a budget line">${photoLineOptions(P, S.photoNewLine || '', 'New photos: no budget line')}</select>
+    </div>
+    <div class="small muted" style="margin:-4px 0 12px">Pictures are shrunk on your device before upload to save space. Pick a budget line above to link new photos to it. Tap a photo to change its date, caption or line, or delete it.</div>
     <input type="file" id="photoIn" accept="image/*" multiple hidden>
     ${body}`;
+  $('#photoFilter').addEventListener('change', e => { S.photoFilter = e.target.value; render(); });
+  $('#photoNewLine').addEventListener('change', e => { S.photoNewLine = e.target.value; });
   $('#photoIn').addEventListener('change', e => {
     const input = e.target;
     uploadPhotos(P, input.files).catch(err => toast(msg(err), true)).finally(() => { input.value = ''; });
@@ -1185,7 +1206,7 @@ function renderPhotos(P){
   loadPhotoThumbs();
 }
 
-async function photoSheet(ph){
+async function photoSheet(P, ph){
   const res = await sb.storage.from('receipts').createSignedUrl(ph.path, 3600);
   const src = res.data ? res.data.signedUrl : '';
   sheet({
@@ -1199,10 +1220,11 @@ async function photoSheet(ph){
       <div class="grid">
         <label>Date taken<input type="date" name="taken_on" value="${esc(ph.taken_on)}"></label>
         <label class="full">Caption<input name="caption" value="${esc(ph.caption || '')}" placeholder="e.g. Framing east wall"></label>
+        <label class="full">Budget line<select name="line">${photoLineOptions(P, ph.budget_line_id || '', 'No budget line')}</select></label>
       </div>`,
     onSubmit: async form => {
       const v = form.elements;
-      check(await sb.from('project_photos').update({taken_on: v.taken_on.value || ph.taken_on, caption: v.caption.value.trim()}).eq('id', ph.id));
+      check(await sb.from('project_photos').update({taken_on: v.taken_on.value || ph.taken_on, caption: v.caption.value.trim(), budget_line_id: v.line.value || null}).eq('id', ph.id));
       await render();
     }
   });
@@ -2249,7 +2271,7 @@ const actions = {
     });
   },
   'add-photos': () => $('#photoIn').click(),
-  'open-photo': (t, id) => photoSheet(S.proj.photos.find(x => x.id === id)),
+  'open-photo': (t, id) => photoSheet(S.proj, S.proj.photos.find(x => x.id === id)),
   'open-pay': (t, id) => paymentDetail(S.proj.pays.find(p => p.id === id)),
   'open-file': (t) => openFile(t.dataset.path).catch(e => toast(msg(e), true)),
   'del-receipt': async (t, id) => {
