@@ -1028,36 +1028,52 @@ function currentDraw(P){
   return P.draws.find(d => d.id === S.drawSel) || P.draws[P.draws.length - 1] || null;
 }
 
-// Print-ready draw request. The user picks "Save as PDF" in the print dialog and sends it to the bank inspector.
+// Bank draw report: print-ready. The user picks "Save as PDF" and sends it to the bank inspector.
 function printDraw(P, cur){
   const rows = drawRows(P, cur);
   const request = rows.reduce((a, r) => a + r.amt, 0);
   const loan = num(P.project.loan_amount);
   const fundedBefore = P.draws.filter(d => d.status === 'Funded' && d.draw_number < cur.draw_number)
     .reduce((a, d) => a + num(d.funded_amount), 0);
+  const paidBy = paidByLine(P);
+  const prevFunded = P.draws.filter(d => d.status === 'Funded' && d.funded_date && d.draw_number < cur.draw_number)
+    .sort((x, y) => y.draw_number - x.draw_number)[0];
+  const since = prevFunded ? prevFunded.funded_date : '';
+  const recent = P.pays.filter(p => !since || p.pay_date > since).sort((x, y) => x.pay_date < y.pay_date ? -1 : 1);
   const w = window.open('', '_blank');
   if (!w){ toast('Allow pop-ups for this site to download the draw report.', true); return; }
-  const body = rows.map(r => `<tr>
+  const body = rows.map(r => {
+    const earned = r.budget * r.pct / 100;
+    return `<tr>
       <td>${esc(lineName(r.line))}</td>
       <td class="r">${money(r.budget)}</td>
-      <td class="r">${r.before}%</td>
       <td class="r">${r.pct}%</td>
-      <td class="r">${r.bank ? 'Yes' : 'No'}</td>
+      <td class="r">${money(earned)}</td>
+      <td class="r">${money(paidBy[r.line.id] || 0)}</td>
+      <td class="r">${money(Math.max(0, r.budget - earned))}</td>
       <td class="r">${r.bank ? money(r.amt) : '—'}</td>
-    </tr>`).join('');
+    </tr>`;
+  }).join('');
+  const recentRows = recent.map(p => `<tr>
+      <td>${esc(fmtDate(p.pay_date))}</td>
+      <td>${esc((p.vendors && p.vendors.name) || 'No contractor')}</td>
+      <td>${esc(p.method)}${p.reference ? ' #' + esc(p.reference) : ''}</td>
+      <td class="r">${money(p.amount)}</td>
+      <td>${esc(p.status)}</td>
+    </tr>`).join('') || '<tr><td colspan="5">No payments in this period.</td></tr>';
   w.document.write(`<!doctype html><html><head><meta charset="utf-8">
     <title>Draw ${cur.draw_number} · ${esc(P.project.name)}</title>
     <style>
       body{font-family:Arial,Helvetica,sans-serif;color:#111;margin:32px;font-size:13px}
-      h1{font-size:20px;margin:0 0 4px} .sub{color:#444;margin-bottom:16px}
+      h1{font-size:20px;margin:0 0 4px} h3{font-size:14px;margin:22px 0 4px}
+      .sub{color:#444;margin-bottom:16px}
       .sum{display:flex;gap:28px;margin:14px 0;flex-wrap:wrap}
       .sum div{min-width:150px} .lbl{color:#555;font-size:12px} .val{font-size:16px;font-weight:bold}
-      table{width:100%;border-collapse:collapse;margin-top:10px}
+      table{width:100%;border-collapse:collapse;margin-top:6px}
       th,td{border-bottom:1px solid #ddd;padding:6px;text-align:left;vertical-align:top}
       th{border-bottom:2px solid #111;font-size:12px} .r{text-align:right}
       .tot td{font-weight:bold;border-top:2px solid #111}
       .sig{margin-top:56px;display:flex;gap:40px} .sig div{flex:1;border-top:1px solid #111;padding-top:4px}
-      @media print{ .noprint{display:none} }
     </style></head><body>
     <h1>Draw ${cur.draw_number} request</h1>
     <div class="sub">${esc(P.project.name)}${P.project.address ? ' · ' + esc(P.project.address) : ''}<br>
@@ -1068,10 +1084,16 @@ function printDraw(P, cur){
       <div><div class="lbl">Requested this draw</div><div class="val">${money(request)}</div></div>
       <div><div class="lbl">Left to fund after this draw</div><div class="val">${money(Math.max(0, loan - fundedBefore - request))}</div></div>
     </div>
+    <h3>Work built by budget line</h3>
     <table>
-      <thead><tr><th>Budget line</th><th class="r">Budget</th><th class="r">Built at last draw</th><th class="r">Built to date</th><th class="r">Bank funds</th><th class="r">Request</th></tr></thead>
+      <thead><tr><th>Budget line</th><th class="r">Budget</th><th class="r">Built to date</th><th class="r">Earned to date</th><th class="r">Paid to date</th><th class="r">Left to build</th><th class="r">This draw</th></tr></thead>
       <tbody>${body}</tbody>
-      <tfoot><tr class="tot"><td colspan="5">Total requested</td><td class="r">${money(request)}</td></tr></tfoot>
+      <tfoot><tr class="tot"><td colspan="6">Total requested this draw</td><td class="r">${money(request)}</td></tr></tfoot>
+    </table>
+    <h3>${since ? 'Payments since the last funded draw (' + esc(fmtDate(since)) + ')' : 'All payments on this project'}</h3>
+    <table>
+      <thead><tr><th>Date</th><th>Paid to</th><th>Method</th><th class="r">Amount</th><th>Vendor status</th></tr></thead>
+      <tbody>${recentRows}</tbody>
     </table>
     <div class="sig"><div>Borrower signature and date</div><div>Inspector approval and date</div></div>
     <script>window.onload = () => setTimeout(() => window.print(), 200);<\/script>
@@ -1362,6 +1384,62 @@ function renderFiles(P){
     ${list || '<div class="empty">No files yet.</div>'}`;
 }
 
+// ---------- Payment confirmation links (contractors confirm without signing in) ----------
+function randomToken(){
+  const a = new Uint8Array(24);
+  crypto.getRandomValues(a);
+  return btoa(String.fromCharCode(...a)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+async function sha256Hex(text){
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
+  return [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+function requestConfirmSheet(P, vendorId){
+  const v = S.vendors.find(x => x.id === vendorId);
+  const waiting = P.pays.filter(p => p.vendor_id === vendorId && p.status === 'Waiting on vendor');
+  if (!waiting.length){ toast('No payments are waiting for this contractor.', true); return; }
+  sheet({
+    title: `Confirm Payments · ${v ? v.name : 'Contractor'}`,
+    submit: 'Create Link',
+    html: `<p class="small muted" style="margin:0 0 10px">Choose the payments the contractor should confirm. The link works for 30 days and needs no sign-in.</p>
+      <div>${waiting.map(p => `<label style="display:flex;gap:8px;align-items:center;padding:8px 0;border-top:1px solid var(--soft)">
+        <input type="checkbox" name="pay" value="${p.id}" checked>
+        <span>${esc(fmtDate(p.pay_date))} · ${esc(p.method)}${p.reference ? ' #' + esc(p.reference) : ''} · <strong>${money(p.amount)}</strong></span></label>`).join('')}</div>`,
+    onSubmit: async form => {
+      const ids = [...form.querySelectorAll('input[name=pay]:checked')].map(i => i.value);
+      if (!ids.length) throw new Error('Choose at least one payment.');
+      const token = randomToken();
+      const vendorPays = P.pays.filter(p => p.vendor_id === vendorId);
+      const lineIds = new Set(vendorPays.map(p => p.budget_line_id));
+      const contract = P.lines.filter(l => lineIds.has(l.id)).reduce((a, l) => a + budgetOf(l), 0);
+      const paid = vendorPays.reduce((a, p) => a + num(p.amount), 0);
+      const expires = new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10);
+      check(await sb.from('payment_confirmations').insert({
+        project_id: P.project.id, vendor_id: vendorId, token_hash: await sha256Hex(token), payment_ids: ids,
+        contract_amount: contract, paid_to_date: paid, expires_on: expires
+      }));
+      const link = new URL('confirm.html#t=' + token, location.href).href;
+      setTimeout(() => confirmLinkSheet(v ? v.name : 'Contractor', link, ids.length), 300);
+    }
+  });
+}
+
+function confirmLinkSheet(vendorName, link, count){
+  sheet({
+    title: 'Confirmation Link Ready',
+    submit: 'Done',
+    html: `<p class="small muted" style="margin:0 0 10px">Send this to ${esc(vendorName)} for ${count} payment${count === 1 ? '' : 's'}. It works for 30 days. Anyone with the link can answer, so send it only to the contractor.</p>
+      <input readonly value="${esc(link)}" style="width:100%;font-size:14px">
+      <div class="btn-row" style="margin-top:10px">
+        <button type="button" class="btn primary" data-act="copy-link" data-link="${esc(link)}">Copy Link</button>
+        <button type="button" class="btn" data-act="share-link" data-link="${esc(link)}" data-name="${esc(vendorName)}">Share</button>
+      </div>
+      <p class="small muted">The link cannot be shown again. If you lose it, create a new one.</p>`,
+    onSubmit: async () => {}
+  });
+}
+
 // ---------- Contractors (assigned to this project) ----------
 function renderContractors(P){
   const assigned = S.vendors.filter(v => P.assignedIds.has(v.id));
@@ -1405,6 +1483,7 @@ function renderContractors(P){
             ? `<button class="btn primary" data-act="add-coi" data-id="${r.v.id}">Add Certificate</button>
                <button class="btn" data-act="dismiss-coi" data-id="${r.v.id}">Dismiss With Reason</button>`
             : `<button class="btn" data-act="add-coi" data-id="${r.v.id}">Update Certificate</button>`}
+          <button class="btn" data-act="request-confirm" data-id="${r.v.id}">Request Payment Confirmation</button>
         </div>
       </div>`;
   });
@@ -2374,6 +2453,13 @@ const actions = {
   'open-photo': (t, id) => photoSheet(S.proj, S.proj.photos.find(x => x.id === id)),
   'photo-more': (t, id) => { const o = S.photoOpen || (S.photoOpen = {}); o[id] = !o[id]; render(); },
   'open-pay': (t, id) => paymentDetail(S.proj.pays.find(p => p.id === id)),
+  'request-confirm': (t, id) => requestConfirmSheet(S.proj, id),
+  'copy-link': async (t) => { await navigator.clipboard.writeText(t.dataset.link); toast('Link copied'); },
+  'share-link': async (t) => {
+    if (!navigator.share) { await navigator.clipboard.writeText(t.dataset.link); toast('Link copied'); return; }
+    try { await navigator.share({title: 'Payment confirmation', text: `Please confirm payments for ${t.dataset.name}`, url: t.dataset.link}); }
+    catch (e) { if (e.name !== 'AbortError') throw e; }
+  },
   'edit-pay': (t, id) => paymentEdit(S.proj.pays.find(p => p.id === id)),
   'open-file': (t) => openFile(t.dataset.path).catch(e => toast(msg(e), true)),
   'del-receipt': async (t, id) => {
