@@ -1897,9 +1897,16 @@ async function saveLineRow(tr){
   Object.assign(l, row);
   await syncLineTask(P, l.id, l, dates);
   toast('Line saved');
-  // Refresh the totals once the user has left the table, so typing in another cell is not interrupted.
-  setTimeout(() => { if (!document.activeElement || !document.activeElement.closest('.bud-tbl')) render(); }, 60);
+  // Totals are refreshed when focus leaves the table (see budgetFocusOut), so Tab between cells is not interrupted.
+  S.budDirty = true;
 }
+
+document.addEventListener('focusout', e => {
+  if (!S.budDirty || !e.target.closest || !e.target.closest('.bud-tbl')) return;
+  if (e.relatedTarget && e.relatedTarget.closest && e.relatedTarget.closest('.bud-tbl')) return;
+  S.budDirty = false;
+  render();
+});
 
 document.addEventListener('change', e => {
   const tr = e.target.closest ? e.target.closest('tr.item[data-id]') : null;
