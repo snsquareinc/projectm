@@ -73,7 +73,10 @@
   const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const usd = n => Number(n || 0).toLocaleString('en-US', {style: 'currency', currency: 'USD', maximumFractionDigits: 2});
   const date = s => s ? new Date(s + 'T12:00:00').toLocaleDateString('en-US', {month: 'short', day: 'numeric', year: 'numeric'}) : '';
-  const sb = supabase.createClient(window.TRACKER_CONFIG.url, window.TRACKER_CONFIG.anonKey);
+  const cfg = window.TRACKER_CONFIG || {};
+  const sb = (window.supabase && cfg.url && cfg.anonKey) ? supabase.createClient(cfg.url, cfg.anonKey) : null;
+  // Stop waiting after 20 seconds and say what went wrong.
+  const withTimeout = p => Promise.race([p, new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 20000))]);
   // The secret sits after the # so it is never sent to the web server.
   const token = new URLSearchParams(location.hash.slice(1)).get('t');
   const $ = id => document.getElementById(id);
@@ -108,11 +111,18 @@
   }
 
   async function load(){
-    if (!token) return message('This link is incomplete. Ask SN Square for a new link.');
-    const {data, error} = await sb.rpc('get_payment_confirmation', {p_token: token});
-    if (error) return message('This page could not load. Try again in a few minutes.');
-    if (!data) return message('This link is not valid or has expired. Ask SN Square for a new link.');
-    render(data);
+    try {
+      if (!sb) return message('This page could not connect. Try again later, or ask SN Square for a new link.');
+      if (!token) return message('This link is incomplete. Ask SN Square for a new link.');
+      const {data, error} = await withTimeout(sb.rpc('get_payment_confirmation', {p_token: token}));
+      if (error) return message('This page could not load (' + (error.message || 'server error') + '). Try again in a few minutes.');
+      if (!data) return message('This link is not valid or has expired. Ask SN Square for a new link.');
+      render(data);
+    } catch (e) {
+      message(e.message === 'timeout'
+        ? 'This page is taking too long to load. Check your connection and refresh.'
+        : 'This page could not load. Refresh, or ask SN Square for a new link.');
+    }
   }
 
   async function answer(response){
@@ -121,9 +131,12 @@
     err.hidden = true;
     if (!name){ err.textContent = 'Enter your full name first.'; err.hidden = false; return; }
     $('yes').disabled = true; $('no').disabled = true;
-    const {error} = await sb.rpc('respond_payment_confirmation', {
-      p_token: token, p_name: name, p_response: response, p_note: $('note').value.trim()
-    });
+    let error = null;
+    try {
+      ({error} = await withTimeout(sb.rpc('respond_payment_confirmation', {
+        p_token: token, p_name: name, p_response: response, p_note: $('note').value.trim()
+      })));
+    } catch (e) { error = {message: 'No connection. Check your signal and try again.'}; }
     if (error){
       err.textContent = error.message || 'Could not save your answer. Try again.';
       err.hidden = false;
