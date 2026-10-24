@@ -15,12 +15,13 @@ Work through these in order. Each step says where to click.
    6. `009_photos.sql`
    7. `010_photo_lines.sql`
    8. `011_vendor_confirm.sql`
+   9. `012_confirm_signature.sql`
 4. If a file shows an error, stop and send me the message. Do not run the next file.
 5. Re-running a file is safe, but do not skip one.
 
 ## Part 2: Put the new version live (Netlify)
 
-Run step 011 in Part 1 before merging. Without it, the Request Payment Confirmation button fails.
+Run steps 011 and 012 in Part 1 before merging. Without them, the Request Payment Confirmation button and finger signature fail.
 
 1. Open the repository on GitHub: `github.com/snsquareinc/projectm`.
 2. Click **Pull requests**, then **New pull request**.
