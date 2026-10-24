@@ -1420,19 +1420,25 @@ function requestConfirmSheet(P, vendorId){
         contract_amount: contract, paid_to_date: paid, expires_on: expires
       }));
       const link = new URL('confirm.html#t=' + token, location.href).href;
-      setTimeout(() => confirmLinkSheet(v ? v.name : 'Contractor', link, ids.length), 300);
+      setTimeout(() => confirmLinkSheet(v ? v.name : 'Contractor', v ? v.email : '', link, ids.length, P.project.name), 300);
     }
   });
 }
 
-function confirmLinkSheet(vendorName, link, count){
+function confirmLinkSheet(vendorName, email, link, count, projectName){
+  const subject = encodeURIComponent(`Please confirm payments: ${projectName}`);
+  const body = encodeURIComponent(`Hello ${vendorName},\n\nPlease confirm the ${count} payment${count === 1 ? '' : 's'} listed on this link. Open it, check the amounts, sign with your finger and tap one button. No login is needed. The link works for 30 days.\n\n${link}\n\nThank you,\nSN Square`);
+  const mailto = `mailto:${encodeURIComponent(email || '')}?subject=${subject}&body=${body}`;
   sheet({
     title: 'Confirmation Link Ready',
     submit: 'Done',
     html: `<p class="small muted" style="margin:0 0 10px">Send this to ${esc(vendorName)} for ${count} payment${count === 1 ? '' : 's'}. It works for 30 days. Anyone with the link can answer, so send it only to the contractor.</p>
+      <div class="btn-row" style="margin-bottom:10px">
+        <a class="btn primary" href="${esc(mailto)}" style="text-decoration:none">Email Link${email ? '' : ' (add an email to the contractor first)'}</a>
+      </div>
       <input readonly value="${esc(link)}" style="width:100%;font-size:14px">
       <div class="btn-row" style="margin-top:10px">
-        <button type="button" class="btn primary" data-act="copy-link" data-link="${esc(link)}">Copy Link</button>
+        <button type="button" class="btn" data-act="copy-link" data-link="${esc(link)}">Copy Link</button>
         <button type="button" class="btn" data-act="share-link" data-link="${esc(link)}" data-name="${esc(vendorName)}">Share</button>
       </div>
       <p class="small muted">The link cannot be shown again. If you lose it, create a new one.</p>`,

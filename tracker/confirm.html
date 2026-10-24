@@ -33,6 +33,8 @@
   .no{background:#fff;color:var(--navy);border:1px solid #CBD5E1 !important;font-weight:600;font-size:15px}
   .err{color:#9F1239;font-size:14px;margin:0}
   footer{font-size:12px;color:#94A3B8;text-align:center;padding:4px 0 24px}
+  .link{background:none;color:var(--teal);width:auto;padding:6px 0;font-size:14px;font-weight:600}
+  #sig{width:100%;height:170px;border:1px solid #CBD5E1;border-radius:12px;background:#fff;touch-action:none;display:block}
   [hidden]{display:none !important}
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
@@ -60,6 +62,11 @@
 
     <form class="card" id="answer" style="display:flex;flex-direction:column;gap:12px" novalidate>
       <input id="name" name="name" autocomplete="name" placeholder="Your full name" aria-label="Your full name">
+      <div>
+        <div class="lbl" style="margin:0 0 6px">Sign with your finger</div>
+        <canvas id="sig" width="600" height="200" aria-label="Signature"></canvas>
+        <button type="button" class="link" id="clear">Clear signature</button>
+      </div>
       <textarea id="note" name="note" placeholder="Anything that does not match? (optional)" aria-label="Note"></textarea>
       <p class="err" id="err" hidden></p>
       <button type="button" class="yes" id="yes">Yes, I received these amounts</button>
@@ -125,16 +132,35 @@
     }
   }
 
+  // Finger signature pad
+  const canvas = $('sig'), ctx = canvas.getContext('2d');
+  let drawing = false, signed = false;
+  ctx.lineWidth = 3; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.strokeStyle = '#0F172A';
+  const at = e => { const r = canvas.getBoundingClientRect(); return {x: (e.clientX - r.left) * canvas.width / r.width, y: (e.clientY - r.top) * canvas.height / r.height}; };
+  canvas.addEventListener('pointerdown', e => {
+    drawing = true; const p = at(e); ctx.beginPath(); ctx.moveTo(p.x, p.y);
+    canvas.setPointerCapture(e.pointerId); e.preventDefault();
+  });
+  canvas.addEventListener('pointermove', e => {
+    if (!drawing) return; const p = at(e); ctx.lineTo(p.x, p.y); ctx.stroke(); signed = true; e.preventDefault();
+  });
+  const stop = () => { drawing = false; };
+  canvas.addEventListener('pointerup', stop);
+  canvas.addEventListener('pointercancel', stop);
+  $('clear').addEventListener('click', () => { ctx.clearRect(0, 0, canvas.width, canvas.height); signed = false; });
+
   async function answer(response){
     const name = $('name').value.trim();
     const err = $('err');
     err.hidden = true;
     if (!name){ err.textContent = 'Enter your full name first.'; err.hidden = false; return; }
+    if (!signed){ err.textContent = 'Sign with your finger first.'; err.hidden = false; return; }
+    const signature = canvas.toDataURL('image/png');
     $('yes').disabled = true; $('no').disabled = true;
     let error = null;
     try {
       ({error} = await withTimeout(sb.rpc('respond_payment_confirmation', {
-        p_token: token, p_name: name, p_response: response, p_note: $('note').value.trim()
+        p_token: token, p_name: name, p_response: response, p_note: $('note').value.trim(), p_signature: signature
       })));
     } catch (e) { error = {message: 'No connection. Check your signal and try again.'}; }
     if (error){
