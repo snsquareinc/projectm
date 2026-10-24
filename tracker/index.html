@@ -127,9 +127,16 @@ main{padding:14px 16px 110px;display:flex;flex-direction:column;gap:12px;max-wid
 .bud-wrap{max-height:calc(100vh - 250px);overflow:auto}
 .bud-wrap thead tr:first-child th{position:sticky;top:0;z-index:3}
 .bud-wrap thead tr:nth-child(2) th{position:sticky;top:30px;z-index:3;background:#F1F5F9;border-bottom:1px solid #CBD5E1}
+.bud-tbl tr.item input,.bud-tbl tr.item select{width:100%;min-width:0;height:26px;padding:2px 4px;font-size:13px;border:1px solid transparent;background:transparent;border-radius:6px;color:inherit}
+.bud-tbl tr.item input:hover,.bud-tbl tr.item select:hover{border-color:#CBD5E1;background:#fff}
+.bud-tbl tr.item input:focus,.bud-tbl tr.item select:focus{border-color:var(--teal);background:#fff;outline:none}
+.bud-tbl tr.item input[type=checkbox]{width:auto;height:auto;margin:0}
+.bud-tbl tr.item .num-in{text-align:right}
+.bud-tbl .bud-desc{display:flex;align-items:center;gap:4px}
+.bud-tbl .bud-desc input{flex:1}
 .bud-wrap .bud-tbl tbody td{height:28px;padding:2px 4px;border-bottom:1px solid #E2E8F0;border-right:1px solid #EEF2F6;vertical-align:middle}
 .bud-wrap .bud-tbl tr.grp td{background:#F8FAFC;font-weight:600}
-.bud-wrap .bud-tbl tr.item:hover td{background:#F8FAFC;cursor:pointer}
+.bud-wrap .bud-tbl tr.item:hover td{background:#F8FAFC}
 .bud-wrap .bud-tbl tr.tr-grand td{position:sticky;bottom:0;background:#F1F5F9;border-top:2px solid #CBD5E1}
 .bud-entry td{background:#ECFDF5;padding:2px 3px;height:32px;border-bottom:2px solid #A7F3D0;vertical-align:middle}
 .bud-entry input,.bud-entry select{height:26px;font-size:13px;padding:0 6px;width:100%;min-width:0;border:1px solid #D1FAE5;border-radius:3px;background:#fff;color:var(--ink)}
@@ -722,20 +729,21 @@ function budgetTableHtml(P, paid, byDiv, codes, filtered){
     ls.forEach(l => {
       const bl = budgetOf(l), lp = paid[l.id] || 0;
       const t = taskForLine(P, l.id);
-      body.push(`<tr class="item tr-click" data-act="edit-line" data-id="${l.id}" data-div="${esc(code)}"${isC ? ' hidden' : ''}>
+      // Cells are edited in place: a change saves the line (see saveLineRow). ICON_NOTE opens the full sheet for notes and revisions.
+      body.push(`<tr class="item" data-id="${l.id}" data-div="${esc(code)}"${isC ? ' hidden' : ''}>
         <td class="code">${esc(l.subtask_code || '')}<button class="icon-btn line-del" data-act="delete-line" data-id="${l.id}" title="Delete budget line" aria-label="Delete budget line">${ICON_TRASH}</button></td>
-        <td class="desc m-name"><span class="bud-name">${esc(lineName(l))}</span>${l.notes ? ` <span class="bud-note" title="${esc(l.notes)}">${ICON_NOTE}</span>` : ''}</td>
-        <td class="g-start">${esc(l.unit || '')}</td>
-        <td class="r">${fmtQty(l.qty)}</td>
-        <td class="r">${money(l.rate)}</td>
-        <td class="g-start">${dateOr(t?.start_date)}</td>
-        <td>${dateOr(t?.end_date)}</td>
-        <td class="r g-start">${money(l.budget)}</td>
-        <td class="r m-amt">${money(bl)}</td>
+        <td class="desc m-name"><div class="bud-desc"><input data-f="label" value="${esc(lineName(l))}" aria-label="Description"${l.subtask_code ? ' readonly title="Name comes from the library subtask"' : ''}><button class="icon-btn" data-act="edit-line" data-id="${l.id}" title="Notes, revisions and more" aria-label="More details">${ICON_NOTE}</button></div></td>
+        <td class="g-start"><select data-f="unit" aria-label="Unit"><option value="">—</option>${[...new Set([...UNIT_HINTS, l.unit || ''].filter(Boolean))].map(u => `<option ${u === (l.unit || '') ? 'selected' : ''}>${esc(u)}</option>`).join('')}</select></td>
+        <td class="r"><input data-f="qty" class="num-in" inputmode="decimal" value="${esc(fmtInput(l.qty))}" aria-label="Sq.Ft. or Qty"></td>
+        <td class="r"><input data-f="rate" class="num-in" inputmode="decimal" value="${esc(fmtInput(l.rate))}" aria-label="Rate"></td>
+        <td class="g-start"><input data-f="start" type="date" value="${esc(t?.start_date || '')}" aria-label="Start"></td>
+        <td><input data-f="end" type="date" value="${esc(t?.end_date || '')}" aria-label="End"></td>
+        <td class="r g-start m-amt">${money(l.budget)}</td>
+        <td class="r"><input data-f="contract" class="num-in" inputmode="decimal" value="${esc(fmtInput(l.contract_amount))}" placeholder="—" aria-label="Contract"></td>
         <td class="r g-start m-meta"><button class="link-btn" data-act="pay-line" data-id="${l.id}" title="Record a payment on this line">${money(lp)}</button></td>
         <td class="r m-owed" data-noact>${money(bl - lp)}</td>
         <td class="r var" data-noact>${varHtml(num(l.budget) - bl)}</td>
-        <td class="ctr g-start">${l.bank_funded ? 'Yes' : 'No'}</td>
+        <td class="ctr g-start"><input data-f="bank" type="checkbox" ${l.bank_funded ? 'checked' : ''} aria-label="Bank funded"></td>
       </tr>`);
     });
     gBud += dBud; gTot += dTot; gPaid += dPaid;
@@ -749,7 +757,7 @@ function budgetTableHtml(P, paid, byDiv, codes, filtered){
   </tr>`);
   return `<div class="card bud-wrap" style="padding:0;overflow-x:auto">
     <table class="sheet-tbl bud-tbl${S.showBank ? '' : ' no-bank'}">
-      <colgroup>${[96, null, 64, 88, 72, 96, 96, 88, 88, 80, 80, 80, 64].slice(0, S.showBank ? 13 : 12).map(w => w ? `<col style="width:${w}px">` : '<col>').join('')}</colgroup>
+      <colgroup>${[96, 230, 64, 88, 72, 96, 96, 88, 88, 80, 80, 80, 64].slice(0, S.showBank ? 13 : 12).map(w => `<col style="width:${w}px">`).join('')}</colgroup>
       <thead>
         <tr class="band"><th class="code"></th><th class="desc"></th>
           <th colspan="3" class="gh g-start">Quantity</th>
@@ -1865,6 +1873,39 @@ async function savePaymentRecord(P, d){
   S.txDate = ''; S.txMethod = d.method; // date goes back to today; method stays; division, task, contractor, amount and check # clear
   return txNotes(v, l) || 'Transaction saved.';
 }
+
+// Saves one budget line edited in place. Revision and notes stay as they are; use the note icon for those.
+async function saveLineRow(tr){
+  const P = S.proj;
+  const l = P.lines.find(x => x.id === tr.dataset.id);
+  if (!l) return;
+  const q = f => tr.querySelector(`[data-f="${f}"]`);
+  const qty = num(q('qty').value), rate = num(q('rate').value);
+  const start = q('start').value, end = q('end').value;
+  const existing = taskForLine(P, l.id);
+  const dates = {start_date: {value: start}, end_date: {value: end},
+    percent_complete: {value: String(existing ? existing.percent_complete : 0)}};
+  checkLineDates(dates);
+  const row = {
+    unit: q('unit').value, qty, rate, budget: qty * rate,
+    contract_amount: num(q('contract').value), bank_funded: q('bank').checked
+  };
+  // Only store a description that was actually changed, so the generated name is not frozen into the line.
+  const label = q('label').value.trim();
+  if (label !== lineName(l)) row.label = label;
+  check(await sb.from('project_lines').update(row).eq('id', l.id));
+  Object.assign(l, row);
+  await syncLineTask(P, l.id, l, dates);
+  toast('Line saved');
+  // Refresh the totals once the user has left the table, so typing in another cell is not interrupted.
+  setTimeout(() => { if (!document.activeElement || !document.activeElement.closest('.bud-tbl')) render(); }, 60);
+}
+
+document.addEventListener('change', e => {
+  const tr = e.target.closest ? e.target.closest('tr.item[data-id]') : null;
+  if (!tr || !e.target.dataset.f) return;
+  saveLineRow(tr).catch(err => toast(msg(err), true));
+});
 
 // Saves one existing row when a cell is changed (Excel-style).
 async function saveRow(tr){
