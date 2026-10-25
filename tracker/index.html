@@ -291,6 +291,8 @@ summary::after{content:"+";color:var(--teal-d);font-size:20px;line-height:1}
 details[open] summary::after{content:"–"}
 details .sub-li{display:flex;justify-content:space-between;gap:10px;padding:9px 0;border-top:1px solid var(--soft);font-size:14px}
 details .sub-li span:first-child{overflow-wrap:anywhere}
+details .sub-li .sub-acts{display:flex;flex:none;gap:2px}
+details .sub-li .del-link{color:#B91C1C}
 
 /* Buttons and fields */
 .btn{padding:11px 14px;border:1px solid var(--line);background:#fff;border-radius:12px;font-weight:600;font-size:14px;cursor:pointer;white-space:nowrap;text-decoration:none;color:var(--navy);display:inline-flex;align-items:center;justify-content:center;gap:6px}
@@ -515,10 +517,21 @@ const coiBadge = st => `<span class="badge ${COI_BADGE[st][0]}">${COI_BADGE[st][
 async function loadLibrary(){
   const [d, s] = await Promise.all([
     sb.from('library_divisions').select('*').eq('retired', false).order('code'),
-    sb.from('library_subtasks').select('*').eq('retired', false).order('code')
+    sb.from('library_subtasks').select('*').order('code')
   ]);
-  setLibrary(check(d), check(s));
+  // Retired sub-tasks stay in the name lookup, so budget lines that use them still show their names.
+  const all = check(s);
+  setLibrary(check(d), all.filter(x => !x.retired));
+  S.subMap = Object.fromEntries(all.map(x => [x.code, x]));
 }
+
+// Remember which divisions are open in the Library, so saving an edit does not collapse them.
+document.addEventListener('toggle', e => {
+  const d = e.target;
+  if (!d.matches || !d.matches('details[data-lib]')) return;
+  S.libOpen = S.libOpen || new Set();
+  if (d.open) S.libOpen.add(d.dataset.lib); else S.libOpen.delete(d.dataset.lib);
+}, true);
 
 // ---------- Projects list ----------
 async function renderProjects(){
@@ -1652,10 +1665,10 @@ async function renderLibrary(){
   S.divs.forEach(d => {
     const subs = subsByDiv[d.code] || [];
     html += `
-      <details>
+      <details data-lib="${esc(d.code)}"${(S.libOpen || new Set()).has(d.code) ? ' open' : ''}>
         <summary><span>${esc(d.code)} ${esc(d.name)} <span class="muted small" style="font-weight:500">· ${subs.length}</span></span></summary>
         <div style="margin-top:6px">
-          ${subs.map(s => `<div class="sub-li"><span>${esc(s.code)} ${esc(s.name)}</span></div>`).join('') || '<div class="small muted">No sub-tasks yet.</div>'}
+          ${subs.map(s => `<div class="sub-li"><span>${esc(s.code)} ${esc(s.name)}</span><span class="sub-acts"><button class="link-btn" data-act="edit-subtask" data-code="${esc(s.code)}">Edit</button><button class="link-btn del-link" data-act="delete-subtask" data-code="${esc(s.code)}">Delete</button></span></div>`).join('') || '<div class="small muted">No sub-tasks yet.</div>'}
         </div>
         <div style="margin-top:10px"><button class="btn sm" data-act="new-subtask" data-code="${esc(d.code)}">+ Sub-Task</button></div>
       </details>`;
@@ -2473,8 +2486,47 @@ function subtaskSheet(divCode, onCreated, onCancel){
   });
 }
 
+// Edit a sub-task's name. The code stays fixed, because budget lines are linked to it.
+function editSubtaskSheet(code){
+  const s0 = S.subMap[code];
+  if (!s0) return;
+  sheet({
+    title: `Edit Sub-Task · ${code}`,
+    html: `<label>Name<input name="name" required value="${esc(s0.name)}"></label>
+      <div class="small muted">The code ${esc(code)} stays the same, so budget lines that use it keep their link.</div>`,
+    onSubmit: async form => {
+      const name = form.elements.name.value.trim();
+      if (!name) throw new Error('Enter a name.');
+      check(await sb.from('library_subtasks').update({name}).eq('code', code));
+      s0.name = name;
+      toast('Sub-task saved.');
+    }
+  });
+}
+
+// Delete a sub-task. If budget lines use it, it is hidden from the Library instead, and those lines keep it.
+async function deleteSubtask(code){
+  const s0 = S.subMap[code];
+  if (!s0) return;
+  const r = await sb.from('project_lines').select('id', {count: 'exact', head: true}).eq('subtask_code', code);
+  if (r.error) throw r.error;
+  const used = r.count || 0;
+  if (used){
+    if (!confirm(`${code} ${s0.name} is used on ${used} budget line${used === 1 ? '' : 's'}. It will be hidden from the Library for new budgets. Those lines keep it. Continue?`)) return;
+    check(await sb.from('library_subtasks').update({retired: true}).eq('code', code));
+    toast('Sub-task hidden. Existing budget lines keep it.');
+  } else {
+    if (!confirm(`Delete ${code} ${s0.name} from the Library? This cannot be undone.`)) return;
+    check(await sb.from('library_subtasks').delete().eq('code', code));
+    toast('Sub-task deleted.');
+  }
+  await render();
+}
+
 // ---------- Actions (delegated) ----------
 const actions = {
+  'edit-subtask': t => editSubtaskSheet(t.dataset.code),
+  'delete-subtask': t => deleteSubtask(t.dataset.code).catch(err => toast(msg(err), true)),
   'sign-out': () => sb.auth.signOut(),
   'new-project': () => projectSheet(null),
   'edit-project': () => projectSheet(S.proj.project),
