@@ -133,6 +133,11 @@ main{padding:14px 16px 110px;display:flex;flex-direction:column;gap:12px;max-wid
 .bud-tbl tr.item input[type=checkbox]{width:auto;height:auto;margin:0}
 .bud-tbl tr.item .num-in{text-align:right}
 .bud-tbl .bud-desc{display:flex;align-items:center;gap:4px}
+.date-field{position:relative;display:flex;align-items:center;gap:2px;min-width:0}
+.date-field .date-in{flex:1;min-width:0;width:100%;padding-left:3px;padding-right:2px}
+.date-field .date-pick{flex:none;border:0;background:none;color:var(--muted,#64748B);padding:0 1px;cursor:pointer;border-radius:4px;line-height:0}
+.date-field .date-pick:hover{color:var(--teal);background:#E6FAF6}
+.date-field input.date-native{position:absolute;right:0;bottom:0;width:1px!important;height:1px!important;min-width:0;opacity:0;pointer-events:none;border:0;padding:0;margin:0}
 .bud-tbl input.date-in{font-variant-numeric:tabular-nums}
 .bud-entry input.date-in{width:100%;min-width:0;box-sizing:border-box}
 .bud-tbl .bud-desc input{flex:1}
@@ -739,8 +744,8 @@ function budgetTableHtml(P, paid, byDiv, codes, filtered){
         <td class="g-start"><select data-f="unit" aria-label="Unit"><option value="">—</option>${[...new Set([...UNIT_HINTS, l.unit || ''].filter(Boolean))].map(u => `<option ${u === (l.unit || '') ? 'selected' : ''}>${esc(u)}</option>`).join('')}</select></td>
         <td class="r"><input data-f="qty" class="num-in" inputmode="decimal" value="${esc(fmtInput(l.qty))}" aria-label="Sq.Ft. or Qty"></td>
         <td class="r"><input data-f="rate" class="num-in" inputmode="decimal" value="${esc(fmtInput(l.rate))}" aria-label="Rate"></td>
-        <td class="g-start"><input data-f="start" class="date-in" value="${esc(dateOr(t?.start_date))}" placeholder="MM/DD/YYYY" inputmode="numeric" maxlength="10" aria-label="Start"></td>
-        <td><input data-f="end" class="date-in" value="${esc(dateOr(t?.end_date))}" placeholder="MM/DD/YYYY" inputmode="numeric" maxlength="10" aria-label="End"></td>
+        <td class="g-start">${dateField('data-f="start" aria-label="Start"', t?.start_date || '')}</td>
+        <td>${dateField('data-f="end" aria-label="End"', t?.end_date || '')}</td>
         <td class="r g-start m-amt">${money(l.budget)}</td>
         <td class="r"><input data-f="contract" class="num-in" inputmode="decimal" value="${esc(fmtInput(l.contract_amount))}" placeholder="—" aria-label="Contract"></td>
         <td class="r g-start m-meta"><button class="link-btn" data-act="pay-line" data-id="${l.id}" title="Record a payment on this line">${money(lp)}</button></td>
@@ -760,7 +765,7 @@ function budgetTableHtml(P, paid, byDiv, codes, filtered){
   </tr>`);
   return `<div class="card bud-wrap" style="padding:0;overflow-x:auto">
     <table class="sheet-tbl bud-tbl${S.showBank ? '' : ' no-bank'}">
-      <colgroup>${[96, 222, 64, 88, 72, 96, 96, 88, 88, 80, 80, 80, 64].slice(0, S.showBank ? 13 : 12).map(w => `<col style="width:${w}px">`).join('')}</colgroup>
+      <colgroup>${[96, 188, 64, 88, 72, 112, 112, 88, 88, 80, 80, 80, 64].slice(0, S.showBank ? 13 : 12).map(w => `<col style="width:${w}px">`).join('')}</colgroup>
       <thead>
         <tr class="band"><th class="code"></th><th class="desc"></th>
           <th colspan="3" class="gh g-start">Quantity</th>
@@ -812,8 +817,8 @@ function budDraftRow(){
     <td class="g-start">${unit}</td>
     <td class="r"><input type="text" class="money r" data-b="qty" value="1" inputmode="decimal" aria-label="Sq.Ft. or qty"></td>
     <td class="r"><input type="text" class="money r" data-b="rate" value="0" inputmode="decimal" aria-label="Rate"></td>
-    <td class="g-start"><input class="date-in" data-b="start" placeholder="MM/DD/YYYY" inputmode="numeric" maxlength="10" aria-label="Start date"></td>
-    <td><input class="date-in" data-b="end" placeholder="MM/DD/YYYY" inputmode="numeric" maxlength="10" aria-label="End date"></td>
+    <td class="g-start">${dateField('data-b="start" aria-label="Start date"')}</td>
+    <td>${dateField('data-b="end" aria-label="End date"')}</td>
     <td class="r g-start" data-b="budget">${money(0)}</td>
     <td class="r"><input type="text" class="money r" data-b="contract" placeholder="Contract" inputmode="decimal" aria-label="Signed contract"></td><td class="g-start"></td><td></td>
     <td class="ctr"><button class="btn primary sm" data-act="save-bud">Save</button></td>
@@ -830,6 +835,22 @@ function budInput(el){
   if (el.classList.contains('money')) el.value = formatMoneyText(el.value);
   body.querySelector('[data-b=budget]').textContent = money(num(body.querySelector('[data-b=qty]').value) * num(body.querySelector('[data-b=rate]').value));
 }
+const isoOrEmpty = txt => { try { return parseTypedDate(txt); } catch (e) { return ''; } };
+// Calendar button: open the browser's date picker next to the text field.
+document.addEventListener('click', e => {
+  const btn = e.target.closest && e.target.closest('[data-act="pick-date"]');
+  if (!btn) return;
+  const nat = btn.parentElement.querySelector('.date-native');
+  try { nat.showPicker(); } catch (err) { nat.focus(); nat.click(); }
+});
+// A date picked in the calendar fills the text field and runs its normal change handling.
+document.addEventListener('change', e => {
+  if (!e.target.classList || !e.target.classList.contains('date-native')) return;
+  const txt = e.target.parentElement.querySelector('.date-in');
+  txt.value = dateOr(e.target.value);
+  txt.dispatchEvent(new Event('change', {bubbles: true}));
+});
+
 // Inserts one budget line and its schedule dates. o: {div, sub, label, unit, qty, rate, contract, bank, start, end}.
 async function insertBudgetLine(P, o){
   const line = check(await sb.from('project_lines').insert({
@@ -858,8 +879,8 @@ function customLineSheet(body){
         <label class="full">Line Name<input name="label" required placeholder="e.g. Temporary heat" autocomplete="off"></label>
         <label>Unit${unitSelect(q('unit').value)}</label>
         <label class="check"><input type="checkbox" name="bank_funded" checked> Bank Funds This Line</label>
-        <label>Start<input name="start" class="date-in" value="${esc(start)}" placeholder="MM/DD/YYYY" inputmode="numeric" maxlength="10"></label>
-        <label>End<input name="end" class="date-in" value="${esc(end)}" placeholder="MM/DD/YYYY" inputmode="numeric" maxlength="10"></label>
+        <label>Start${dateField('name="start"', isoOrEmpty(start))}</label>
+        <label>End${dateField('name="end"', isoOrEmpty(end))}</label>
         <label>Sq.Ft. / Qty<input type="text" class="money" name="qty" inputmode="decimal" value="${esc(qty)}"></label>
         <label>Rate ($)<input type="text" class="money" name="rate" inputmode="decimal" value="${esc(rate)}"></label>
         <label class="full">Signed Contract ($)<input type="text" class="money" name="contract_amount" placeholder="Leave blank until signed"></label>
@@ -2727,6 +2748,9 @@ const atNoon = d => new Date(d.getFullYear(), d.getMonth(), d.getDate(), 12);
 const addDays = (d, n) => { const x = new Date(d); x.setDate(x.getDate() + n); return x; };
 const toDate = s => new Date(s + 'T12:00:00');
 // Budget dates are typed as m/d/yy (m/d/yyyy and yyyy-mm-dd also work) and shown as m/d/yy everywhere in the table.
+// A typed date field with a calendar button. The button opens the browser's date picker; the chosen date is written back as MM/DD/YYYY.
+// attrs: extra attributes for the text input (data-f / data-b / name / aria-label). value: yyyy-mm-dd.
+const dateField = (attrs, value = '') => `<span class="date-field"><input type="text" class="date-in" placeholder="MM/DD/YYYY" inputmode="numeric" maxlength="10" value="${esc(dateOr(value))}" ${attrs}><button type="button" class="date-pick" data-act="pick-date" aria-label="Pick a date" title="Pick a date"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg></button><input type="date" class="date-native" tabindex="-1" aria-hidden="true" value="${esc(value || '')}"></span>`;
 // Returns yyyy-mm-dd, '' when empty, and throws when the text is not a real date.
 const parseTypedDate = raw => {
   const s = String(raw || '').trim();
