@@ -808,7 +808,7 @@ function budDraftRow(){
   const unit = unitSelect().replace('name="unit"', 'data-b="unit" aria-label="Unit"');
   return `<tbody class="bud-entry"><tr>
     <td><select data-b="div" aria-label="Division"><option value="">Choose A Division</option>${divOptions('')}</select></td>
-    <td><select data-b="sub" aria-label="Sub-task">${budSubOptions('')}</select><input data-b="custom" placeholder="Name the custom line" hidden aria-label="Custom line name"></td>
+    <td><select data-b="sub" aria-label="Sub-task">${budSubOptions('')}</select></td>
     <td class="g-start">${unit}</td>
     <td class="r"><input type="text" class="money r" data-b="qty" value="1" inputmode="decimal" aria-label="Sq.Ft. or qty"></td>
     <td class="r"><input type="text" class="money r" data-b="rate" value="0" inputmode="decimal" aria-label="Rate"></td>
@@ -823,25 +823,72 @@ function budDraftRow(){
 function budChange(t){
   const body = t.closest('.bud-entry');
   if (t.dataset.b === 'div') fillSelect(body.querySelector('[data-b=sub]'), budSubOptions(t.value), '__div');
-  if (t.dataset.b === 'sub'){
-    const c = body.querySelector('[data-b=custom]');
-    c.hidden = t.value !== '__custom';
-    if (!c.hidden) c.focus();
-  }
+  if (t.dataset.b === 'sub' && t.value === '__custom') customLineSheet(body);
 }
 function budInput(el){
   const body = el.closest('.bud-entry');
   if (el.classList.contains('money')) el.value = formatMoneyText(el.value);
   body.querySelector('[data-b=budget]').textContent = money(num(body.querySelector('[data-b=qty]').value) * num(body.querySelector('[data-b=rate]').value));
 }
+// Inserts one budget line and its schedule dates. o: {div, sub, label, unit, qty, rate, contract, bank, start, end}.
+async function insertBudgetLine(P, o){
+  const line = check(await sb.from('project_lines').insert({
+    project_id: P.project.id, division_code: o.div, subtask_code: o.sub === '__custom' || o.sub === '__div' ? null : o.sub, label: o.label,
+    unit: o.unit, notes: '', qty: o.qty, rate: o.rate, budget: o.qty * o.rate, contract_amount: o.contract, bank_funded: o.bank
+  }).select().single());
+  await syncLineTask(P, line.id, line, {start_date: {value: o.start}, end_date: {value: o.end}, percent_complete: {value: '0'}});
+  return line;
+}
+
+// Custom line: a popup with full-width fields. It opens pre-filled with what is already in the entry row.
+function customLineSheet(body){
+  const P = S.proj;
+  const q = k => body.querySelector(`[data-b="${k}"]`);
+  const div = q('div').value;
+  if (!div){
+    q('sub').value = '';
+    toast('Choose the division first.', true);
+    return;
+  }
+  const qty = q('qty').value, rate = q('rate').value, start = q('start').value, end = q('end').value;
+  sheet({
+    title: 'New custom line',
+    html: `<div class="small muted">${esc(divName(div))}</div>
+      <div class="grid">
+        <label class="full">Line Name<input name="label" required placeholder="e.g. Temporary heat" autocomplete="off"></label>
+        <label>Unit${unitSelect(q('unit').value)}</label>
+        <label class="check"><input type="checkbox" name="bank_funded" checked> Bank Funds This Line</label>
+        <label>Start<input name="start" class="date-in" value="${esc(start)}" placeholder="MM/DD/YYYY" inputmode="numeric" maxlength="10"></label>
+        <label>End<input name="end" class="date-in" value="${esc(end)}" placeholder="MM/DD/YYYY" inputmode="numeric" maxlength="10"></label>
+        <label>Sq.Ft. / Qty<input type="text" class="money" name="qty" inputmode="decimal" value="${esc(qty)}"></label>
+        <label>Rate ($)<input type="text" class="money" name="rate" inputmode="decimal" value="${esc(rate)}"></label>
+        <label class="full">Signed Contract ($)<input type="text" class="money" name="contract_amount" placeholder="Leave blank until signed"></label>
+      </div>
+      ${calcBox(num(qty), num(rate))}`,
+    submit: 'Add Line',
+    onOpen: form => { bindCalc(form); setTimeout(() => form.elements.label.focus(), 0); },
+    onSubmit: async form => {
+      const v = form.elements;
+      const label = v.label.value.trim();
+      if (!label) throw new Error('Name the custom line.');
+      const s = parseTypedDate(v.start.value), e = parseTypedDate(v.end.value);
+      checkLineDates({start_date: {value: s}, end_date: {value: e}, percent_complete: {value: '0'}});
+      const qn = num(v.qty.value), rt = num(v.rate.value);
+      await insertBudgetLine(P, {div, sub: '__custom', label, unit: v.unit.value.trim(), qty: qn, rate: rt,
+        contract: num(v.contract_amount.value), bank: v.bank_funded.checked, start: s, end: e});
+      toast('Budget line added. Tap the note icon on the line to set a revision or notes.');
+    },
+    onCancel: () => { q('sub').value = ''; }
+  });
+}
+
 async function saveBudDraft(P, body){
   const q = k => body.querySelector(`[data-b="${k}"]`);
   const div = q('div').value;
   if (!div) throw new Error('Choose the division for this line.');
   const sub = q('sub').value;
   if (!sub) throw new Error('Choose a sub-task, or Division Level if you do not have a breakdown.');
-  const custom = sub === '__custom' ? q('custom').value.trim() : '';
-  if (sub === '__custom' && !custom) throw new Error('Name the custom line.');
+  if (sub === '__custom'){ customLineSheet(body); return; }
   const start = parseTypedDate(q('start').value), end = parseTypedDate(q('end').value);
   if (start || end){
     if (!start || !end) throw new Error('Enter both the start and end date, or clear both.');
@@ -849,13 +896,10 @@ async function saveBudDraft(P, body){
   }
   const qty = num(q('qty').value), rate = num(q('rate').value);
   const divLevel = sub === '__div';
-  const label = sub === '__custom' ? custom : divLevel ? `${S.divMap[div]?.name || 'Division'} Budget` : '';
-  const line = check(await sb.from('project_lines').insert({
-    project_id: P.project.id, division_code: div, subtask_code: sub === '__custom' || divLevel ? null : sub, label,
-    unit: q('unit').value.trim(), notes: '', qty, rate, budget: qty * rate, contract_amount: num(q('contract').value), bank_funded: q('bank').checked
-  }).select().single());
-  await syncLineTask(P, line.id, line, {start_date: {value: start}, end_date: {value: end}, percent_complete: {value: '0'}});
-  toast(divLevel ? 'Division budget added. Break it into sub-tasks later if you need to.' : 'Budget line added. Tap the line to set a revision or notes.');
+  const label = divLevel ? `${S.divMap[div]?.name || 'Division'} Budget` : '';
+  await insertBudgetLine(P, {div, sub, label, unit: q('unit').value.trim(), qty, rate,
+    contract: num(q('contract').value), bank: q('bank').checked, start, end});
+  toast(divLevel ? 'Division budget added. Break it into sub-tasks later if you need to.' : 'Budget line added. Tap the note icon on the line to set a revision or notes.');
   await render();
   document.querySelector('.bud-entry [data-b=div]')?.focus();
 }
