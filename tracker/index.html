@@ -467,6 +467,14 @@ function setLibrary(divs, subs){
 }
 const divName = code => S.divMap[code] ? `${code} ${S.divMap[code].name}` : code;
 const lineName = l => l.subtask_code ? (S.subMap[l.subtask_code]?.name || l.subtask_code) : (l.label || 'Custom line');
+// Number shown for a line: the library sub-task code, or the line's own number (040-901 style) for free-form lines.
+const lineNo = l => l.subtask_code || l.line_code || '';
+// Next free number for a free-form line in a division, e.g. 040-901, 040-902.
+const nextLineCode = (P, div) => {
+  const pre = String(div).slice(0, 4);
+  const nums = P.lines.map(l => l.line_code).filter(c => c && c.startsWith(pre)).map(c => Number(c.slice(4))).filter(Number.isFinite);
+  return pre + (Math.max(900, ...nums) + 1);
+};
 // Total = signed contract when one is entered; until then, budget plus any revision.
 const budgetOf = l => num(l.contract_amount) > 0 ? num(l.contract_amount) : num(l.budget) + num(l.revision);
 // Dates show as MM/DD/YYYY everywhere in the app (budget, schedule, look-ahead).
@@ -739,7 +747,7 @@ function budgetTableHtml(P, paid, byDiv, codes, filtered){
       const t = taskForLine(P, l.id);
       // Cells are edited in place: a change saves the line (see saveLineRow). ICON_NOTE opens the full sheet for notes and revisions.
       body.push(`<tr class="item" data-id="${l.id}" data-div="${esc(code)}"${isC ? ' hidden' : ''}>
-        <td class="code">${esc(l.subtask_code || '')}<button class="icon-btn line-del" data-act="delete-line" data-id="${l.id}" title="Delete budget line" aria-label="Delete budget line">${ICON_TRASH}</button></td>
+        <td class="code">${esc(lineNo(l))}<button class="icon-btn line-del" data-act="delete-line" data-id="${l.id}" title="Delete budget line" aria-label="Delete budget line">${ICON_TRASH}</button></td>
         <td class="desc m-name"><div class="bud-desc"><input data-f="label" value="${esc(lineName(l))}" aria-label="Description"${l.subtask_code ? ' readonly title="Name comes from the library subtask"' : ''}><button class="icon-btn" data-act="edit-line" data-id="${l.id}" title="Notes, revisions and more" aria-label="More details">${ICON_NOTE}</button></div></td>
         <td class="g-start"><select data-f="unit" aria-label="Unit"><option value="">—</option>${[...new Set([...UNIT_HINTS, l.unit || ''].filter(Boolean))].map(u => `<option ${u === (l.unit || '') ? 'selected' : ''}>${esc(u)}</option>`).join('')}</select></td>
         <td class="r"><input data-f="qty" class="num-in" inputmode="decimal" value="${esc(fmtInput(l.qty))}" aria-label="Sq.Ft. or Qty"></td>
@@ -788,7 +796,7 @@ function exportBudgetCsv(){
   const rows = [['Division', 'Code', 'Sub-Task', 'Unit', 'Start', 'End', 'Sq.Ft. / Qty', 'Rate', 'Budget', 'Revision', 'Total', 'Paid', 'Owed', 'Bank Funded', 'Notes']];
   P.lines.slice().sort((a, b) => a.division_code.localeCompare(b.division_code)).forEach(l => {
     const bl = budgetOf(l), lp = paid[l.id] || 0;
-    rows.push([divName(l.division_code), l.subtask_code || 'Custom', lineName(l), l.unit || '', taskForLine(P, l.id)?.start_date || '', taskForLine(P, l.id)?.end_date || '', num(l.qty), num(l.rate), num(l.budget), num(l.revision), bl, lp, bl - lp, l.bank_funded ? 'Yes' : 'No', l.notes || '']);
+    rows.push([divName(l.division_code), lineNo(l) || 'Custom', lineName(l), l.unit || '', taskForLine(P, l.id)?.start_date || '', taskForLine(P, l.id)?.end_date || '', num(l.qty), num(l.rate), num(l.budget), num(l.revision), bl, lp, bl - lp, l.bank_funded ? 'Yes' : 'No', l.notes || '']);
   });
   const csv = rows.map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\r\n');
   const blob = new Blob(['﻿' + csv], {type: 'text/csv;charset=utf-8'});
@@ -855,6 +863,7 @@ document.addEventListener('change', e => {
 async function insertBudgetLine(P, o){
   const line = check(await sb.from('project_lines').insert({
     project_id: P.project.id, division_code: o.div, subtask_code: o.sub === '__custom' || o.sub === '__div' ? null : o.sub, label: o.label,
+    line_code: o.sub === '__custom' || o.sub === '__div' ? nextLineCode(P, o.div) : null,
     unit: o.unit, notes: '', qty: o.qty, rate: o.rate, budget: o.qty * o.rate, contract_amount: o.contract, bank_funded: o.bank
   }).select().single());
   await syncLineTask(P, line.id, line, {start_date: {value: o.start}, end_date: {value: o.end}, percent_complete: {value: '0'}});
@@ -1772,7 +1781,7 @@ function lineSheet(line){
     const linked = taskForLine(P, line.id);
     sheet({
       title: lineName(line),
-      html: `<div class="small muted">${esc(divName(line.division_code))}${line.subtask_code ? ' · ' + esc(line.subtask_code) : ''}</div>
+      html: `<div class="small muted">${esc(divName(line.division_code))}${lineNo(line) ? ' · ' + esc(lineNo(line)) : ''}</div>
         <div class="grid">
           ${custom ? `<label class="full">Line Name<input name="label" value="${esc(line.label)}"></label>` : ''}
           <label>Unit${unitSelect(line.unit)}</label>
@@ -1858,7 +1867,8 @@ function lineSheet(line){
       checkLineDates(v);
       const created = check(await sb.from('project_lines').insert({
         project_id: S.proj.project.id, division_code: v.division_code.value,
-        subtask_code: sub, label: sub ? '' : label, unit: v.unit.value.trim(), notes: v.notes.value.trim(),
+        subtask_code: sub, label: sub ? '' : label, line_code: sub ? null : nextLineCode(S.proj, v.division_code.value),
+        unit: v.unit.value.trim(), notes: v.notes.value.trim(),
         qty, rate, budget: qty * rate, bank_funded: v.bank_funded.checked
       }).select().single());
       await syncLineTask(S.proj, created.id, created, v);
@@ -1914,7 +1924,7 @@ async function resolveLineId(P, value, div){
   const named = P.lines.find(l => l.division_code === div && lineName(l).toLowerCase() === v.toLowerCase());
   if (named) return {lineId: named.id, created: false, label: lineName(named), division_code: div};
   const line = check(await sb.from('project_lines').insert({
-    project_id: P.project.id, division_code: div, subtask_code: null, label: v,
+    project_id: P.project.id, division_code: div, subtask_code: null, label: v, line_code: nextLineCode(P, div),
     budget: 0, bank_funded: !!S.divMap[div]?.bank_funded
   }).select().single());
   P.lines.push(line);
