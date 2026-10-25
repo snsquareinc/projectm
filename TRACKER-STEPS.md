@@ -16,12 +16,13 @@ Work through these in order. Each step says where to click.
    7. `010_photo_lines.sql`
    8. `011_vendor_confirm.sql`
    9. `012_confirm_signature.sql`
+   10. `013_line_codes.sql` (numbers for custom and division-level budget lines, such as 040-901)
 4. If a file shows an error, stop and send me the message. Do not run the next file.
 5. Re-running a file is safe, but do not skip one.
 
 ## Part 2: Put the new version live (Netlify)
 
-Run steps 011 and 012 in Part 1 before merging. Without them, the Request Payment Confirmation button and finger signature fail.
+Run steps 011, 012 and 013 in Part 1 before merging. Without 011 and 012, the Request Payment Confirmation button and finger signature fail. Without 013, adding a budget line fails.
 
 1. Open the repository on GitHub: `github.com/snsquareinc/projectm`.
 2. Click **Pull requests**, then **New pull request**.
