@@ -89,6 +89,11 @@ main{padding:14px 16px 110px;display:flex;flex-direction:column;gap:12px;max-wid
 .look select{width:auto;min-width:150px;flex:none;font:inherit;font-size:14px;font-weight:600;padding:6px 10px;border:1px solid var(--line);border-radius:10px;background:#fff;color:var(--ink)}
 .page-h .tx-add-btn{display:none}
 @media (max-width:640px){.page-h .tx-add-btn{display:inline-flex}}
+.rep-row{display:flex;justify-content:space-between;align-items:baseline;gap:12px;padding:9px 0;border-top:1px solid var(--soft);font-size:14px}
+.rep-row:first-child{border-top:0}
+.rep-row .num{text-align:right;white-space:nowrap}
+.rep-link{background:none;border:0;padding:0;font:inherit;color:inherit;text-align:left;cursor:pointer}
+.rep-link:hover{color:var(--teal-d);text-decoration:underline}
 .tx-tools{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;align-items:center}
 .tx-tools .tx-q{flex:1 1 220px;margin:0}
 .tx-tools select{width:auto;flex:0 0 auto;padding:8px 10px;font:inherit;font-size:14px}
@@ -964,12 +969,26 @@ function txRows(P){
       files: rc[p.id] || 0};
   });
 }
+// The line above the list: all totals, or the filtered count and total when a filter is on.
+function txSummaryText(P){
+  if (txFilterActive()){
+    const shown = txFiltered(P);
+    return `${shown.length} of ${P.pays.length} shown · ${money(shown.reduce((a, r) => a + num(r.p.amount), 0))}`;
+  }
+  const total = P.pays.reduce((a, p) => a + num(p.amount), 0);
+  return `${P.pays.length} ${P.pays.length === 1 ? 'transaction' : 'transactions'} · ${money(total)} total`;
+}
+function txFilterActive(){
+  return !!(S.txQ || S.txFilterDiv || S.txFilterVendor || S.txFilterStatus);
+}
 function txFiltered(P){
   const q = (S.txQ || '').trim().toLowerCase();
   const div = S.txFilterDiv || '';
   const ven = S.txFilterVendor || '';
+  const st = S.txFilterStatus || '';
   return txRows(P).filter(r => {
     if (div && r.div !== div) return false;
+    if (st && r.p.status !== st) return false;
     if (ven && (ven === '__none' ? !!r.p.vendor_id : r.p.vendor_id !== ven)) return false;
     return !q || [r.p.pay_date, r.amt, divName(r.div), r.task, r.vendor, r.method, r.ref, r.notes].join(' ').toLowerCase().includes(q);
   });
@@ -1017,6 +1036,8 @@ function txRowHtml(r, no){
 }
 function txFill(P){
   const rows = txSorted(P);
+  const sum = $('#txSummary');
+  if (sum) sum.textContent = txSummaryText(P);
   const empty = P.pays.length ? 'No transactions match these filters.' : 'No transactions yet. Add one above.';
   const desk = $('#txRows'), cards = $('#txCards');
   if (!desk) return;
@@ -1063,7 +1084,7 @@ function renderPayments(P){
       <h2>Transactions</h2>
       <button class="btn primary sm tx-add-btn" data-act="new-payment">+ Add Transaction</button>
     </div>
-    <div class="small muted" style="margin:-4px 0 12px">${P.pays.length} ${P.pays.length === 1 ? 'transaction' : 'transactions'} · ${money(total)} total</div>
+    <div class="small muted" id="txSummary" style="margin:-4px 0 12px">${txSummaryText(P)}</div>
     ${txDatalists(P)}
     <div class="tx-tools">
       <input type="search" id="txQ" class="tx-q" placeholder="Search transactions" value="${esc(S.txQ || '')}" aria-label="Search transactions">
@@ -1075,6 +1096,10 @@ function renderPayments(P){
         <option value="">All Contractors</option>
         <option value="__none" ${S.txFilterVendor === '__none' ? 'selected' : ''}>No Contractor</option>
         ${S.vendors.map(v => `<option value="${v.id}" ${S.txFilterVendor === v.id ? 'selected' : ''}>${esc(v.name)}</option>`).join('')}
+      </select>
+      <select id="txStatusSel" aria-label="Filter by status">
+        <option value="">All Statuses</option>
+        ${['Waiting on vendor', 'Confirmed', 'Disputed'].map(v => `<option value="${v}" ${S.txFilterStatus === v ? 'selected' : ''}>${v}</option>`).join('')}
       </select>
       <select id="txSortSel" aria-label="Sort transactions">
         ${[['date_desc', 'Date: Newest First'], ['date_asc', 'Date: Oldest First'], ['amount_desc', 'Amount: High to Low'], ['amount_asc', 'Amount: Low to High'], ['division', 'Division'], ['task', 'Task'], ['vendor', 'Paid To']]
@@ -1411,6 +1436,19 @@ async function photoSheet(P, ph){
 }
 
 // ---------- Reports (computed from this project's data) ----------
+// Contractor id for a name on the Reports page; '__none' for payments with no contractor.
+const vendorIdOf = name => name === 'No contractor' ? '__none' : (S.vendors.find(v => v.name === name)?.id || '');
+
+// Opens a list from a Reports total: sets the matching Transactions filter, or the Budget tab.
+function goFromReports(t){
+  S.txQ = '';
+  S.txFilterDiv = t.dataset.div || '';
+  S.txFilterVendor = t.dataset.vendor || '';
+  S.txFilterStatus = t.dataset.status || '';
+  const target = `#/project/${S.proj.project.id}/${t.dataset.tab}`;
+  if (location.hash === target) render(); else location.hash = target;
+}
+
 function renderReports(P){
   const paidBy = paidByLine(P);
   const budget = P.lines.reduce((a, l) => a + budgetOf(l), 0);
@@ -1425,7 +1463,7 @@ function renderReports(P){
   });
   const divRows = Object.keys(divs).sort().map(code => {
     const d = divs[code];
-    return `<div class="rep-row"><span>${esc(divName(code))}</span><span class="num">${money(d.paid)} of ${money(d.budget)} paid</span></div>`;
+    return `<div class="rep-row"><button class="rep-link" data-act="rep-go" data-tab="payments" data-div="${esc(code)}">${esc(divName(code))}</button><span class="num">${money(d.paid)} of ${money(d.budget)} paid</span></div>`;
   }).join('') || '<div class="small muted">No budget lines yet.</div>';
   const vend = {};
   P.pays.forEach(p => {
@@ -1434,7 +1472,7 @@ function renderReports(P){
     v.paid += num(p.amount);
     v.count++;
   });
-  const vendRows = Object.keys(vend).sort().map(name => `<div class="rep-row"><span>${esc(name)} <span class="small muted">· ${vend[name].count} paid</span></span><span class="num">${money(vend[name].paid)}</span></div>`).join('')
+  const vendRows = Object.keys(vend).sort().map(name => `<div class="rep-row"><button class="rep-link" data-act="rep-go" data-tab="payments" data-vendor="${esc(vendorIdOf(name))}">${esc(name)} <span class="small muted">· ${vend[name].count} paid</span></button><span class="num">${money(vend[name].paid)}</span></div>`).join('')
     || '<div class="small muted">No payments yet.</div>';
   const coiRows = [...P.assignedIds].map(id => {
     const v = S.vendors.find(x => x.id === id);
@@ -1447,10 +1485,11 @@ function renderReports(P){
     <div class="page-h"><h2>Reports</h2></div>
     <div class="small muted" style="margin:-4px 0 12px">Built from this project's budget and transactions. Updates as you enter data.</div>
     <div class="card" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px">
-      <div><div class="small muted">Budget</div><div class="num" style="font-size:18px">${money(budget)}</div></div>
-      <div><div class="small muted">Paid</div><div class="num" style="font-size:18px">${money(paid)}</div></div>
-      <div><div class="small muted">Owed</div><div class="num" style="font-size:18px">${money(owed)}</div></div>
-      <div><div class="small muted">Waiting on vendor confirmation</div><div class="num" style="font-size:18px">${waiting.length} · ${money(waiting.reduce((a, p) => a + num(p.amount), 0))}</div></div>
+      <button class="rep-link" data-act="rep-go" data-tab="budget"><span class="small muted" style="display:block">Budget</span><span class="num" style="display:block;font-size:18px">${money(budget)}</span></button>
+      <button class="rep-link" data-act="rep-go" data-tab="budget"><span class="small muted" style="display:block">Budget</span><span class="num" style="display:block;font-size:18px">${money(budget)}</span></button>
+      <button class="rep-link" data-act="rep-go" data-tab="payments"><span class="small muted" style="display:block">Paid</span><span class="num" style="display:block;font-size:18px">${money(paid)}</span></button>
+      <button class="rep-link" data-act="rep-go" data-tab="budget"><span class="small muted" style="display:block">Owed</span><span class="num" style="display:block;font-size:18px">${money(owed)}</span></button>
+      <button class="rep-link" data-act="rep-go" data-tab="payments" data-status="Waiting on vendor"><span class="small muted" style="display:block">Waiting on vendor confirmation</span><span class="num" style="display:block;font-size:18px">${waiting.length} · ${money(waiting.reduce((a, p) => a + num(p.amount), 0))}</span></button>
     </div>
     <div class="card" style="margin-top:12px"><h3 style="margin:0 0 8px">Paid by division</h3>${divRows}</div>
     <div class="card" style="margin-top:12px"><h3 style="margin:0 0 8px">Payments by contractor</h3>${vendRows}</div>
@@ -2525,6 +2564,7 @@ async function deleteSubtask(code){
 
 // ---------- Actions (delegated) ----------
 const actions = {
+  'rep-go': t => goFromReports(t),
   'edit-subtask': t => editSubtaskSheet(t.dataset.code),
   'delete-subtask': t => deleteSubtask(t.dataset.code).catch(err => toast(msg(err), true)),
   'sign-out': () => sb.auth.signOut(),
@@ -2710,9 +2750,10 @@ function openNewVendor(row, sel, isDraft){
 
 document.addEventListener('change', e => {
   const t = e.target;
-  if (t.id === 'txDivSel' || t.id === 'txSortSel' || t.id === 'txVendorSel'){
+  if (t.id === 'txDivSel' || t.id === 'txSortSel' || t.id === 'txVendorSel' || t.id === 'txStatusSel'){
     if (t.id === 'txDivSel') S.txFilterDiv = t.value;
     else if (t.id === 'txVendorSel') S.txFilterVendor = t.value;
+    else if (t.id === 'txStatusSel') S.txFilterStatus = t.value;
     else S.txSort = t.value;
     if (S.proj) txFill(S.proj);
     return;
