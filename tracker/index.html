@@ -1135,7 +1135,7 @@ function renderPayments(P){
         <thead>
           <tr><th class="ctr">#</th><th>Date</th><th class="r">Amount</th><th>Expense Classification</th><th>Task</th><th>Paid To</th><th>Method</th><th>Check #</th><th class="ctr">Notes</th><th class="ctr">Receipts</th><th class="ctr"></th></tr>
         </thead>
-        <tbody id="txDraftBody">${draftRow()}</tbody>
+        <tbody id="txDraftBody">${draftRow(P)}</tbody>
         <tbody id="txRows"></tbody>
         <tfoot id="txFoot"></tfoot>
       </table>
@@ -2195,20 +2195,34 @@ function txDatalists(P){
     <datalist id="txVendors">${S.vendors.map(v => `<option value="${esc(v.name)}">`).join('')}</datalist>`;
 }
 
-function draftRow(){
-  const preTask = S.txPreTask || '';
+// What is typed in the new-transaction row for the current project. Kept in state so leaving the page and coming back does not clear it.
+function txDraftVals(P){
+  if (!S.txDraft || S.txDraft.pid !== P.project.id) S.txDraft = {pid: P.project.id, vals: {}};
+  return S.txDraft.vals;
+}
+function keepDraft(e){
+  const t = e.target;
+  if (!S.proj || !t.closest || !t.closest('#txDraftBody') || !t.dataset.d || t.value === '__new') return;
+  txDraftVals(S.proj)[t.dataset.d] = t.value;
+}
+
+function draftRow(P){
+  const v = P ? txDraftVals(P) : {};
+  const keep = (k, fallback) => (k in v ? v[k] : fallback);
+  const preTask = keep('task', S.txPreTask || '');
   S.txPreTask = '';
-  const methodOpts = PAY_METHODS.map(m => `<option ${m === (S.txMethod || 'Check') ? 'selected' : ''}>${m}</option>`).join('');
-  const div = S.txDiv || '';
+  const method = keep('method', S.txMethod || 'Check');
+  const methodOpts = PAY_METHODS.map(m => `<option ${m === method ? 'selected' : ''}>${m}</option>`).join('');
+  const div = keep('div', S.txDiv || '');
   return `<tr class="tx-draft">
     <td class="ctr tx-no">New</td>
-    <td><input type="date" data-d="date" value="${S.txDate || todayISO()}" aria-label="Date"></td>
-    <td><input type="text" class="money" data-d="amount" inputmode="decimal" placeholder="0.00" aria-label="Amount"></td>
+    <td><input type="date" data-d="date" value="${keep('date', S.txDate || todayISO())}" aria-label="Date"></td>
+    <td><input type="text" class="money" data-d="amount" inputmode="decimal" placeholder="0.00" value="${esc(keep('amount', ''))}" aria-label="Amount"></td>
     <td><select data-d="div" aria-label="Expense classification (division)"><option value="">Choose A Division</option>${divOptions(div)}</select></td>
     <td><select data-d="task" aria-label="Task">${taskOptions(div, preTask)}</select></td>
-    <td><select data-d="vendor" aria-label="Paid to">${vendorOptions()}</select></td>
+    <td><select data-d="vendor" aria-label="Paid to">${vendorOptions(keep('vendor', ''))}</select></td>
     <td><select data-d="method" aria-label="Method">${methodOpts}</select></td>
-    <td><input data-d="ref" placeholder="Check or ref #" aria-label="Check number"></td>
+    <td><input data-d="ref" placeholder="Check or ref #" value="${esc(keep('ref', ''))}" aria-label="Check number"></td>
     <td class="ctr"></td>
     <td class="ctr"></td>
     <td class="ctr"><button class="btn primary sm" data-act="save-draft">Save</button></td>
@@ -2228,6 +2242,7 @@ async function saveDraft(){
   };
   try {
     const out = await savePaymentRecord(S.proj, d);
+    S.txDraft = {};
     toast(out);
     await render();
     document.querySelector('#txDraftBody [data-d=amount]')?.focus();
@@ -2650,6 +2665,9 @@ const actions = {
     if (!l) return;
     S.txDiv = l.division_code;
     S.txPreTask = l.id;
+    const vals = txDraftVals(S.proj);
+    vals.div = l.division_code;
+    vals.task = l.id;
     location.hash = `#/project/${S.proj.project.id}/payments`;
   },
   'delete-line': async (t, id) => {
@@ -2790,6 +2808,8 @@ document.addEventListener('keydown', e => {
 });
 
 // Remembers the value before a pick so a cancelled "+ New" can restore it.
+document.addEventListener('input', keepDraft);
+document.addEventListener('change', keepDraft);
 document.addEventListener('focusin', e => {
   const t = e.target;
   if (t.tagName === 'SELECT' && t.closest && t.closest('#txRows, #txDraftBody')) t.dataset.prev = t.value;
@@ -3204,8 +3224,11 @@ function showSignedIn(on){
   $('#app').classList.toggle('hidden', !on);
 }
 
-sb.auth.onAuthStateChange((_event, s) => {
+sb.auth.onAuthStateChange((event, s) => {
+  const sameUser = !!(session && s && session.user && s.user && session.user.id === s.user.id);
   session = s;
+  // A token refresh (or a repeat sign-in for the same user) must not rebuild the page and wipe what is being typed.
+  if (event === 'TOKEN_REFRESHED' || (event === 'SIGNED_IN' && sameUser)) return;
   // Run app queries after the auth callback returns. Awaiting queries inside it can hang in some browsers.
   setTimeout(() => startApp(s), 0);
 });
