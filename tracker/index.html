@@ -1544,6 +1544,21 @@ function renderReports(P){
 }
 
 // ---------- Files (receipts and insurance certificates for this project) ----------
+// Link to the project's Google Drive folder (plans, contracts, permits and anything else). Only https links are shown.
+function driveCard(P){
+  const url = P.project.drive_url || '';
+  if (/^https:\/\//i.test(url)) return `
+    <div class="card" style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:12px;flex-wrap:wrap">
+      <div><strong>Project Google Drive</strong><div class="small muted">Plans, contracts, permits and anything else for this project.</div></div>
+      <a class="btn primary sm" href="${esc(url)}" target="_blank" rel="noopener">Open Drive folder</a>
+    </div>`;
+  return `
+    <div class="card" style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:12px;flex-wrap:wrap">
+      <div class="small muted">No Google Drive folder linked yet. Add the link in Project Details and it will open from here.</div>
+      <button class="btn sm" data-act="edit-project">Add link</button>
+    </div>`;
+}
+
 function renderFiles(P){
   const payOf = id => P.pays.find(p => p.id === id) || {};
   const receipts = P.receipts.map(r => {
@@ -1565,6 +1580,7 @@ function renderFiles(P){
   $('#main').innerHTML = `
     <div class="page-h"><h2>Files</h2></div>
     <div class="small muted" style="margin:-4px 0 12px">Receipts attach to transactions. Certificates of insurance attach to contractors.</div>
+    ${driveCard(P)}
     ${list || '<div class="empty">No files yet.</div>'}`;
 }
 
@@ -1835,14 +1851,19 @@ function projectSheet(pr){
       <label>Loan Amount ($)<input type="text" class="money" name="loan_amount" inputmode="decimal" min="0" step="any" value="${esc(fmtInput(pr?.loan_amount))}"></label>
       <label>Start Date<input type="date" name="start_date" value="${esc(pr?.start_date || '')}"></label>
       <label>End Date<input type="date" name="end_date" value="${esc(pr?.end_date || '')}"></label>
+      <label class="full">Google Drive Folder<input type="url" name="drive_url" placeholder="https://drive.google.com/..." value="${esc(pr?.drive_url || '')}"></label>
+      <div class="small muted full">Paste the link to this project's Drive folder (plans, contracts, permits, anything else). The Files page opens it.</div>
     </div>`,
     onSubmit: async form => {
       const v = form.elements;
       if (!v.name.value.trim()) throw new Error('Enter the project name.');
+      const drive = v.drive_url.value.trim();
+      if (drive && !/^https:\/\//i.test(drive)) throw new Error('The Drive link must start with https://');
       const row = {
         name: v.name.value.trim(), address: v.address.value.trim(), status: v.status.value,
         general_contractor: v.general_contractor.value.trim(), lender: v.lender.value.trim(),
-        loan_amount: num(v.loan_amount.value), start_date: v.start_date.value || null, end_date: v.end_date.value || null
+        loan_amount: num(v.loan_amount.value), start_date: v.start_date.value || null, end_date: v.end_date.value || null,
+        drive_url: drive || null
       };
       if (editing){
         check(await sb.from('projects').update(row).eq('id', pr.id));
