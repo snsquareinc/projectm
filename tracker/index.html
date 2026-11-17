@@ -89,6 +89,29 @@ main{padding:14px 16px 110px;display:flex;flex-direction:column;gap:12px;max-wid
 .look select{width:auto;min-width:150px;flex:none;font:inherit;font-size:14px;font-weight:600;padding:6px 10px;border:1px solid var(--line);border-radius:10px;background:#fff;color:var(--ink)}
 .page-h .tx-add-btn{display:none}
 @media (max-width:640px){.page-h .tx-add-btn{display:inline-flex}}
+.rp-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(170px,100%),1fr));gap:12px;margin-bottom:12px}
+.rp-kpi{display:flex;flex-direction:column;gap:6px;background:#fff;border:1px solid var(--soft);border-radius:14px;padding:14px 16px;text-align:left;cursor:pointer;font:inherit;color:inherit}
+.rp-kpi:hover{border-color:#CBD5E1;box-shadow:0 2px 8px rgba(15,23,42,.06)}
+.rp-kpi.warn{border-color:#FCD34D;background:#FFFBEB}
+.rp-lbl{font-size:12px;font-weight:600;color:var(--muted,#64748B);text-transform:uppercase;letter-spacing:.04em}
+.rp-val{font-size:22px;font-weight:700;font-variant-numeric:tabular-nums;color:var(--navy)}
+.rp-sub{font-size:12px;color:var(--muted,#64748B)}
+.rp-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(320px,100%),1fr));gap:12px}
+.rp-grid h3{margin:0 0 4px}
+.rp-item{display:flex;flex-direction:column;gap:6px;width:100%;background:none;border:0;border-top:1px solid var(--soft);padding:11px 2px;text-align:left;cursor:pointer;font:inherit;color:inherit}
+.rp-grid h3+.rp-item{border-top:0}
+.rp-item:hover .rp-name{color:var(--teal-d);text-decoration:underline}
+.rp-top{display:flex;justify-content:space-between;gap:12px;align-items:baseline}
+.rp-name{font-weight:600;font-size:14px;overflow-wrap:anywhere}
+.rp-amt{font-weight:700;font-variant-numeric:tabular-nums;font-size:14px;white-space:nowrap}
+.rp-of{font-weight:500;color:var(--muted,#64748B);font-size:12px}
+.rp-bar{display:block;height:8px;border-radius:99px;background:#E2E8F0;overflow:hidden;margin-top:2px}
+.rp-bar>span{display:block;height:100%;border-radius:99px;background:var(--teal);transition:width .3s}
+.rp-bar.warn>span{background:#D97706}
+.rp-bar.bad>span{background:#B91C1C}
+.rp-alert{display:flex;justify-content:space-between;align-items:center;gap:12px;width:100%;padding:10px 12px;border-radius:10px;background:#F8FAFC;border:1px solid var(--soft);margin-top:8px;font:inherit;font-size:14px;text-align:left;color:inherit}
+button.rp-alert{cursor:pointer}
+.rp-alert.bad{background:#FEF2F2;border-color:#FECACA}
 .rep-row{display:flex;justify-content:space-between;align-items:baseline;gap:12px;padding:9px 0;border-top:1px solid var(--soft);font-size:14px}
 .rep-row:first-child{border-top:0}
 .rep-row .num{text-align:right;white-space:nowrap}
@@ -1436,9 +1459,6 @@ async function photoSheet(P, ph){
 }
 
 // ---------- Reports (computed from this project's data) ----------
-// Contractor id for a name on the Reports page; '__none' for payments with no contractor.
-const vendorIdOf = name => name === 'No contractor' ? '__none' : (S.vendors.find(v => v.name === name)?.id || '');
-
 // Opens a list from a Reports total: sets the matching Transactions filter, or the Budget tab.
 function goFromReports(t){
   S.txQ = '';
@@ -1454,46 +1474,73 @@ function renderReports(P){
   const budget = P.lines.reduce((a, l) => a + budgetOf(l), 0);
   const paid = P.pays.reduce((a, p) => a + num(p.amount), 0);
   const owed = Math.max(0, budget - paid);
+  const pct = (a, b) => b > 0 ? Math.min(100, Math.round(a / b * 100)) : 0;
   const waiting = P.pays.filter(p => p.status === 'Waiting on vendor');
+  const waitingAmt = waiting.reduce((a, p) => a + num(p.amount), 0);
+
+  // Paid by contractor, largest first
+  const vend = {};
+  P.pays.forEach(p => {
+    const name = (p.vendors && p.vendors.name) || 'No contractor';
+    const v = (vend[name] ||= {paid: 0, count: 0, id: p.vendor_id || '__none'});
+    v.paid += num(p.amount);
+    v.count++;
+  });
+  const vendList = Object.entries(vend).sort((a, b) => b[1].paid - a[1].paid);
+  const maxVend = Math.max(1, ...vendList.map(([, v]) => v.paid));
+  const vendHtml = vendList.map(([name, v]) => `
+    <button class="rp-item" data-act="rep-go" data-tab="payments" data-vendor="${esc(v.id)}">
+      <span class="rp-top"><span class="rp-name">${esc(name)}</span><span class="rp-amt">${money(v.paid)}</span></span>
+      <span class="rp-bar"><span style="width:${(v.paid / maxVend * 100).toFixed(1)}%"></span></span>
+      <span class="rp-sub">${v.count} payment${v.count === 1 ? '' : 's'} · ${pct(v.paid, paid)}% of all paid</span>
+    </button>`).join('') || '<div class="empty">No payments yet.</div>';
+
+  // Budget used by division
   const divs = {};
   P.lines.forEach(l => {
     const d = (divs[l.division_code] ||= {budget: 0, paid: 0});
     d.budget += budgetOf(l);
     d.paid += paidBy[l.id] || 0;
   });
-  const divRows = Object.keys(divs).sort().map(code => {
-    const d = divs[code];
-    return `<div class="rep-row"><button class="rep-link" data-act="rep-go" data-tab="payments" data-div="${esc(code)}">${esc(divName(code))}</button><span class="num">${money(d.paid)} of ${money(d.budget)} paid</span></div>`;
-  }).join('') || '<div class="small muted">No budget lines yet.</div>';
-  const vend = {};
-  P.pays.forEach(p => {
-    const name = (p.vendors && p.vendors.name) || 'No contractor';
-    const v = (vend[name] ||= {paid: 0, count: 0});
-    v.paid += num(p.amount);
-    v.count++;
-  });
-  const vendRows = Object.keys(vend).sort().map(name => `<div class="rep-row"><button class="rep-link" data-act="rep-go" data-tab="payments" data-vendor="${esc(vendorIdOf(name))}">${esc(name)} <span class="small muted">· ${vend[name].count} paid</span></button><span class="num">${money(vend[name].paid)}</span></div>`).join('')
-    || '<div class="small muted">No payments yet.</div>';
+  const divList = Object.keys(divs).sort().map(code => ({code, ...divs[code]}));
+  const divHtml = divList.map(d => {
+    const p = pct(d.paid, d.budget), over = d.budget > 0 && d.paid > d.budget;
+    const tone = over ? 'bad' : p >= 90 ? 'warn' : 'ok';
+    return `
+    <button class="rp-item" data-act="rep-go" data-tab="payments" data-div="${esc(d.code)}">
+      <span class="rp-top"><span class="rp-name">${esc(divName(d.code))}</span><span class="rp-amt">${money(d.paid)} <span class="rp-of">of ${money(d.budget)}</span></span></span>
+      <span class="rp-bar ${tone}"><span style="width:${Math.min(100, p)}%"></span></span>
+      <span class="rp-sub">${p}% used · ${over ? money(d.paid - d.budget) + ' over budget' : money(d.budget - d.paid) + ' left'}</span>
+    </button>`;
+  }).join('') || '<div class="empty">No budget lines yet.</div>';
+
+  // Insurance certificates that need attention
   const coiRows = [...P.assignedIds].map(id => {
     const v = S.vendors.find(x => x.id === id);
     const st = coiStatus(P.insMap[id + '|' + P.project.id]);
     return {name: v ? v.name : 'Contractor', st};
   }).filter(x => x.st !== 'ok' && x.st !== 'dismissed');
-  const coiHtml = coiRows.map(x => `<div class="rep-row"><span>${esc(x.name)}</span>${coiBadge(x.st)}</div>`).join('')
-    || '<div class="small muted">Every assigned contractor has a certificate of insurance on file.</div>';
+
+  const attention = [];
+  if (waiting.length) attention.push(`<button class="rp-alert" data-act="rep-go" data-tab="payments" data-status="Waiting on vendor"><span>${waiting.length} payment${waiting.length === 1 ? '' : 's'} waiting for contractor confirmation</span><span class="num">${money(waitingAmt)}</span></button>`);
+  divList.filter(d => d.budget > 0 && d.paid > d.budget).forEach(d => attention.push(`<button class="rp-alert bad" data-act="rep-go" data-tab="payments" data-div="${esc(d.code)}"><span>${esc(divName(d.code))} is over budget</span><span class="num">${money(d.paid - d.budget)} over</span></button>`));
+  coiRows.forEach(x => attention.push(`<div class="rp-alert"><span>${esc(x.name)} · insurance</span>${coiBadge(x.st)}</div>`));
+  const attentionHtml = attention.join('') || '<div class="small muted">Nothing needs attention right now.</div>';
+
   $('#main').innerHTML = `
     <div class="page-h"><h2>Reports</h2></div>
-    <div class="small muted" style="margin:-4px 0 12px">Built from this project's budget and transactions. Updates as you enter data.</div>
-    <div class="card" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px">
-      <button class="rep-link" data-act="rep-go" data-tab="budget"><span class="small muted" style="display:block">Budget</span><span class="num" style="display:block;font-size:18px">${money(budget)}</span></button>
-      <button class="rep-link" data-act="rep-go" data-tab="budget"><span class="small muted" style="display:block">Budget</span><span class="num" style="display:block;font-size:18px">${money(budget)}</span></button>
-      <button class="rep-link" data-act="rep-go" data-tab="payments"><span class="small muted" style="display:block">Paid</span><span class="num" style="display:block;font-size:18px">${money(paid)}</span></button>
-      <button class="rep-link" data-act="rep-go" data-tab="budget"><span class="small muted" style="display:block">Owed</span><span class="num" style="display:block;font-size:18px">${money(owed)}</span></button>
-      <button class="rep-link" data-act="rep-go" data-tab="payments" data-status="Waiting on vendor"><span class="small muted" style="display:block">Waiting on vendor confirmation</span><span class="num" style="display:block;font-size:18px">${waiting.length} · ${money(waiting.reduce((a, p) => a + num(p.amount), 0))}</span></button>
+    <div class="small muted" style="margin:-4px 0 14px">Built from this project's budget and transactions. Click any number to see the detail.</div>
+    <div class="rp-kpis">
+      <button class="rp-kpi" data-act="rep-go" data-tab="budget"><span class="rp-lbl">Budget</span><span class="rp-val">${money(budget)}</span><span class="rp-sub">${P.lines.length} line${P.lines.length === 1 ? '' : 's'}</span></button>
+      <button class="rp-kpi" data-act="rep-go" data-tab="payments"><span class="rp-lbl">Paid</span><span class="rp-val">${money(paid)}</span><span class="rp-bar"><span style="width:${pct(paid, budget)}%"></span></span><span class="rp-sub">${pct(paid, budget)}% of budget</span></button>
+      <button class="rp-kpi" data-act="rep-go" data-tab="budget"><span class="rp-lbl">Owed</span><span class="rp-val">${money(owed)}</span><span class="rp-sub">Budget minus paid</span></button>
+      <button class="rp-kpi${waiting.length ? ' warn' : ''}" data-act="rep-go" data-tab="payments" data-status="Waiting on vendor"><span class="rp-lbl">Waiting on contractor</span><span class="rp-val">${waiting.length}</span><span class="rp-sub">${money(waitingAmt)}</span></button>
     </div>
-    <div class="card" style="margin-top:12px"><h3 style="margin:0 0 8px">Paid by division</h3>${divRows}</div>
-    <div class="card" style="margin-top:12px"><h3 style="margin:0 0 8px">Payments by contractor</h3>${vendRows}</div>
-    <div class="card" style="margin-top:12px"><h3 style="margin:0 0 8px">Insurance needing attention</h3>${coiHtml}</div>`;
+    <div class="rp-grid">
+      <section class="card"><h3>Paid by contractor</h3>${vendHtml}</section>
+      <section class="card"><h3>Budget used by division</h3>${divHtml}</section>
+    </div>
+    <section class="card" style="margin-top:12px"><h3 style="margin:0 0 4px">Needs attention</h3>${attentionHtml}</section>`;
 }
 
 // ---------- Files (receipts and insurance certificates for this project) ----------
