@@ -667,12 +667,14 @@ async function renderProject(r){
       <a href="#/project/${pr.id}/schedule" ${r.tab === 'schedule' ? 'aria-current="page"' : ''}>Schedule</a>
       <a href="#/project/${pr.id}/payments" ${r.tab === 'payments' ? 'aria-current="page"' : ''}>Transactions</a>
       <a href="#/project/${pr.id}/contractors" ${r.tab === 'contractors' ? 'aria-current="page"' : ''}>Contractors</a>
+      <a href="#/project/${pr.id}/statements" ${r.tab === 'statements' ? 'aria-current="page"' : ''}>Card Statements</a>
       <a href="#/project/${pr.id}/draws" ${r.tab === 'draws' ? 'aria-current="page"' : ''}>Draws</a>
       <a href="#/project/${pr.id}/reports" ${r.tab === 'reports' ? 'aria-current="page"' : ''}>Reports</a>
       <a href="#/project/${pr.id}/files" ${r.tab === 'files' ? 'aria-current="page"' : ''}>Files</a>
       <a href="#/project/${pr.id}/photos" ${r.tab === 'photos' ? 'aria-current="page"' : ''}>Photos</a>
     </div>`);
   if (r.tab === 'payments') renderPayments(P);
+  else if (r.tab === 'statements') renderStatements(P);
   else if (r.tab === 'contractors') renderContractors(P);
   else if (r.tab === 'draws') renderDraws(P);
   else if (r.tab === 'reports') renderReports(P);
@@ -1142,6 +1144,172 @@ function renderPayments(P){
     </div>
     <div class="tx-cards" id="txCards"></div>`;
   txFill(P);
+}
+
+// ---------- Card statement import ----------
+// Reads a CSV exported from a card website, shows each charge for review, and saves the ones you categorize.
+// Nothing is saved until "Save"; rows already entered (same date, amount and description, method Card) are unchecked.
+function parseCsv(text){
+  const rows = []; let row = [], field = '', quoted = false;
+  text = String(text).replace(/^﻿/, '');
+  for (let i = 0; i < text.length; i++){
+    const c = text[i];
+    if (quoted){
+      if (c === '"'){ if (text[i + 1] === '"'){ field += '"'; i++; } else quoted = false; }
+      else field += c;
+    } else if (c === '"') quoted = true;
+    else if (c === ','){ row.push(field); field = ''; }
+    else if (c === '\n' || c === '\r'){
+      if (c === '\r' && text[i + 1] === '\n') i++;
+      row.push(field); rows.push(row); row = []; field = '';
+    } else field += c;
+  }
+  if (field || row.length){ row.push(field); rows.push(row); }
+  return rows.filter(r => r.some(x => x.trim() !== ''));
+}
+function parseStatementMoney(s){
+  const t0 = String(s || '').trim();
+  if (!t0) return null;
+  const neg = /^\(.*\)$/.test(t0) || t0.includes('-');
+  const n = Number(t0.replace(/[()$,\s-]/g, ''));
+  if (!isFinite(n) || t0.replace(/[()$,\s-]/g, '') === '') return null;
+  return neg ? -n : n;
+}
+function parseStatement(text){
+  const grid = parseCsv(text);
+  if (grid.length < 2) throw new Error('This file has no transactions in it.');
+  const H = grid[0].map(h => h.trim().toLowerCase());
+  const find = re => H.findIndex(h => re.test(h));
+  let dateI = find(/^(transaction |trans |purchase )?date$/);
+  if (dateI < 0) dateI = find(/date/);
+  const descI = find(/description|merchant|payee|details/);
+  const amtI = find(/^amount/);
+  const debI = find(/^debit/), creI = find(/^credit/);
+  const split = amtI < 0 && debI >= 0 && creI >= 0;
+  if (dateI < 0 || descI < 0 || (amtI < 0 && !split)){
+    throw new Error('Could not find Date, Description and Amount columns. Download the statement as CSV from your card website (PDF files cannot be read here).');
+  }
+  const rows = grid.slice(1).map(c => {
+    const desc = String(c[descI] || '').trim().replace(/\s+/g, ' ');
+    let date = null, err = '';
+    try { date = parseTypedDate(String(c[dateI] || '').trim()); } catch (e) { err = 'Date not recognized'; }
+    const raw = split
+      ? (parseStatementMoney(c[debI]) || 0) - (parseStatementMoney(c[creI]) || 0)
+      : parseStatementMoney(c[amtI]);
+    if (raw == null && !err) err = 'Amount not recognized';
+    return {date, desc, raw: raw ?? 0, err};
+  });
+  const neg = rows.filter(r => r.raw < 0).length, pos = rows.filter(r => r.raw > 0).length;
+  return {rows, split, sign: neg > pos ? 'neg' : 'pos'};
+}
+// Recomputes amounts, skips and duplicates after a change to the file or the sign setting.
+function impRefresh(P, imp){
+  imp.rows.forEach(r => {
+    r.amt = r.err ? 0 : (imp.split || imp.sign === 'pos' ? r.raw : -r.raw);
+    r.skip = !!r.err || r.amt <= 0;
+    r.dupe = !r.skip && P.pays.some(p => p.method === 'Card' && p.pay_date === r.date && num(p.amount) === r.amt && (p.notes || '').trim() === r.desc);
+    if (!r.touched) r.include = !r.skip && !r.dupe;
+  });
+}
+// Suggests division, task and contractor from earlier card payments with the same description.
+function renderStatements(P){
+  if (S.stmt && S.stmt.pid === P.project.id){ $('#main').innerHTML = importView(P, S.stmt); return; }
+  $('#main').innerHTML = `
+    <div class="page-h"><h2>Card Statements</h2></div>
+    <div class="card" style="padding:18px;max-width:640px">
+      <p style="margin:0 0 10px">Upload a CSV downloaded from your card website. Each charge is shown for review, and nothing is saved until you categorize the rows you want and press Save.</p>
+      <p class="small muted" style="margin:0 0 14px">Transactions already entered (same date, amount and description) are unchecked. Credits and payments are skipped. PDF statements cannot be read here.</p>
+      <button class="btn primary sm" data-act="import-stmt">Choose CSV File</button>
+      <input type="file" id="stmtIn" accept=".csv,text/csv" hidden>
+    </div>`;
+}
+function impPrepare(P, imp){
+  const hist = new Map();
+  P.pays.forEach(p => {
+    const k = (p.notes || '').trim().toLowerCase();
+    if (!k || !p.budget_line_id || hist.has(k)) return;
+    const l = P.lines.find(x => x.id === p.budget_line_id);
+    if (l) hist.set(k, {div: l.division_code, task: l.id, vendor: p.vendor_id || ''});
+  });
+  imp.rows.forEach(r => {
+    const h = hist.get(r.desc.toLowerCase());
+    r.div = h ? h.div : ''; r.task = h ? h.task : ''; r.vendor = h ? h.vendor : '';
+    r.include = false; r.touched = false;
+  });
+  impRefresh(P, imp);
+}
+function impStatus(r){
+  if (r.err) return [r.err, 'b-bad'];
+  if (r.skip) return ['Credit or payment', 'b-mute'];
+  if (r.dupe) return ['Already entered', 'b-mute'];
+  if (r.div && !r.task) return ['Pick a task', 'b-warn'];
+  if (!r.div) return ['Unclassified', 'b-warn'];
+  return ['Ready', 'b-ok'];
+}
+function impRowHtml(r, i){
+  const [label, cls] = impStatus(r);
+  return `<tr class="tx-edit ${r.skip || r.dupe ? 'tx-unc' : ''}" data-i="${i}">
+    <td class="ctr"><input type="checkbox" data-imp="include" ${r.include ? 'checked' : ''} ${r.skip ? 'disabled' : ''} aria-label="Save this row"></td>
+    <td>${r.date ? fmtDate(r.date) : '—'}</td>
+    <td>${esc(r.desc)}</td>
+    <td class="r">${money(r.amt)}</td>
+    <td><select data-imp="div" aria-label="Expense classification (division)"><option value="">Choose A Division</option>${divOptions(r.div)}</select></td>
+    <td><select data-imp="task" aria-label="Task">${taskOptions(r.div, r.task)}</select></td>
+    <td><select data-imp="vendor" aria-label="Paid to">${vendorOptions(r.vendor)}</select></td>
+    <td><span class="badge ${cls}">${esc(label)}</span></td>
+  </tr>`;
+}
+function importView(P, imp){
+  const ready = imp.rows.filter(r => r.include && !r.skip && !r.err).length;
+  const dupes = imp.rows.filter(r => r.dupe).length;
+  const skipped = imp.rows.filter(r => r.skip).length;
+  return `
+    <div class="page-h">
+      <h2>Review Card Statement</h2>
+      <div class="imp-acts">
+        <button class="btn sm" data-act="imp-cancel">Cancel Import</button>
+        <button class="btn primary sm" data-act="imp-save">Save ${ready} Transaction${ready === 1 ? '' : 's'}</button>
+      </div>
+    </div>
+    <div class="small muted" style="margin:-4px 0 12px">${esc(imp.fileName)} · ${imp.rows.length} rows · ${dupes} already entered · ${skipped} credits or payments skipped. Nothing is saved until you press Save.</div>
+    ${imp.split ? '' : `<div class="tx-tools"><label class="small">Charges show as
+      <select id="impSign" aria-label="Charges show as"><option value="pos" ${imp.sign === 'pos' ? 'selected' : ''}>Positive numbers</option><option value="neg" ${imp.sign === 'neg' ? 'selected' : ''}>Negative numbers</option></select></label></div>`}
+    <div class="card tx-wrap" style="padding:0;overflow-x:auto">
+      <table class="sheet-tbl tx-tbl" id="impTbl">
+        <thead><tr><th class="ctr">Save</th><th>Date</th><th>Description</th><th class="r">Amount</th><th>Expense Classification</th><th>Task</th><th>Paid To</th><th>Status</th></tr></thead>
+        <tbody>${imp.rows.map(impRowHtml).join('')}</tbody>
+      </table>
+    </div>`;
+}
+// Applies a choice to other rows with the same description, only where they are still empty.
+function impPropagate(imp, r, field, value){
+  const key = r.desc.toLowerCase();
+  imp.rows.forEach(x => {
+    if (x === r || x.skip || x.desc.toLowerCase() !== key) return;
+    if (field === 'div' && !x.div){ x.div = value; x.task = ''; }
+    if (field === 'task' && !x.task && x.div === r.div) x.task = value;
+    if (field === 'vendor' && !x.vendor) x.vendor = value;
+  });
+}
+async function impSave(){
+  const P = S.proj, imp = S.stmt;
+  if (!imp || imp.pid !== P.project.id) return;
+  const rows = imp.rows.filter(r => r.include && !r.skip && !r.err);
+  if (!rows.length) throw new Error('Nothing is selected to save.');
+  const bad = rows.find(r => r.div && !r.task);
+  if (bad) throw new Error(`Pick a task for "${bad.desc}", or clear its division.`);
+  const payload = [];
+  for (const r of rows){
+    const lineId = r.div && r.task ? (await resolveLineId(P, r.task, r.div)).lineId : null;
+    payload.push({
+      project_id: P.project.id, vendor_id: r.vendor || null, budget_line_id: lineId,
+      pay_date: r.date, amount: r.amt, method: 'Card', reference: '', invoice_number: '', notes: r.desc
+    });
+  }
+  check(await sb.from('payments').insert(payload));
+  S.stmt = null;
+  toast(`Saved ${payload.length} card transaction${payload.length === 1 ? '' : 's'}.`);
+  await render();
 }
 
 // ---------- Draws (bank funding requests) ----------
@@ -2786,7 +2954,10 @@ const actions = {
   'open-vendor': (t, id) => vendorSheet(S.vendors.find(v => v.id === id)),
   'new-division': () => divisionSheet(),
   'new-subtask': (t) => subtaskSheet(t.dataset.code),
-  'export-csv': () => exportBudgetCsv()
+  'export-csv': () => exportBudgetCsv(),
+  'import-stmt': () => $('#stmtIn').click(),
+  'imp-cancel': () => { S.stmt = null; renderStatements(S.proj); },
+  'imp-save': () => impSave()
 };
 
 document.addEventListener('click', async e => {
@@ -2808,6 +2979,41 @@ document.addEventListener('keydown', e => {
 });
 
 // Remembers the value before a pick so a cancelled "+ New" can restore it.
+document.addEventListener('change', async e => {
+  const t = e.target;
+  if (t.id === 'stmtIn'){
+    const f = t.files[0];
+    t.value = '';
+    if (!f || !S.proj) return;
+    try {
+      const parsed = parseStatement(await f.text());
+      const imp = {pid: S.proj.project.id, fileName: f.name, split: parsed.split, sign: parsed.sign, rows: parsed.rows};
+      impPrepare(S.proj, imp);
+      S.stmt = imp;
+      renderStatements(S.proj);
+    } catch (err) { toast(msg(err), true); }
+    return;
+  }
+  if (t.id === 'impSign' && S.stmt && S.proj){
+    S.stmt.sign = t.value;
+    impRefresh(S.proj, S.stmt);
+    renderStatements(S.proj);
+    return;
+  }
+  if (!t.closest || !t.closest('#impTbl') || !S.stmt) return;
+  const r = S.stmt.rows[+t.closest('tr[data-i]').dataset.i];
+  if (t.dataset.imp === 'include'){ r.include = t.checked; r.touched = true; renderStatements(S.proj); return; }
+  const field = t.dataset.imp;
+  if (t.value === '__new'){
+    toast('Add the contractor or task first in the Transactions table, then import again.', true);
+    t.value = r[field] || '';
+    return;
+  }
+  r[field] = t.value;
+  if (field === 'div') r.task = '';
+  impPropagate(S.stmt, r, field, t.value);
+  renderStatements(S.proj);
+});
 document.addEventListener('input', keepDraft);
 document.addEventListener('change', keepDraft);
 document.addEventListener('focusin', e => {
@@ -3154,6 +3360,7 @@ function renderSide(r){
         ${link(`#/project/${id}/budget`, 'Budget', r.tab === 'budget', 'child')}
         ${link(`#/project/${id}/schedule`, 'Schedule', r.tab === 'schedule', 'child')}
         ${link(`#/project/${id}/payments`, 'Transactions', r.tab === 'payments', 'child')}
+        ${link(`#/project/${id}/statements`, 'Card Statements', r.tab === 'statements', 'child')}
         ${link(`#/project/${id}/contractors`, 'Contractors', r.tab === 'contractors', 'child')}
         ${link(`#/project/${id}/draws`, 'Draws', r.tab === 'draws', 'child')}
         ${link(`#/project/${id}/reports`, 'Reports', r.tab === 'reports', 'child')}
