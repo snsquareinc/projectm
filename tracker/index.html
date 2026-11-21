@@ -407,6 +407,13 @@ dialog.sheet form{display:flex;flex-direction:column;gap:14px;padding:18px}
 .gate{max-width:380px;margin:12vh auto 0;padding:0 16px}
 .gate .card{margin-top:10px}
 .hidden{display:none !important}
+.stmt-acts{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.stmt-acts .btn svg{vertical-align:-2px;margin-right:4px}
+.stmt-files{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px}
+.stmt-chip{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--line);border-radius:999px;padding:4px 6px 4px 10px;background:#fff;font-size:13px}
+.stmt-chip select{font:inherit;font-size:12px;padding:2px 4px;border:1px solid var(--line);border-radius:6px}
+.stmt-kind{font-size:10px;font-weight:700;letter-spacing:.5px;color:var(--teal)}
+.stmt-foot{display:flex;justify-content:flex-end;margin-top:10px}
 </style>
 </head>
 <body>
@@ -1146,9 +1153,77 @@ function renderPayments(P){
   txFill(P);
 }
 
-// ---------- Card statement import ----------
-// Reads a CSV exported from a card website, shows each charge for review, and saves the ones you categorize.
-// Nothing is saved until "Save"; rows already entered (same date, amount and description, method Card) are unchecked.
+// ---------- Card statements ----------
+// Upload card statements (CSV or PDF), categorize each charge, then save the ones you choose to Transactions.
+// Nothing is saved until "Save to Transactions". Rows already entered (same date, amount and description, method Card) are unchecked.
+const PDFJS_URL = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@6.2.108/build/pdf.min.mjs';
+let pdfjsReady = null;
+// Loads pdf.js only when a PDF is uploaded. The worker is copied into a same-origin blob so it can run.
+function loadPdfJs(){
+  if (!pdfjsReady) pdfjsReady = (async () => {
+    const lib = await import(PDFJS_URL);
+    const code = await fetch(PDFJS_URL.replace('pdf.min.mjs', 'pdf.worker.min.mjs')).then(r => r.text());
+    lib.GlobalWorkerOptions.workerSrc = URL.createObjectURL(new Blob([code], {type: 'text/javascript'}));
+    return lib;
+  })().catch(e => { pdfjsReady = null; throw e; });
+  return pdfjsReady;
+}
+// Text of a PDF as lines, with items on the same height joined left to right.
+async function pdfTextLines(file){
+  const lib = await loadPdfJs();
+  const doc = await lib.getDocument({data: new Uint8Array(await file.arrayBuffer())}).promise;
+  const lines = [];
+  for (let n = 1; n <= doc.numPages; n++){
+    const content = await (await doc.getPage(n)).getTextContent();
+    const bands = [];
+    content.items.filter(it => it.str && it.str.trim()).forEach(it => {
+      const y = Math.round(it.transform[5]);
+      let band = bands.find(b => Math.abs(b.y - y) <= 2);
+      if (!band){ band = {y, items: []}; bands.push(band); }
+      band.items.push({s: it.str, x: it.transform[4], w: it.width || 0});
+    });
+    bands.sort((a, b) => b.y - a.y).forEach(band => {
+      band.items.sort((a, b) => a.x - b.x);
+      let text = '', end = null;
+      band.items.forEach(it => {
+        if (end !== null) text += it.x - end > 6 ? '   ' : ' ';
+        text += it.s;
+        end = it.x + it.w;
+      });
+      lines.push(text.trim());
+    });
+  }
+  return lines;
+}
+const MONTHS = {Jan: 0, Feb: 1, Mar: 2, Apr: 3, May: 4, Jun: 5, Jul: 6, Aug: 7, Sep: 8, Oct: 9, Nov: 10, Dec: 11};
+// Reads "Mon DD  Mon DD  description  $amount" lines (transaction date, posting date, description, amount).
+// Credits show as "- $amount". The year comes from the statement period.
+function parseCardPdf(lines){
+  const per = lines.map(l => l.match(/([A-Z][a-z]{2}) (\d{1,2}), (\d{4})\s*-\s*([A-Z][a-z]{2}) (\d{1,2}), (\d{4})/)).find(Boolean);
+  const start = per ? new Date(+per[3], MONTHS[per[1]], +per[2]) : null;
+  const end = per ? new Date(+per[6], MONTHS[per[4]], +per[5]) : null;
+  const DAY = 86400000;
+  const pat = /^([A-Z][a-z]{2}) (\d{1,2})\s+[A-Z][a-z]{2} \d{1,2}\s+(.+?)\s+(-\s*)?\$([\d,]+\.\d{2})\s*$/;
+  const rows = [];
+  lines.forEach(l => {
+    const m = l.match(pat);
+    if (!m || !(m[1] in MONTHS)) return;
+    const month = MONTHS[m[1]], day = +m[2];
+    let year = end ? end.getFullYear() : new Date().getFullYear();
+    if (end){
+      const c = new Date(year, month, day).getTime();
+      if (c > end.getTime() + 31 * DAY) year -= 1;
+      else if (start && c < start.getTime() - 31 * DAY) year += 1;
+    }
+    const date = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    const raw = Number(m[5].replace(/,/g, '')) * (m[4] ? -1 : 1);
+    rows.push({date, desc: m[3].trim().replace(/\s+/g, ' '), raw, err: ''});
+  });
+  return rows;
+}
+const ICON_CSV = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M9 4v16"/></svg>`;
+const ICON_PDF = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M14 3H6v18h12V7z"/><path d="M14 3v4h4"/><path d="M9 15h6M9 12h2"/></svg>`;
+
 function parseCsv(text){
   const rows = []; let row = [], field = '', quoted = false;
   text = String(text).replace(/^﻿/, '');
@@ -1202,28 +1277,18 @@ function parseStatement(text){
   const neg = rows.filter(r => r.raw < 0).length, pos = rows.filter(r => r.raw > 0).length;
   return {rows, split, sign: neg > pos ? 'neg' : 'pos'};
 }
-// Recomputes amounts, skips and duplicates after a change to the file or the sign setting.
+// Recomputes amounts, skips and duplicates. Each row follows its own file's sign setting.
 function impRefresh(P, imp){
   imp.rows.forEach(r => {
-    r.amt = r.err ? 0 : (imp.split || imp.sign === 'pos' ? r.raw : -r.raw);
+    const f = (imp.files && imp.files.find(x => x.id === r.fileId)) || imp;
+    r.amt = r.err ? 0 : (f.split || f.sign === 'pos' ? r.raw : -r.raw);
     r.skip = !!r.err || r.amt <= 0;
     r.dupe = !r.skip && P.pays.some(p => p.method === 'Card' && p.pay_date === r.date && num(p.amount) === r.amt && (p.notes || '').trim() === r.desc);
     if (!r.touched) r.include = !r.skip && !r.dupe;
   });
 }
-// Suggests division, task and contractor from earlier card payments with the same description.
-function renderStatements(P){
-  if (S.stmt && S.stmt.pid === P.project.id){ $('#main').innerHTML = importView(P, S.stmt); return; }
-  $('#main').innerHTML = `
-    <div class="page-h"><h2>Card Statements</h2></div>
-    <div class="card" style="padding:18px;max-width:640px">
-      <p style="margin:0 0 10px">Upload a CSV downloaded from your card website. Each charge is shown for review, and nothing is saved until you categorize the rows you want and press Save.</p>
-      <p class="small muted" style="margin:0 0 14px">Transactions already entered (same date, amount and description) are unchecked. Credits and payments are skipped. PDF statements cannot be read here.</p>
-      <button class="btn primary sm" data-act="import-stmt">Choose CSV File</button>
-      <input type="file" id="stmtIn" accept=".csv,text/csv" hidden>
-    </div>`;
-}
-function impPrepare(P, imp){
+// Suggests division, task and contractor from earlier card payments with the same description, for the rows just added.
+function impPrepare(P, imp, rows){
   const hist = new Map();
   P.pays.forEach(p => {
     const k = (p.notes || '').trim().toLowerCase();
@@ -1231,7 +1296,7 @@ function impPrepare(P, imp){
     const l = P.lines.find(x => x.id === p.budget_line_id);
     if (l) hist.set(k, {div: l.division_code, task: l.id, vendor: p.vendor_id || ''});
   });
-  imp.rows.forEach(r => {
+  rows.forEach(r => {
     const h = hist.get(r.desc.toLowerCase());
     r.div = h ? h.div : ''; r.task = h ? h.task : ''; r.vendor = h ? h.vendor : '';
     r.include = false; r.touched = false;
@@ -1259,28 +1324,66 @@ function impRowHtml(r, i){
     <td><span class="badge ${cls}">${esc(label)}</span></td>
   </tr>`;
 }
-function importView(P, imp){
-  const ready = imp.rows.filter(r => r.include && !r.skip && !r.err).length;
+// Reads one uploaded file and adds its rows to the review. Several files can be reviewed together.
+async function addStatement(file, kind){
+  const P = S.proj;
+  let parsed;
+  if (kind === 'PDF'){
+    const rows = parseCardPdf(await pdfTextLines(file));
+    if (!rows.length) throw new Error('No transactions were found in this PDF. Download the statement as CSV from your card website instead.');
+    parsed = {rows, split: false, sign: 'pos'};
+  } else parsed = parseStatement(await file.text());
+  const imp = S.stmt && S.stmt.pid === P.project.id ? S.stmt : {pid: P.project.id, files: [], rows: []};
+  const id = 'f' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+  imp.files.push({id, name: file.name, kind, split: parsed.split, sign: parsed.sign, count: parsed.rows.length});
+  const added = parsed.rows.map(r => ({...r, fileId: id, include: false, touched: false, div: '', task: '', vendor: ''}));
+  imp.rows.push(...added);
+  impPrepare(P, imp, added);
+  S.stmt = imp;
+  renderStatements(P);
+}
+function statementsView(P, imp){
+  const ready = imp.rows.filter(r => r.include && !r.skip && !r.err);
+  const readyTotal = ready.reduce((a, r) => a + r.amt, 0);
   const dupes = imp.rows.filter(r => r.dupe).length;
   const skipped = imp.rows.filter(r => r.skip).length;
+  const chips = imp.files.map(f => `
+    <span class="stmt-chip">
+      <span class="stmt-kind">${f.kind}</span>
+      <span class="stmt-name">${esc(f.name)}</span>
+      <span class="small muted">${f.count} rows</span>
+      ${f.split ? '' : `<label class="small">Charges as <select data-file="${f.id}" aria-label="Charges show as"><option value="pos" ${f.sign === 'pos' ? 'selected' : ''}>positive</option><option value="neg" ${f.sign === 'neg' ? 'selected' : ''}>negative</option></select></label>`}
+      <button class="icon-btn" data-act="stmt-remove" data-id="${f.id}" title="Remove this file" aria-label="Remove ${esc(f.name)}">×</button>
+    </span>`).join('');
+  const body = imp.rows.length
+    ? `<div class="small muted" style="margin:0 0 10px">${imp.rows.length} rows · ${ready.length} selected · ${money(readyTotal)} to save · ${dupes} already entered · ${skipped} credits or payments skipped</div>
+      <div class="card tx-wrap" style="padding:0;overflow-x:auto">
+        <table class="sheet-tbl tx-tbl" id="impTbl">
+          <thead><tr><th class="ctr">Save</th><th>Date</th><th>Description</th><th class="r">Amount</th><th>Expense Classification</th><th>Task</th><th>Paid To</th><th>Status</th></tr></thead>
+          <tbody>${imp.rows.map(impRowHtml).join('')}</tbody>
+        </table>
+      </div>`
+    : `<div class="card" style="padding:18px;max-width:640px"><p style="margin:0">Upload a statement to start. Each charge is listed for you to categorize. Nothing is saved until you press Save to Transactions.</p></div>`;
   return `
     <div class="page-h">
-      <h2>Review Card Statement</h2>
-      <div class="imp-acts">
-        <button class="btn sm" data-act="imp-cancel">Cancel Import</button>
-        <button class="btn primary sm" data-act="imp-save">Save ${ready} Transaction${ready === 1 ? '' : 's'}</button>
+      <h2>Card Statements</h2>
+      <div class="stmt-acts">
+        <button class="btn sm" data-act="stmt-csv" title="Upload a CSV from your card website">${ICON_CSV} Upload CSV</button>
+        <button class="btn sm" data-act="stmt-pdf" title="Upload a PDF statement">${ICON_PDF} Upload PDF</button>
+        ${imp.rows.length ? `<button class="btn primary sm" data-act="imp-save" ${ready.length ? '' : 'disabled'}>Save ${ready.length} to Transactions</button>` : ''}
       </div>
     </div>
-    <div class="small muted" style="margin:-4px 0 12px">${esc(imp.fileName)} · ${imp.rows.length} rows · ${dupes} already entered · ${skipped} credits or payments skipped. Nothing is saved until you press Save.</div>
-    ${imp.split ? '' : `<div class="tx-tools"><label class="small">Charges show as
-      <select id="impSign" aria-label="Charges show as"><option value="pos" ${imp.sign === 'pos' ? 'selected' : ''}>Positive numbers</option><option value="neg" ${imp.sign === 'neg' ? 'selected' : ''}>Negative numbers</option></select></label></div>`}
-    <div class="card tx-wrap" style="padding:0;overflow-x:auto">
-      <table class="sheet-tbl tx-tbl" id="impTbl">
-        <thead><tr><th class="ctr">Save</th><th>Date</th><th>Description</th><th class="r">Amount</th><th>Expense Classification</th><th>Task</th><th>Paid To</th><th>Status</th></tr></thead>
-        <tbody>${imp.rows.map(impRowHtml).join('')}</tbody>
-      </table>
-    </div>`;
+    ${imp.files.length ? `<div class="stmt-files">${chips}</div>` : ''}
+    ${body}
+    ${imp.files.length ? `<div class="stmt-foot"><button class="btn sm" data-act="imp-cancel">Clear All</button></div>` : ''}`;
 }
+function renderStatements(P){
+  const imp = S.stmt && S.stmt.pid === P.project.id ? S.stmt : null;
+  $('#main').innerHTML = (imp ? statementsView(P, imp) : statementsView(P, {files: [], rows: []})) + `
+    <input type="file" id="stmtCsvIn" accept=".csv,text/csv" hidden>
+    <input type="file" id="stmtPdfIn" accept="application/pdf,.pdf" hidden>`;
+}
+
 // Applies a choice to other rows with the same description, only where they are still empty.
 function impPropagate(imp, r, field, value){
   const key = r.desc.toLowerCase();
@@ -1308,7 +1411,7 @@ async function impSave(){
   }
   check(await sb.from('payments').insert(payload));
   S.stmt = null;
-  toast(`Saved ${payload.length} card transaction${payload.length === 1 ? '' : 's'}.`);
+  toast(`Saved ${payload.length} card transaction${payload.length === 1 ? '' : 's'} to Transactions.`);
   await render();
 }
 
@@ -2955,8 +3058,16 @@ const actions = {
   'new-division': () => divisionSheet(),
   'new-subtask': (t) => subtaskSheet(t.dataset.code),
   'export-csv': () => exportBudgetCsv(),
-  'import-stmt': () => $('#stmtIn').click(),
-  'imp-cancel': () => { S.stmt = null; renderStatements(S.proj); },
+  'stmt-csv': () => $('#stmtCsvIn').click(),
+  'stmt-pdf': () => $('#stmtPdfIn').click(),
+  'stmt-remove': (t, id) => {
+    const imp = S.stmt;
+    imp.files = imp.files.filter(f => f.id !== id);
+    imp.rows = imp.rows.filter(r => r.fileId !== id);
+    if (!imp.files.length) S.stmt = null;
+    renderStatements(S.proj);
+  },
+  'imp-cancel': () => { if (confirm('Remove all uploaded statements and your categories? Nothing has been saved.')){ S.stmt = null; renderStatements(S.proj); } },
   'imp-save': () => impSave()
 };
 
@@ -2981,23 +3092,17 @@ document.addEventListener('keydown', e => {
 // Remembers the value before a pick so a cancelled "+ New" can restore it.
 document.addEventListener('change', async e => {
   const t = e.target;
-  if (t.id === 'stmtIn'){
+  if (t.id === 'stmtCsvIn' || t.id === 'stmtPdfIn'){
     const f = t.files[0];
     t.value = '';
     if (!f || !S.proj) return;
-    try {
-      const parsed = parseStatement(await f.text());
-      const imp = {pid: S.proj.project.id, fileName: f.name, split: parsed.split, sign: parsed.sign, rows: parsed.rows};
-      impPrepare(S.proj, imp);
-      S.stmt = imp;
-      renderStatements(S.proj);
-    } catch (err) { toast(msg(err), true); }
+    try { await addStatement(f, t.id === 'stmtCsvIn' ? 'CSV' : 'PDF'); }
+    catch (err) { toast(msg(err), true); }
     return;
   }
-  if (t.id === 'impSign' && S.stmt && S.proj){
-    S.stmt.sign = t.value;
-    impRefresh(S.proj, S.stmt);
-    renderStatements(S.proj);
+  if (t.dataset.file && S.stmt && t.closest('.stmt-files')){
+    const f = S.stmt.files.find(x => x.id === t.dataset.file);
+    if (f){ f.sign = t.value; impRefresh(S.proj, S.stmt); renderStatements(S.proj); }
     return;
   }
   if (!t.closest || !t.closest('#impTbl') || !S.stmt) return;
