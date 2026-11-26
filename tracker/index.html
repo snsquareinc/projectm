@@ -407,6 +407,13 @@ dialog.sheet form{display:flex;flex-direction:column;gap:14px;padding:18px}
 .gate{max-width:380px;margin:12vh auto 0;padding:0 16px}
 .gate .card{margin-top:10px}
 .hidden{display:none !important}
+.stmt-acts{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.stmt-acts .btn svg{vertical-align:-2px;margin-right:4px}
+.stmt-files{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px}
+.stmt-chip{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--line);border-radius:999px;padding:4px 6px 4px 10px;background:#fff;font-size:13px}
+.stmt-chip select{font:inherit;font-size:12px;padding:2px 4px;border:1px solid var(--line);border-radius:6px}
+.stmt-kind{font-size:10px;font-weight:700;letter-spacing:.5px;color:var(--teal)}
+.stmt-foot{display:flex;justify-content:flex-end;margin-top:10px}
 </style>
 </head>
 <body>
@@ -667,12 +674,14 @@ async function renderProject(r){
       <a href="#/project/${pr.id}/schedule" ${r.tab === 'schedule' ? 'aria-current="page"' : ''}>Schedule</a>
       <a href="#/project/${pr.id}/payments" ${r.tab === 'payments' ? 'aria-current="page"' : ''}>Transactions</a>
       <a href="#/project/${pr.id}/contractors" ${r.tab === 'contractors' ? 'aria-current="page"' : ''}>Contractors</a>
+      <a href="#/project/${pr.id}/statements" ${r.tab === 'statements' ? 'aria-current="page"' : ''}>Card Statements</a>
       <a href="#/project/${pr.id}/draws" ${r.tab === 'draws' ? 'aria-current="page"' : ''}>Draws</a>
       <a href="#/project/${pr.id}/reports" ${r.tab === 'reports' ? 'aria-current="page"' : ''}>Reports</a>
       <a href="#/project/${pr.id}/files" ${r.tab === 'files' ? 'aria-current="page"' : ''}>Files</a>
       <a href="#/project/${pr.id}/photos" ${r.tab === 'photos' ? 'aria-current="page"' : ''}>Photos</a>
     </div>`);
   if (r.tab === 'payments') renderPayments(P);
+  else if (r.tab === 'statements') renderStatements(P);
   else if (r.tab === 'contractors') renderContractors(P);
   else if (r.tab === 'draws') renderDraws(P);
   else if (r.tab === 'reports') renderReports(P);
@@ -1142,6 +1151,268 @@ function renderPayments(P){
     </div>
     <div class="tx-cards" id="txCards"></div>`;
   txFill(P);
+}
+
+// ---------- Card statements ----------
+// Upload card statements (CSV or PDF), categorize each charge, then save the ones you choose to Transactions.
+// Nothing is saved until "Save to Transactions". Rows already entered (same date, amount and description, method Card) are unchecked.
+const PDFJS_URL = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@6.2.108/build/pdf.min.mjs';
+let pdfjsReady = null;
+// Loads pdf.js only when a PDF is uploaded. The worker is copied into a same-origin blob so it can run.
+function loadPdfJs(){
+  if (!pdfjsReady) pdfjsReady = (async () => {
+    const lib = await import(PDFJS_URL);
+    const code = await fetch(PDFJS_URL.replace('pdf.min.mjs', 'pdf.worker.min.mjs')).then(r => r.text());
+    lib.GlobalWorkerOptions.workerSrc = URL.createObjectURL(new Blob([code], {type: 'text/javascript'}));
+    return lib;
+  })().catch(e => { pdfjsReady = null; throw e; });
+  return pdfjsReady;
+}
+// Text of a PDF as lines, with items on the same height joined left to right.
+async function pdfTextLines(file){
+  const lib = await loadPdfJs();
+  const doc = await lib.getDocument({data: new Uint8Array(await file.arrayBuffer())}).promise;
+  const lines = [];
+  for (let n = 1; n <= doc.numPages; n++){
+    const content = await (await doc.getPage(n)).getTextContent();
+    const bands = [];
+    content.items.filter(it => it.str && it.str.trim()).forEach(it => {
+      const y = Math.round(it.transform[5]);
+      let band = bands.find(b => Math.abs(b.y - y) <= 2);
+      if (!band){ band = {y, items: []}; bands.push(band); }
+      band.items.push({s: it.str, x: it.transform[4], w: it.width || 0});
+    });
+    bands.sort((a, b) => b.y - a.y).forEach(band => {
+      band.items.sort((a, b) => a.x - b.x);
+      let text = '', end = null;
+      band.items.forEach(it => {
+        if (end !== null) text += it.x - end > 6 ? '   ' : ' ';
+        text += it.s;
+        end = it.x + it.w;
+      });
+      lines.push(text.trim());
+    });
+  }
+  return lines;
+}
+const MONTHS = {Jan: 0, Feb: 1, Mar: 2, Apr: 3, May: 4, Jun: 5, Jul: 6, Aug: 7, Sep: 8, Oct: 9, Nov: 10, Dec: 11};
+// Reads "Mon DD  Mon DD  description  $amount" lines (transaction date, posting date, description, amount).
+// Credits show as "- $amount". The year comes from the statement period.
+function parseCardPdf(lines){
+  const per = lines.map(l => l.match(/([A-Z][a-z]{2}) (\d{1,2}), (\d{4})\s*-\s*([A-Z][a-z]{2}) (\d{1,2}), (\d{4})/)).find(Boolean);
+  const start = per ? new Date(+per[3], MONTHS[per[1]], +per[2]) : null;
+  const end = per ? new Date(+per[6], MONTHS[per[4]], +per[5]) : null;
+  const DAY = 86400000;
+  const pat = /^([A-Z][a-z]{2}) (\d{1,2})\s+[A-Z][a-z]{2} \d{1,2}\s+(.+?)\s+(-\s*)?\$([\d,]+\.\d{2})\s*$/;
+  const rows = [];
+  lines.forEach(l => {
+    const m = l.match(pat);
+    if (!m || !(m[1] in MONTHS)) return;
+    const month = MONTHS[m[1]], day = +m[2];
+    let year = end ? end.getFullYear() : new Date().getFullYear();
+    if (end){
+      const c = new Date(year, month, day).getTime();
+      if (c > end.getTime() + 31 * DAY) year -= 1;
+      else if (start && c < start.getTime() - 31 * DAY) year += 1;
+    }
+    const date = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    const raw = Number(m[5].replace(/,/g, '')) * (m[4] ? -1 : 1);
+    rows.push({date, desc: m[3].trim().replace(/\s+/g, ' '), raw, err: ''});
+  });
+  return rows;
+}
+const ICON_CSV = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M9 4v16"/></svg>`;
+const ICON_PDF = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M14 3H6v18h12V7z"/><path d="M14 3v4h4"/><path d="M9 15h6M9 12h2"/></svg>`;
+
+function parseCsv(text){
+  const rows = []; let row = [], field = '', quoted = false;
+  text = String(text).replace(/^﻿/, '');
+  for (let i = 0; i < text.length; i++){
+    const c = text[i];
+    if (quoted){
+      if (c === '"'){ if (text[i + 1] === '"'){ field += '"'; i++; } else quoted = false; }
+      else field += c;
+    } else if (c === '"') quoted = true;
+    else if (c === ','){ row.push(field); field = ''; }
+    else if (c === '\n' || c === '\r'){
+      if (c === '\r' && text[i + 1] === '\n') i++;
+      row.push(field); rows.push(row); row = []; field = '';
+    } else field += c;
+  }
+  if (field || row.length){ row.push(field); rows.push(row); }
+  return rows.filter(r => r.some(x => x.trim() !== ''));
+}
+function parseStatementMoney(s){
+  const t0 = String(s || '').trim();
+  if (!t0) return null;
+  const neg = /^\(.*\)$/.test(t0) || t0.includes('-');
+  const n = Number(t0.replace(/[()$,\s-]/g, ''));
+  if (!isFinite(n) || t0.replace(/[()$,\s-]/g, '') === '') return null;
+  return neg ? -n : n;
+}
+function parseStatement(text){
+  const grid = parseCsv(text);
+  if (grid.length < 2) throw new Error('This file has no transactions in it.');
+  const H = grid[0].map(h => h.trim().toLowerCase());
+  const find = re => H.findIndex(h => re.test(h));
+  let dateI = find(/^(transaction |trans |purchase )?date$/);
+  if (dateI < 0) dateI = find(/date/);
+  const descI = find(/description|merchant|payee|details/);
+  const amtI = find(/^amount/);
+  const debI = find(/^debit/), creI = find(/^credit/);
+  const split = amtI < 0 && debI >= 0 && creI >= 0;
+  if (dateI < 0 || descI < 0 || (amtI < 0 && !split)){
+    throw new Error('Could not find Date, Description and Amount columns. Download the statement as CSV from your card website (PDF files cannot be read here).');
+  }
+  const rows = grid.slice(1).map(c => {
+    const desc = String(c[descI] || '').trim().replace(/\s+/g, ' ');
+    let date = null, err = '';
+    try { date = parseTypedDate(String(c[dateI] || '').trim()); } catch (e) { err = 'Date not recognized'; }
+    const raw = split
+      ? (parseStatementMoney(c[debI]) || 0) - (parseStatementMoney(c[creI]) || 0)
+      : parseStatementMoney(c[amtI]);
+    if (raw == null && !err) err = 'Amount not recognized';
+    return {date, desc, raw: raw ?? 0, err};
+  });
+  const neg = rows.filter(r => r.raw < 0).length, pos = rows.filter(r => r.raw > 0).length;
+  return {rows, split, sign: neg > pos ? 'neg' : 'pos'};
+}
+// Recomputes amounts, skips and duplicates. Each row follows its own file's sign setting.
+function impRefresh(P, imp){
+  imp.rows.forEach(r => {
+    const f = (imp.files && imp.files.find(x => x.id === r.fileId)) || imp;
+    r.amt = r.err ? 0 : (f.split || f.sign === 'pos' ? r.raw : -r.raw);
+    r.skip = !!r.err || r.amt <= 0;
+    r.dupe = !r.skip && P.pays.some(p => p.method === 'Card' && p.pay_date === r.date && num(p.amount) === r.amt && (p.notes || '').trim() === r.desc);
+    if (!r.touched) r.include = !r.skip && !r.dupe;
+  });
+}
+// Suggests division, task and contractor from earlier card payments with the same description, for the rows just added.
+function impPrepare(P, imp, rows){
+  const hist = new Map();
+  P.pays.forEach(p => {
+    const k = (p.notes || '').trim().toLowerCase();
+    if (!k || !p.budget_line_id || hist.has(k)) return;
+    const l = P.lines.find(x => x.id === p.budget_line_id);
+    if (l) hist.set(k, {div: l.division_code, task: l.id, vendor: p.vendor_id || ''});
+  });
+  rows.forEach(r => {
+    const h = hist.get(r.desc.toLowerCase());
+    r.div = h ? h.div : ''; r.task = h ? h.task : ''; r.vendor = h ? h.vendor : '';
+    r.include = false; r.touched = false;
+  });
+  impRefresh(P, imp);
+}
+function impStatus(r){
+  if (r.err) return [r.err, 'b-bad'];
+  if (r.skip) return ['Credit or payment', 'b-mute'];
+  if (r.dupe) return ['Already entered', 'b-mute'];
+  if (r.div && !r.task) return ['Pick a task', 'b-warn'];
+  if (!r.div) return ['Unclassified', 'b-warn'];
+  return ['Ready', 'b-ok'];
+}
+function impRowHtml(r, i){
+  const [label, cls] = impStatus(r);
+  return `<tr class="tx-edit ${r.skip || r.dupe ? 'tx-unc' : ''}" data-i="${i}">
+    <td class="ctr"><input type="checkbox" data-imp="include" ${r.include ? 'checked' : ''} ${r.skip ? 'disabled' : ''} aria-label="Save this row"></td>
+    <td>${r.date ? fmtDate(r.date) : '—'}</td>
+    <td>${esc(r.desc)}</td>
+    <td class="r">${money(r.amt)}</td>
+    <td><select data-imp="div" aria-label="Expense classification (division)"><option value="">Choose A Division</option>${divOptions(r.div)}</select></td>
+    <td><select data-imp="task" aria-label="Task">${taskOptions(r.div, r.task)}</select></td>
+    <td><select data-imp="vendor" aria-label="Paid to">${vendorOptions(r.vendor)}</select></td>
+    <td><span class="badge ${cls}">${esc(label)}</span></td>
+  </tr>`;
+}
+// Reads one uploaded file and adds its rows to the review. Several files can be reviewed together.
+async function addStatement(file, kind){
+  const P = S.proj;
+  let parsed;
+  if (kind === 'PDF'){
+    const rows = parseCardPdf(await pdfTextLines(file));
+    if (!rows.length) throw new Error('No transactions were found in this PDF. Download the statement as CSV from your card website instead.');
+    parsed = {rows, split: false, sign: 'pos'};
+  } else parsed = parseStatement(await file.text());
+  const imp = S.stmt && S.stmt.pid === P.project.id ? S.stmt : {pid: P.project.id, files: [], rows: []};
+  const id = 'f' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+  imp.files.push({id, name: file.name, kind, split: parsed.split, sign: parsed.sign, count: parsed.rows.length});
+  const added = parsed.rows.map(r => ({...r, fileId: id, include: false, touched: false, div: '', task: '', vendor: ''}));
+  imp.rows.push(...added);
+  impPrepare(P, imp, added);
+  S.stmt = imp;
+  renderStatements(P);
+}
+function statementsView(P, imp){
+  const ready = imp.rows.filter(r => r.include && !r.skip && !r.err);
+  const readyTotal = ready.reduce((a, r) => a + r.amt, 0);
+  const dupes = imp.rows.filter(r => r.dupe).length;
+  const skipped = imp.rows.filter(r => r.skip).length;
+  const chips = imp.files.map(f => `
+    <span class="stmt-chip">
+      <span class="stmt-kind">${f.kind}</span>
+      <span class="stmt-name">${esc(f.name)}</span>
+      <span class="small muted">${f.count} rows</span>
+      ${f.split ? '' : `<label class="small">Charges as <select data-file="${f.id}" aria-label="Charges show as"><option value="pos" ${f.sign === 'pos' ? 'selected' : ''}>positive</option><option value="neg" ${f.sign === 'neg' ? 'selected' : ''}>negative</option></select></label>`}
+      <button class="icon-btn" data-act="stmt-remove" data-id="${f.id}" title="Remove this file" aria-label="Remove ${esc(f.name)}">×</button>
+    </span>`).join('');
+  const body = imp.rows.length
+    ? `<div class="small muted" style="margin:0 0 10px">${imp.rows.length} rows · ${ready.length} selected · ${money(readyTotal)} to save · ${dupes} already entered · ${skipped} credits or payments skipped</div>
+      <div class="card tx-wrap" style="padding:0;overflow-x:auto">
+        <table class="sheet-tbl tx-tbl" id="impTbl">
+          <thead><tr><th class="ctr">Save</th><th>Date</th><th>Description</th><th class="r">Amount</th><th>Expense Classification</th><th>Task</th><th>Paid To</th><th>Status</th></tr></thead>
+          <tbody>${imp.rows.map(impRowHtml).join('')}</tbody>
+        </table>
+      </div>`
+    : `<div class="card" style="padding:18px;max-width:640px"><p style="margin:0">Upload a statement to start. Each charge is listed for you to categorize. Nothing is saved until you press Save to Transactions.</p></div>`;
+  return `
+    <div class="page-h">
+      <h2>Card Statements</h2>
+      <div class="stmt-acts">
+        <button class="btn sm" data-act="stmt-csv" title="Upload a CSV from your card website">${ICON_CSV} Upload CSV</button>
+        <button class="btn sm" data-act="stmt-pdf" title="Upload a PDF statement">${ICON_PDF} Upload PDF</button>
+        ${imp.rows.length ? `<button class="btn primary sm" data-act="imp-save" ${ready.length ? '' : 'disabled'}>Save ${ready.length} to Transactions</button>` : ''}
+      </div>
+    </div>
+    ${imp.files.length ? `<div class="stmt-files">${chips}</div>` : ''}
+    ${body}
+    ${imp.files.length ? `<div class="stmt-foot"><button class="btn sm" data-act="imp-cancel">Clear All</button></div>` : ''}`;
+}
+function renderStatements(P){
+  const imp = S.stmt && S.stmt.pid === P.project.id ? S.stmt : null;
+  $('#main').innerHTML = (imp ? statementsView(P, imp) : statementsView(P, {files: [], rows: []})) + `
+    <input type="file" id="stmtCsvIn" accept=".csv,text/csv" hidden>
+    <input type="file" id="stmtPdfIn" accept="application/pdf,.pdf" hidden>`;
+}
+
+// Applies a choice to other rows with the same description, only where they are still empty.
+function impPropagate(imp, r, field, value){
+  const key = r.desc.toLowerCase();
+  imp.rows.forEach(x => {
+    if (x === r || x.skip || x.desc.toLowerCase() !== key) return;
+    if (field === 'div' && !x.div){ x.div = value; x.task = ''; }
+    if (field === 'task' && !x.task && x.div === r.div) x.task = value;
+    if (field === 'vendor' && !x.vendor) x.vendor = value;
+  });
+}
+async function impSave(){
+  const P = S.proj, imp = S.stmt;
+  if (!imp || imp.pid !== P.project.id) return;
+  const rows = imp.rows.filter(r => r.include && !r.skip && !r.err);
+  if (!rows.length) throw new Error('Nothing is selected to save.');
+  const bad = rows.find(r => r.div && !r.task);
+  if (bad) throw new Error(`Pick a task for "${bad.desc}", or clear its division.`);
+  const payload = [];
+  for (const r of rows){
+    const lineId = r.div && r.task ? (await resolveLineId(P, r.task, r.div)).lineId : null;
+    payload.push({
+      project_id: P.project.id, vendor_id: r.vendor || null, budget_line_id: lineId,
+      pay_date: r.date, amount: r.amt, method: 'Card', reference: '', invoice_number: '', notes: r.desc
+    });
+  }
+  check(await sb.from('payments').insert(payload));
+  S.stmt = null;
+  toast(`Saved ${payload.length} card transaction${payload.length === 1 ? '' : 's'} to Transactions.`);
+  await render();
 }
 
 // ---------- Draws (bank funding requests) ----------
@@ -2786,7 +3057,18 @@ const actions = {
   'open-vendor': (t, id) => vendorSheet(S.vendors.find(v => v.id === id)),
   'new-division': () => divisionSheet(),
   'new-subtask': (t) => subtaskSheet(t.dataset.code),
-  'export-csv': () => exportBudgetCsv()
+  'export-csv': () => exportBudgetCsv(),
+  'stmt-csv': () => $('#stmtCsvIn').click(),
+  'stmt-pdf': () => $('#stmtPdfIn').click(),
+  'stmt-remove': (t, id) => {
+    const imp = S.stmt;
+    imp.files = imp.files.filter(f => f.id !== id);
+    imp.rows = imp.rows.filter(r => r.fileId !== id);
+    if (!imp.files.length) S.stmt = null;
+    renderStatements(S.proj);
+  },
+  'imp-cancel': () => { if (confirm('Remove all uploaded statements and your categories? Nothing has been saved.')){ S.stmt = null; renderStatements(S.proj); } },
+  'imp-save': () => impSave()
 };
 
 document.addEventListener('click', async e => {
@@ -2808,6 +3090,35 @@ document.addEventListener('keydown', e => {
 });
 
 // Remembers the value before a pick so a cancelled "+ New" can restore it.
+document.addEventListener('change', async e => {
+  const t = e.target;
+  if (t.id === 'stmtCsvIn' || t.id === 'stmtPdfIn'){
+    const f = t.files[0];
+    t.value = '';
+    if (!f || !S.proj) return;
+    try { await addStatement(f, t.id === 'stmtCsvIn' ? 'CSV' : 'PDF'); }
+    catch (err) { toast(msg(err), true); }
+    return;
+  }
+  if (t.dataset.file && S.stmt && t.closest('.stmt-files')){
+    const f = S.stmt.files.find(x => x.id === t.dataset.file);
+    if (f){ f.sign = t.value; impRefresh(S.proj, S.stmt); renderStatements(S.proj); }
+    return;
+  }
+  if (!t.closest || !t.closest('#impTbl') || !S.stmt) return;
+  const r = S.stmt.rows[+t.closest('tr[data-i]').dataset.i];
+  if (t.dataset.imp === 'include'){ r.include = t.checked; r.touched = true; renderStatements(S.proj); return; }
+  const field = t.dataset.imp;
+  if (t.value === '__new'){
+    toast('Add the contractor or task first in the Transactions table, then import again.', true);
+    t.value = r[field] || '';
+    return;
+  }
+  r[field] = t.value;
+  if (field === 'div') r.task = '';
+  impPropagate(S.stmt, r, field, t.value);
+  renderStatements(S.proj);
+});
 document.addEventListener('input', keepDraft);
 document.addEventListener('change', keepDraft);
 document.addEventListener('focusin', e => {
@@ -3154,6 +3465,7 @@ function renderSide(r){
         ${link(`#/project/${id}/budget`, 'Budget', r.tab === 'budget', 'child')}
         ${link(`#/project/${id}/schedule`, 'Schedule', r.tab === 'schedule', 'child')}
         ${link(`#/project/${id}/payments`, 'Transactions', r.tab === 'payments', 'child')}
+        ${link(`#/project/${id}/statements`, 'Card Statements', r.tab === 'statements', 'child')}
         ${link(`#/project/${id}/contractors`, 'Contractors', r.tab === 'contractors', 'child')}
         ${link(`#/project/${id}/draws`, 'Draws', r.tab === 'draws', 'child')}
         ${link(`#/project/${id}/reports`, 'Reports', r.tab === 'reports', 'child')}
