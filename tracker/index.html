@@ -1307,8 +1307,7 @@ function impStatus(r){
   if (r.err) return [r.err, 'b-bad'];
   if (r.skip) return ['Credit or payment', 'b-mute'];
   if (r.dupe) return ['Already entered', 'b-mute'];
-  if (r.div && !r.task) return ['Pick a task', 'b-warn'];
-  if (!r.div) return ['Unclassified', 'b-warn'];
+  if (!r.div || !r.task) return ['Needs division and task', 'b-warn'];
   return ['Ready', 'b-ok'];
 }
 function impRowHtml(r, i){
@@ -1343,7 +1342,7 @@ async function addStatement(file, kind){
   renderStatements(P);
 }
 function statementsView(P, imp){
-  const ready = imp.rows.filter(r => r.include && !r.skip && !r.err);
+  const ready = impReady(imp);
   const readyTotal = ready.reduce((a, r) => a + r.amt, 0);
   const dupes = imp.rows.filter(r => r.dupe).length;
   const skipped = imp.rows.filter(r => r.skip).length;
@@ -1394,13 +1393,18 @@ function impPropagate(imp, r, field, value){
     if (field === 'vendor' && !x.vendor) x.vendor = value;
   });
 }
+// A payment must have a budget line in the database, so a row saves only with a division and task.
+function impReady(imp){
+  return imp.rows.filter(r => r.include && !r.skip && !r.err && r.div && r.task);
+}
 async function impSave(){
   const P = S.proj, imp = S.stmt;
   if (!imp || imp.pid !== P.project.id) return;
-  const rows = imp.rows.filter(r => r.include && !r.skip && !r.err);
-  if (!rows.length) throw new Error('Nothing is selected to save.');
-  const bad = rows.find(r => r.div && !r.task);
-  if (bad) throw new Error(`Pick a task for "${bad.desc}", or clear its division.`);
+  const selected = imp.rows.filter(r => r.include && !r.skip && !r.err);
+  if (!selected.length) throw new Error('Nothing is selected to save.');
+  const missing = selected.filter(r => !(r.div && r.task));
+  if (missing.length) throw new Error(`${missing.length} selected row${missing.length === 1 ? '' : 's'} need a division and task. Categorize ${missing.length === 1 ? 'it' : 'them'} or uncheck ${missing.length === 1 ? 'it' : 'them'}.`);
+  const rows = selected;
   const payload = [];
   for (const r of rows){
     const lineId = r.div && r.task ? (await resolveLineId(P, r.task, r.div)).lineId : null;
